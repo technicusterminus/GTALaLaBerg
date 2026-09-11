@@ -11,6 +11,7 @@
 #include "LaLaBergWaffe.h"
 #include "EngineUtils.h"
 #include "GameFramework/PlayerController.h"
+#include "Sound/SoundBase.h"
 
 ALaLaBergCharacter::ALaLaBergCharacter() {
  Kamera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
@@ -41,6 +42,21 @@ void ALaLaBergCharacter::BeginPlay() {
 void ALaLaBergCharacter::Tick(float DeltaSeconds) {
  Super::Tick(DeltaSeconds);
  if (bFeuerKnopf) Feuern();
+ PruefeSchritt(DeltaSeconds);
+}
+
+// Weg statt Zeit als Takt: schneller gehen heisst schneller wiederkehrende
+// Tritte, nicht nur ein Metronom im Hintergrund.
+void ALaLaBergCharacter::PruefeSchritt(float Zeit) {
+ if (!GetCharacterMovement() || GetCharacterMovement()->MovementMode != MOVE_Walking) { SchrittWeg = 0.0f; return; }
+ const float Tempo = GetVelocity().Size2D();
+ if (Tempo < 20.0f) { SchrittWeg = 0.0f; return; }
+ SchrittWeg += Tempo * Zeit;
+ constexpr float Schrittlaenge = 140.0f;
+ if (SchrittWeg < Schrittlaenge) return;
+ SchrittWeg = 0.0f;
+ if (auto* Sound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Audio/SFX_Schritt.SFX_Schritt")))
+  UGameplayStatics::PlaySoundAtLocation(this, Sound, GetActorLocation(), 0.7f, FMath::FRandRange(0.9f, 1.1f));
 }
 
 void ALaLaBergCharacter::WarteAufBoden() {

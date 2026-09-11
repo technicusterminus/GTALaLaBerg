@@ -8,6 +8,8 @@
 #include "Kismet/GameplayStatics.h"
 #include "LaLaBergFarbbar.h"
 #include "LaLaBergGameMode.h"
+#include "LaLaBergEinschlagblitz.h"
+#include "Sound/SoundBase.h"
 
 namespace {
  // Kleine Vollkugel aus Breiten- und Laengenringen - genuegt bei 1-6 cm
@@ -106,6 +108,10 @@ void ALaLaBergFarbkugel::Aufprall(UPrimitiveComponent* TroffeneKomponente, AActo
    if (auto* Dyn = Decal->CreateDynamicMaterialInstance()) Dyn->SetVectorParameterValue(TEXT("Farbe"), Farbe);
   }
  }
+ if (auto* Sound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Audio/SFX_Klecks.SFX_Klecks")))
+  UGameplayStatics::PlaySoundAtLocation(this, Sound, Treffer.Location, 1.0f, FMath::FRandRange(0.92f, 1.08f));
+ if (auto* Blitz = GetWorld()->SpawnActor<ALaLaBergEinschlagblitz>(Treffer.Location, FRotator::ZeroRotator))
+  Blitz->Einrichten(Farbe, 3500.0f, 220.0f, 0.10f);
  if (auto* Reaktion = Cast<ILaLaBergFarbbar>(AndererActor)) Reaktion->ErhalteFarbe(Farbe, GetVelocity());
  if (auto* Modus = Cast<ALaLaBergGameMode>(UGameplayStatics::GetGameMode(this))) Modus->ZaehleFarbtreffer();
  UE_LOG(LogTemp, Display, TEXT("LALABERG_FARBKLECKS bei %s auf %s"), *Treffer.Location.ToString(),

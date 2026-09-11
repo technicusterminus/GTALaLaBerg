@@ -39,4 +39,10 @@ private:
  bool bFeuerKnopf = false;
  void FeuerStart() { bFeuerKnopf = true; Feuern(); }
  void FeuerStop() { bFeuerKnopf = false; }
+
+ // Schrittsound: nicht an eine Animation gekoppelt (es gibt kein Skelett-Mesh
+ // fuer die Spielfigur), sondern rein an die zurueckgelegte Strecke am Boden -
+ // alle ~140 cm ein Tritt, wie ein durchschnittlicher Schritt.
+ void PruefeSchritt(float Zeit);
+ float SchrittWeg = 0.0f;
 };

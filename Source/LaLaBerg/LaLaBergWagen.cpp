@@ -13,6 +13,9 @@
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
 #include "LaLaBergWagenForm.h"
+#include "Components/AudioComponent.h"
+#include "Sound/SoundBase.h"
+#include "Kismet/GameplayStatics.h"
 
 namespace {
  // Dieselben neun Querschnitte wie bei den geparkten Wagen, in Zentimetern.
@@ -125,6 +128,12 @@ ALaLaBergWagen::ALaLaBergWagen() {
 
  Kamera = CreateDefaultSubobject<UCameraComponent>(TEXT("Kamera"));
  Kamera->SetupAttachment(Ausleger);
+
+ // Leerlaufbrummen, das mit Tempo/Gas in Tonhoehe und Lautstaerke steigt -
+ // ein einzelner schleifenfaehiger Klang genuegt, siehe Tick().
+ Motorklang = CreateDefaultSubobject<UAudioComponent>(TEXT("Motorklang"));
+ Motorklang->SetupAttachment(Rumpf);
+ Motorklang->bAutoActivate = false;
 }
 
 void ALaLaBergWagen::BeginPlay() {
@@ -143,6 +152,10 @@ void ALaLaBergWagen::BeginPlay() {
  Rumpf->WakeAllRigidBodies();
  BaueKarosserie();
  bGebaut = true;
+ if (auto* Sound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Audio/SFX_Motor.SFX_Motor"))) {
+  Motorklang->SetSound(Sound);
+  Motorklang->Play();
+ }
 }
 
 // Die Form der geparkten Wagen, aus prepare-wagen.cjs: Radkaesten, Fenster,
@@ -315,4 +328,12 @@ void ALaLaBergWagen::Tick(float Zeit) {
  const float Wirkung = FMath::Clamp(FMath::Abs(VorwaertsTempo) / 700.0f, 0.0f, 1.0f);
  const float Richtung = VorwaertsTempo >= 0 ? 1.0f : -1.0f;
  Rumpf->AddTorqueInRadians(Oben * Lenkung * Richtung * Wirkung * 5.4e8f * Anteil);
+
+ // Motorklang: Leerlauf brummt leise und tief, Vollgas hoch und laut - aus
+ // Gaspedal (sofort) und Tempo (traege) gemischt, wie eine Drehzahl.
+ if (Motorklang && Motorklang->IsPlaying()) {
+  const float Drehzahl = FMath::Clamp(FMath::Abs(GasWert) * 0.6f + FMath::Abs(VorwaertsTempo) / Grenze * 0.4f, 0.0f, 1.0f);
+  Motorklang->SetPitchMultiplier(FMath::Lerp(0.6f, 1.8f, Drehzahl));
+  Motorklang->SetVolumeMultiplier(FMath::Lerp(0.35f, 1.0f, Drehzahl));
+ }
 }

@@ -57,6 +57,7 @@ private:
  UPROPERTY() TObjectPtr<class UProceduralMeshComponent> Netz = nullptr;
  UPROPERTY() TObjectPtr<class USpringArmComponent> Ausleger = nullptr;
  UPROPERTY() TObjectPtr<class UCameraComponent> Kamera = nullptr;
+ UPROPERTY() TObjectPtr<class UAudioComponent> Motorklang = nullptr;
 
  UPROPERTY() TObjectPtr<class ACharacter> Fahrer = nullptr;
  FLinearColor Lack = FLinearColor(0.72f, 0.74f, 0.76f);

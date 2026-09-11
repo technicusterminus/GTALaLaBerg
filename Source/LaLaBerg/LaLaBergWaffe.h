@@ -41,4 +41,9 @@ private:
  ELaLaBergWaffenArt Art = ELaLaBergWaffenArt::Pistole;
  float LetzterSchuss = -10.0f;
  int32 SchussZahl = 0;
+
+ // Sichtbarer/hoerbarer Rueckstoss: der Lauf kickt auf Schuss kurz nach oben
+ // und klingt wieder ab, dazu ein Muendungsblitz und ein Schusssound je
+ // Waffenart (Tonhoehe/Lautstaerke aus derselben Kennzahl wie die Ballistik).
+ float RueckstossGrad = 0.0f;
 };

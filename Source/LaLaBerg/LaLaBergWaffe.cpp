@@ -2,7 +2,10 @@
 #include "ProceduralMeshComponent.h"
 #include "Materials/MaterialInterface.h"
 #include "LaLaBergFarbkugel.h"
+#include "LaLaBergEinschlagblitz.h"
 #include "Engine/World.h"
+#include "Kismet/GameplayStatics.h"
+#include "Sound/SoundBase.h"
 
 namespace {
  // Kasten und Zylinder, Sichtseiten nach aussen, eigene Eckpunkte je Flaeche
@@ -79,13 +82,17 @@ namespace {
   float StreuungGrad;    // Kegeloeffnung um die Zielrichtung
   float KugelRadius;
   float KleckMin, KleckMax;
+  float RueckstossGrad;  // Rueckstosskick des Laufs, in Grad
+  float MuendungX;       // Muendungsort lokal auf der Laufachse, fuer Blitz und Sound
+  float TonHoehe;        // Wiedergabetonhoehe des Schusssounds (Feuerrate/Kaliber-Gefuehl)
+  const TCHAR* SoundName;
  };
  const FKennzahl& Kennzahl(ELaLaBergWaffenArt Art) {
   static const FKennzahl T[] = {
-   /* Pistole       */ { 0.28f, 3200.f, 0.55f, 1, 0.6f,  1.4f,  9.f, 15.f },
-   /* Maschine      */ { 0.09f, 3600.f, 0.55f, 1, 2.2f,  1.2f,  7.f, 12.f },
-   /* Schrotflinte  */ { 0.75f, 2400.f, 0.60f, 7, 8.5f,  0.9f,  5.f,  9.f },
-   /* Raketenwerfer */ { 1.40f, 1500.f, 0.35f, 1, 0.0f,  6.0f, 42.f, 58.f },
+   /* Pistole       */ { 0.28f, 3200.f, 0.55f, 1, 0.6f,  1.4f,  9.f, 15.f, 3.2f, 22.5f, 1.05f, TEXT("SFX_Schuss_Pistole") },
+   /* Maschine      */ { 0.09f, 3600.f, 0.55f, 1, 2.2f,  1.2f,  7.f, 12.f, 2.0f, 34.0f, 1.10f, TEXT("SFX_Schuss_Maschine") },
+   /* Schrotflinte  */ { 0.75f, 2400.f, 0.60f, 7, 8.5f,  0.9f,  5.f,  9.f, 6.5f, 34.0f, 0.95f, TEXT("SFX_Schuss_Schrot") },
+   /* Raketenwerfer */ { 1.40f, 1500.f, 0.35f, 1, 0.0f,  6.0f, 42.f, 58.f, 9.0f, 26.5f, 1.00f, TEXT("SFX_Schuss_Rakete") },
   };
   return T[static_cast<uint8>(Art)];
  }
@@ -193,6 +200,12 @@ void ALaLaBergWaffe::BeginPlay() {
 void ALaLaBergWaffe::Tick(float Zeit) {
  Super::Tick(Zeit);
  if (const AActor* Halter = GetOwner()) SetActorHiddenInGame(Halter->IsHidden());
+ // Rueckstoss klingt zuegig ab - der Lauf soll sichtbar hochschlagen und
+ // gleich wieder auf Ziellinie sein, nicht lange nachwackeln.
+ if (RueckstossGrad > 0.001f) {
+  RueckstossGrad = FMath::FInterpTo(RueckstossGrad, 0.0f, Zeit, 14.0f);
+  Netz->SetRelativeRotation(FRotator(RueckstossGrad, 0, 0));
+ }
 }
 
 bool ALaLaBergWaffe::Feuern(const FVector& Ort, const FVector& Richtung) {
@@ -218,6 +231,16 @@ bool ALaLaBergWaffe::Feuern(const FVector& Ort, const FVector& Richtung) {
   }
  }
  for (ALaLaBergFarbkugel* A : Salve) for (ALaLaBergFarbkugel* B : Salve) if (A != B) A->IgnoriereGeschwister(B);
+
+ // Rueckstoss, Sound und Muendungsblitz - dieselbe Kennzahl wie die
+ // Ballistik gibt auch hier den Ausschlag je Waffenart vor.
+ RueckstossGrad = FMath::Min(K.RueckstossGrad * 2.2f, RueckstossGrad + K.RueckstossGrad);
+ if (auto* Sound = LoadObject<USoundBase>(nullptr, *FString::Printf(TEXT("/Game/Audio/%s.%s"), K.SoundName, K.SoundName)))
+  UGameplayStatics::PlaySoundAtLocation(this, Sound, Ort, 1.0f, K.TonHoehe * FMath::FRandRange(0.97f, 1.03f));
+ const FVector MuendungOrt = Netz->GetComponentTransform().TransformPosition(FVector(K.MuendungX, 0, 0));
+ if (auto* Blitz = GetWorld()->SpawnActor<ALaLaBergEinschlagblitz>(MuendungOrt, FRotator::ZeroRotator))
+  Blitz->Einrichten(FLinearColor(1.0f, 0.86f, 0.55f), 6000.0f, 320.0f, 0.06f);
+
  SchussZahl++;
  return true;
 }
