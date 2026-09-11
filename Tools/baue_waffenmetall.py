@@ -74,9 +74,14 @@ bild = hole_textur("T_Waffenmetall_D")
 basis_quelle, basis_ausgang = farbe, ""
 rau_konstante = 0.32
 if bild is not None:
+    # Die Waffen-UVs (P.X/40, P.Y/40 in LaLaBergWaffe.cpp) decken nur einen
+    # winzigen Bereich um 0 ab - mit einer kleinen Kachelzahl wuerde eine
+    # einzelne Textur-Wiederholung ueber das halbe Modell gestreckt und aus
+    # feinen Riefen wurden grobe, brettartige Streifen. Erst eine hohe
+    # Kachelzahl ergibt bei FPS-Nahdistanz feine, glaubwuerdige Riefen.
     uv = knoten(unreal.MaterialExpressionTextureCoordinate, -900, 200)
-    uv.set_editor_property("u_tiling", 3.0)
-    uv.set_editor_property("v_tiling", 3.0)
+    uv.set_editor_property("u_tiling", 80.0)
+    uv.set_editor_property("v_tiling", 80.0)
     probe = knoten(unreal.MaterialExpressionTextureSample, -650, 200)
     probe.set_editor_property("texture", bild)
     verbinde(uv, "", probe, "UVs")
@@ -113,12 +118,15 @@ if rau_konstante is not None:
     rau.set_editor_property("r", rau_konstante)
     an_kanal(rau, "", unreal.MaterialProperty.MP_ROUGHNESS)
 
-metallic = knoten(unreal.MaterialExpressionConstant, -400, 520)
-metallic.set_editor_property("r", 0.85)
-an_kanal(metallic, "", unreal.MaterialProperty.MP_METALLIC)
-
-spek = knoten(unreal.MaterialExpressionConstant, -400, 640)
-spek.set_editor_property("r", 0.55)
+# Kein Metallic: die Stadt hat keine gebackenen Reflection Captures (siehe
+# baue_materialien.py - dort setzt kein einziges Material MP_METALLIC). Mit
+# Metallic > 0 spiegelte die Waffe stattdessen die leere/ungebaute Umgebung
+# und zeigte grobe, brettartige Streifen statt der feinen Riefentextur - ein
+# reines Reflexionsartefakt, keine echte Oberflaechenstruktur. Der
+# "Metall"-Eindruck kommt hier allein aus Rauheit und Spiegelung, wie beim
+# Autolack (M_Lack).
+spek = knoten(unreal.MaterialExpressionConstant, -400, 520)
+spek.set_editor_property("r", 0.62)
 an_kanal(spek, "", unreal.MaterialProperty.MP_SPECULAR)
 
 material.set_editor_property("two_sided", False)

@@ -124,30 +124,48 @@ void ALaLaBergWaffe::BaueModell() {
  TArray<FVector> P; TArray<int32> K; TArray<FLinearColor> F;
  const FLinearColor Koerper(0.07f, 0.075f, 0.08f), Lauf(0.04f, 0.04f, 0.045f), Trichter(0.85f, 0.72f, 0.08f),
                     Oliv(0.20f, 0.22f, 0.14f), Rohr(0.16f, 0.17f, 0.15f);
+ const FLinearColor Griff(0.05f, 0.05f, 0.055f), Messing(0.55f, 0.42f, 0.10f);
  switch (Art) {
   case ELaLaBergWaffenArt::Pistole:
-   kasten(P, K, F, Koerper, FVector(0, 0, 0), FVector(9, 3.2f, 4.2f));
-   zylinder(P, K, F, Lauf, 9.0f, 23.0f, 1.3f, 10);
-   kasten(P, K, F, Trichter, FVector(-1, 0, 8.5f), FVector(3.4f, 3.0f, 4.4f));
-   zylinder(P, K, F, Koerper, -12.0f, -3.0f, 2.1f, 8);
+   kasten(P, K, F, Koerper, FVector(0, 0, 0), FVector(9.0f, 3.0f, 3.4f));                 // Rahmen
+   kasten(P, K, F, Koerper, FVector(1.5f, 0, 4.2f), FVector(8.5f, 2.6f, 1.6f));           // Schlitten, schmaler und hoeher
+   zylinderGlatt(P, K, F, Lauf, 8.5f, 22.5f, 1.15f, 1.0f, 12);                            // Lauf, leicht verjuengt
+   kasten(P, K, F, Griff, FVector(-6.5f, 0, -6.0f), FVector(2.6f, 2.4f, 5.8f));           // Griff
+   buegel(P, K, F, Koerper, 0.0f, -2.6f, -5.8f, 3.0f, -2.4f, 0.5f);                       // Abzugsbuegel
+   kasten(P, K, F, Koerper, FVector(0.5f, 0, -3.4f), FVector(1.4f, 0.5f, 1.8f));          // Abzug
+   kasten(P, K, F, Messing, FVector(-8.3f, 0, 5.3f), FVector(0.5f, 0.35f, 0.9f));         // Kimme
+   kasten(P, K, F, Messing, FVector(9.6f, 0, 5.1f), FVector(0.5f, 0.30f, 0.7f));          // Korn
    break;
   case ELaLaBergWaffenArt::Maschine:
-   kasten(P, K, F, Oliv, FVector(0, 0, 0), FVector(13, 3.4f, 4.6f));
-   zylinder(P, K, F, Lauf, 13.0f, 34.0f, 1.4f, 10);
-   kasten(P, K, F, Trichter, FVector(0, 0, 9.0f), FVector(3.2f, 2.8f, 4.2f));
-   kasten(P, K, F, Koerper, FVector(-2, 0, -6.5f), FVector(2.6f, 2.4f, 6.5f));           // Magazin
-   kasten(P, K, F, Oliv, FVector(-15, 0, -1), FVector(4.0f, 1.6f, 1.8f));                // Schulterstuetze
+   kasten(P, K, F, Oliv, FVector(0, 0, 0), FVector(13.0f, 3.2f, 4.0f));                   // Gehaeuse
+   kasten(P, K, F, Koerper, FVector(0, 0, 3.9f), FVector(12.5f, 2.4f, 1.1f));             // Schienenaufsatz
+   zylinderGlatt(P, K, F, Lauf, 13.0f, 34.0f, 1.35f, 1.1f, 12);                           // Lauf
+   kasten(P, K, F, Koerper, FVector(14.0f, 0, 1.6f), FVector(1.0f, 1.1f, 1.1f));          // Muendungsbremse
+   kasten(P, K, F, Griff, FVector(-2.5f, 0, -6.2f), FVector(2.2f, 2.2f, 5.6f));           // Pistolengriff
+   buegel(P, K, F, Oliv, -1.5f, -4.6f, -6.0f, 1.0f, -3.6f, 0.5f);                         // Abzugsbuegel
+   kasten(P, K, F, Koerper, FVector(-2.0f, 0, -6.5f), FVector(2.4f, 2.2f, 6.5f));         // Magazin
+   kasten(P, K, F, Oliv, FVector(-15.5f, 0, -0.5f), FVector(3.5f, 1.5f, 1.6f));           // Schaft
+   kasten(P, K, F, Oliv, FVector(-19.0f, 0, 1.6f), FVector(0.9f, 1.5f, 1.5f));            // Schulterplatte
+   kasten(P, K, F, Messing, FVector(8.5f, 0, 5.2f), FVector(0.4f, 0.3f, 0.8f));           // Visier
    break;
   case ELaLaBergWaffenArt::Schrotflinte:
-   kasten(P, K, F, Oliv, FVector(0, 0, 0), FVector(11, 3.6f, 5.0f));
-   zylinder(P, K, F, Lauf, 11.0f, 33.0f, 1.6f, 10, 1.7f, 0);
-   zylinder(P, K, F, Lauf, 11.0f, 33.0f, 1.6f, 10, -1.7f, 0);
-   kasten(P, K, F, Koerper, FVector(-16, 0, 1), FVector(6.0f, 2.6f, 3.4f));               // Schaft
+   kasten(P, K, F, Oliv, FVector(-1, 0, 0), FVector(10.0f, 3.6f, 4.6f));                  // Gehaeuse
+   zylinderGlatt(P, K, F, Lauf, 10.0f, 34.0f, 1.55f, 1.35f, 12, 1.75f, 0);                // Doppellauf
+   zylinderGlatt(P, K, F, Lauf, 10.0f, 34.0f, 1.55f, 1.35f, 12, -1.75f, 0);
+   kasten(P, K, F, Koerper, FVector(6.0f, 0, -2.6f), FVector(6.5f, 3.2f, 1.3f));          // Vorderschaft (Pumpe)
+   kasten(P, K, F, Koerper, FVector(-8.0f, 0, -5.8f), FVector(1.8f, 1.9f, 4.4f));         // Pistolengriff
+   buegel(P, K, F, Oliv, -8.0f, -4.4f, -6.2f, -1.6f, -4.6f, 0.5f);                        // Abzugsbuegel
+   kasten(P, K, F, Griff, FVector(-19.0f, 0, 1.5f), FVector(7.5f, 3.0f, 3.6f));           // Schaft
    break;
   case ELaLaBergWaffenArt::Raketenwerfer:
-   zylinder(P, K, F, Rohr, -22.0f, 26.0f, 6.5f, 14);
-   kasten(P, K, F, Oliv, FVector(-6, 0, 6.5f), FVector(5.0f, 3.4f, 2.2f));                // Griff/Visier
-   kasten(P, K, F, Koerper, FVector(-20, 0, 0), FVector(3.6f, 3.6f, 3.6f));               // Schulterkappe
+   zylinderGlatt(P, K, F, Rohr, -22.0f, 24.0f, 6.5f, 5.8f, 16, 0, 0, false, false);       // Rohr, ohne Deckel
+   zylinderGlatt(P, K, F, Rohr, -30.0f, -22.0f, 7.6f, 6.5f, 16, 0, 0, false, true);       // Trichter hinten
+   zylinderGlatt(P, K, F, Koerper, 24.0f, 26.5f, 6.7f, 6.7f, 16, 0, 0, true, false);      // Muendungsrand
+   kasten(P, K, F, Oliv, FVector(-4.0f, 0, 7.5f), FVector(4.5f, 2.2f, 3.4f));             // Visiereinheit
+   kasten(P, K, F, Messing, FVector(-4.0f, 0, 10.7f), FVector(0.4f, 0.3f, 0.9f));         // Visierstift
+   kasten(P, K, F, Griff, FVector(-9.0f, 0, -3.5f), FVector(2.0f, 2.0f, 5.0f));           // Abzugsgriff
+   buegel(P, K, F, Oliv, -9.0f, -3.6f, -7.6f, -1.0f, -5.6f, 0.5f);                        // Abzugsbuegel
+   kasten(P, K, F, Koerper, FVector(-24.0f, 0, 0), FVector(3.4f, 3.4f, 3.4f));            // Schulterkappe
    break;
  }
 
@@ -161,7 +179,7 @@ void ALaLaBergWaffe::BaueModell() {
  for (int32 i = 0; i < P.Num(); i++) UVs.Add(FVector2D(P[i].X / 40.0, P[i].Y / 40.0));
  Netz->ClearAllMeshSections();
  Netz->CreateMeshSection_LinearColor(0, P, K, Normalen, UVs, F, Tangenten, false);
- if (auto* M = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Art/Materials/M_Stoff.M_Stoff"))) Netz->SetMaterial(0, M);
+ if (auto* M = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Art/Materials/M_Waffenmetall.M_Waffenmetall"))) Netz->SetMaterial(0, M);
 }
 
 void ALaLaBergWaffe::BeginPlay() {
