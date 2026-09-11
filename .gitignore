@@ -1,0 +1,11 @@
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+.vs/
+*.sln
+*.slnx
+.vsconfig
+Tools/Export/node_modules/
+__pycache__/
+Build/Windows/FileOpenOrder/

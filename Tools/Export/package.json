@@ -1,0 +1,13 @@
+{
+  "name": "gtalalaberg-export",
+  "private": true,
+  "description": "Ausleitung der Stadtdaten fuer das Unreal-Projekt GTALaLaBerg",
+  "scripts": {
+    "stadt": "node prepare-stadt.cjs",
+    "orte": "node prepare-orte.cjs",
+    "wagen": "node prepare-wagen.cjs"
+  },
+  "dependencies": {
+    "three": "0.185.1"
+  }
+}

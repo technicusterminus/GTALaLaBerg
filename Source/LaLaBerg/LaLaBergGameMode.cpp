@@ -1,0 +1,646 @@
+#include "LaLaBergGameMode.h"
+#include "LaLaBergCharacter.h"
+#include "ProceduralMeshComponent.h"
+#include "KismetProceduralMeshLibrary.h"
+#include "PhysicsEngine/BodySetup.h"
+#include "Materials/MaterialInterface.h"
+#include "Engine/DirectionalLight.h"
+#include "Engine/PointLight.h"
+#include "Engine/StaticMeshActor.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
+#include "Components/PointLightComponent.h"
+#include "Engine/SkyLight.h"
+#include "Engine/TextureCube.h"
+#include "Engine/ExponentialHeightFog.h"
+#include "Components/ExponentialHeightFogComponent.h"
+#include "Engine/PostProcessVolume.h"
+#include "Components/LightComponent.h"
+#include "Components/SkyAtmosphereComponent.h"
+#include "Components/DirectionalLightComponent.h"
+#include "Components/SkyLightComponent.h"
+#include "GameFramework/PlayerStart.h"
+#include "GameFramework/PlayerController.h"
+#include "GameFramework/Pawn.h"
+#include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/PawnMovementComponent.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
+#include "Serialization/JsonReader.h"
+#include "Serialization/JsonSerializer.h"
+#include "TimerManager.h"
+#include "Engine/GameInstance.h"
+#include "LaLaBergMenueSteuerung.h"
+#include "LaLaBergWagen.h"
+#include "LaLaBergHUD.h"
+#include "UObject/UObjectIterator.h"
+#include "EngineUtils.h"
+#include "UnrealClient.h"
+#include "Engine/GameViewportClient.h"
+#include "HAL/FileManager.h"
+
+ALaLaBergGameMode::ALaLaBergGameMode() {
+ DefaultPawnClass=ALaLaBergCharacter::StaticClass();
+ HUDClass=ALaLaBergHUD::StaticClass();
+}
+void ALaLaBergGameMode::InitGame(const FString& MapName,const FString& Options,FString& ErrorMessage) {
+ Super::InitGame(MapName,Options,ErrorMessage);
+ const double Start=FPlatformTime::Seconds();
+ FString Text;
+ TSharedPtr<FJsonObject> Data;
+ // Claude: Wenn die Stadt bereits als StaticMesh-Assets vorliegt, wird sie
+ // geladen statt gebaut. Das ist Codex' Importweg; er bringt Nanite mit und
+ // spart die Sekunden, die das Netz sonst jedes Mal kostet.
+ const bool bAusAssets=LadeAusAssets(Data);
+
+ // Claude: die stadtweite Ausleitung hat Vorrang, der Hauptplatz bleibt Rueckfall.
+ const FString Stadt=FPaths::ProjectContentDir()/TEXT("SourceData/stadt.json");
+ const FString Quelle=bAusAssets
+  ? FPaths::ProjectContentDir()/TEXT("SourceData/Sectors/manifest.json")
+  : (FPaths::FileExists(Stadt)?Stadt:FPaths::ProjectContentDir()/TEXT("SourceData/hauptplatz.json"));
+ // Das kleine Manifest wurde im Asset-Lader bereits geparst. Die 84-MB-
+ // Stadtdatei ein zweites Mal nur fuer Spawn und Gebaeudezahl einzulesen,
+ // kostete acht Sekunden ohne sichtbaren Nutzen.
+ if(!bAusAssets) {
+  if(!FFileHelper::LoadFileToString(Text,*Quelle) ||
+     !FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text),Data) || !Data.IsValid()) {
+   ErrorMessage=TEXT("Missing or invalid city source data");
+   UE_LOG(LogTemp,Error,TEXT("LALABERG_IMPORT_FAILED %s"),*ErrorMessage); return;
+  }
+ }
+ // Aus Assets geladen: die Netze stehen schon, nur die Angaben zum Start
+ // kommen aus dem bereits geparsten Manifest.
+ TArray<TSharedPtr<FJsonValue>> Leer;
+ const TArray<TSharedPtr<FJsonValue>>& Sektionen=bAusAssets?Leer:Data->GetArrayField(TEXT("sections"));
+ UE_LOG(LogTemp,Display,TEXT("LALABERG_ZEIT parse=%.1fs"),FPlatformTime::Seconds()-Start);
+ double TangentSekunden=0, MeshSekunden=0;
+ BuildingCount=Data->GetIntegerField(TEXT("buildingCount"));
+ // Claude: bis hierher zeichnete die ganze Stadt mit dem unbeleuchteten
+ // VertexColorMaterial aus den Engine-Debugmaterialien. Jede Klasse bekommt
+ // jetzt ihr eigenes beleuchtetes Material mit eigener Rauheit.
+ auto* Ersatz=LoadObject<UMaterialInterface>(nullptr,TEXT("/Engine/EngineDebugMaterials/VertexColorMaterial.VertexColorMaterial"));
+ auto Laden=[Ersatz](const TCHAR* Pfad) {
+  auto* M=LoadObject<UMaterialInterface>(nullptr,Pfad);
+  if(!M) UE_LOG(LogTemp,Warning,TEXT("LALABERG_MATERIAL_FEHLT %s"),Pfad);
+  return M?M:Ersatz;
+ };
+ UMaterialInterface* MPutz=Laden(TEXT("/Game/Art/Materials/M_Putz.M_Putz"));
+ UMaterialInterface* MZiegel=Laden(TEXT("/Game/Art/Materials/M_Ziegel.M_Ziegel"));
+ UMaterialInterface* MAsphalt=Laden(TEXT("/Game/Art/Materials/M_Asphalt.M_Asphalt"));
+ UMaterialInterface* MBoden=Laden(TEXT("/Game/Art/Materials/M_Boden.M_Boden"));
+ UMaterialInterface* MWasser=Laden(TEXT("/Game/Art/Materials/M_Wasser.M_Wasser"));
+ UMaterialInterface* MLaub=Laden(TEXT("/Game/Art/Materials/M_Laub.M_Laub"));
+ UMaterialInterface* MStein=Laden(TEXT("/Game/Art/Materials/M_Stein.M_Stein"));
+ UMaterialInterface* MLack=Laden(TEXT("/Game/Art/Materials/M_Lack.M_Lack"));
+ UMaterialInterface* MGlas=Laden(TEXT("/Game/Art/Materials/M_Glas.M_Glas"));
+ UMaterialInterface* MStoff=Laden(TEXT("/Game/Art/Materials/M_Stoff.M_Stoff"));
+ for(const auto& Value:Sektionen) {
+  const auto Obj=Value->AsObject();
+  const auto& Positions=Obj->GetArrayField(TEXT("positions"));
+  TArray<FVector> Vertices; TArray<int32> Indices; TArray<FVector2D> UVs;
+  TArray<FLinearColor> Colors; TArray<FVector> Normals; TArray<FProcMeshTangent> Tangents;
+  const auto& RGB=Obj->GetArrayField(TEXT("color"));
+  const FLinearColor Color(RGB[0]->AsNumber(),RGB[1]->AsNumber(),RGB[2]->AsNumber(),1);
+  // Waende bringen ihre eigene Texturkoordinate mit: waagerecht die Fenster-
+  // achse, senkrecht das Geschoss. Alles andere wird weltbezogen projiziert
+  // und braucht hier nur einen Platzhalter.
+  const TArray<TSharedPtr<FJsonValue>>* Koordinaten=nullptr;
+  const bool EigeneUV=Obj->TryGetArrayField(TEXT("uvs"),Koordinaten) &&
+   Koordinaten->Num()*3==Positions.Num()*2;
+  for(int32 i=0;i<Positions.Num();i+=3) {
+   const FVector P(Positions[i]->AsNumber(),Positions[i+1]->AsNumber(),Positions[i+2]->AsNumber());
+   Vertices.Add(P);
+   const int32 k=i/3*2;
+   UVs.Add(EigeneUV ? FVector2D((*Koordinaten)[k]->AsNumber(),(*Koordinaten)[k+1]->AsNumber())
+                    : FVector2D(P.X/200,P.Y/200));
+   Colors.Add(Color);
+  }
+  for(const auto& Index:Obj->GetArrayField(TEXT("indices"))) Indices.Add(static_cast<int32>(Index->AsNumber()));
+  if(Vertices.IsEmpty() || Indices.IsEmpty()) continue;
+  const FString Klasse=Obj->GetStringField(TEXT("name"));
+  UMaterialInterface* Material=MBoden;
+  if(Klasse.StartsWith(TEXT("Wall"))) Material=MPutz;
+  else if(Klasse.StartsWith(TEXT("Roof"))) Material=MZiegel;
+  else if(Klasse.StartsWith(TEXT("Road")) || Klasse.StartsWith(TEXT("Rail")) || Klasse.StartsWith(TEXT("Plaza"))) Material=MAsphalt;
+  else if(Klasse.StartsWith(TEXT("Water"))) Material=MWasser;
+  else if(Klasse.StartsWith(TEXT("Tree")) || Klasse.StartsWith(TEXT("Trunk"))) Material=MLaub;
+  else if(Klasse.StartsWith(TEXT("Stone")) || Klasse.StartsWith(TEXT("Figure"))) Material=MStein;
+  else if(Klasse.StartsWith(TEXT("Auto"))) Material=MLack;
+  else if(Klasse.StartsWith(TEXT("Glas"))) Material=MGlas;
+  else if(Klasse.StartsWith(TEXT("Reifen"))) Material=MAsphalt;
+  else if(Klasse.StartsWith(TEXT("Stoff")) || Klasse.StartsWith(TEXT("Haut"))) Material=MStoff;
+  else if(Klasse.StartsWith(TEXT("Sockel")) || Klasse.StartsWith(TEXT("Gesims")) ||
+          Klasse.StartsWith(TEXT("Laden")) || Klasse.StartsWith(TEXT("Kamin"))) Material=MStein;
+  auto* Actor=GetWorld()->SpawnActor<AActor>();
+  auto* Mesh=NewObject<UProceduralMeshComponent>(Actor);
+  Actor->SetRootComponent(Mesh); Actor->AddInstanceComponent(Mesh);
+  // Beweglich anmelden: ohne gebautes Licht traegt eine statische Flaeche in
+  // einer statischen Beleuchtung nichts bei und bleibt schwarz.
+  Mesh->SetMobility(EComponentMobility::Movable);
+  Mesh->RegisterComponent();
+  Mesh->bUseComplexAsSimpleCollision=true;
+  Mesh->bUseAsyncCooking=false;
+  Mesh->SetCollisionProfileName(TEXT("BlockAll"));
+  Mesh->GetBodySetup()->bDoubleSidedGeometry=true;
+  // Claude: CalculateTangentsForMesh verschweisst intern und brauchte fuer die
+  // stadtweite Ausleitung 328 der 332 Sekunden Ladezeit. Die Stuetzpunkte sind
+  // ohnehin je Flaeche eigenstaendig, darum genuegt die Flaechennormale.
+  const double T0=FPlatformTime::Seconds();
+  Normals.Init(FVector::ZeroVector,Vertices.Num());
+  for(int32 i=0;i+2<Indices.Num();i+=3) {
+   // Reihenfolge wie beim Zeichnen: erst die dritte, dann die zweite Ecke,
+   // sonst zeigt die Normale in den Koerper hinein.
+   const FVector N=FVector::CrossProduct(Vertices[Indices[i+2]]-Vertices[Indices[i]],Vertices[Indices[i+1]]-Vertices[Indices[i]]);
+   Normals[Indices[i]]+=N; Normals[Indices[i+1]]+=N; Normals[Indices[i+2]]+=N;
+  }
+  for(FVector& N:Normals) N=N.GetSafeNormal(UE_SMALL_NUMBER,FVector::UpVector);
+  const double T1=FPlatformTime::Seconds();
+  Mesh->CreateMeshSection_LinearColor(0,Vertices,Indices,Normals,UVs,Colors,Tangents,true);
+  TangentSekunden+=T1-T0; MeshSekunden+=FPlatformTime::Seconds()-T1;
+  if(Material) Mesh->SetMaterial(0,Material);
+  Actor->Tags.Add(FName(*Klasse));
+ }
+ // Sonne, Himmel und Atmosphaere entstehen aufgeschoben: erst einstellen,
+ // dann anmelden. Nachtraeglich gesetzte Werte wie bAtmosphereSunLight oder
+ // die Beweglichkeit erreichen den bereits gebauten Renderzustand nicht mehr
+ // - die Stadt blieb deshalb schwarz unter einem Daemmerungshimmel.
+ const FTransform SonnenLage(FRotator(-50,152,0),FVector(0,0,15000));
+ auto* Sun=GetWorld()->SpawnActorDeferred<ADirectionalLight>(ADirectionalLight::StaticClass(),SonnenLage);
+ auto* Directional=Cast<UDirectionalLightComponent>(Sun->GetLightComponent());
+ if(Directional) {
+  Directional->SetMobility(EComponentMobility::Movable);
+  Directional->Intensity=11.0f;                             // Lux im Engine-Massstab
+  Directional->LightColor=FColor(255,246,232);
+  Directional->bAtmosphereSunLight=true;
+  Directional->bPerPixelAtmosphereTransmittance=true;
+  Directional->DynamicShadowDistanceMovableLight=60000.0f;   // Schatten bis 600 m
+  Directional->DynamicShadowCascades=4;
+  Directional->CascadeDistributionExponent=2.8f;
+  Directional->LightSourceAngle=0.55f;
+  // Zwei Richtungslichter streiten sonst darum, welches das Vorwaertsschattieren
+  // fuehrt - die Engine meldet das als Warnung ins Bild. Die Sonne fuehrt.
+  Directional->ForwardShadingPriority=10;
+  Directional->bCastVolumetricShadow=false;
+  // Probe: -LaLaBergOhneSchatten schaltet den Schattenwurf der Sonne ab.
+  if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergOhneSchatten"))) Directional->CastShadows=false;
+  if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergHellSonne"))) Directional->Intensity=40.0f;
+  if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergOhneAtmo"))) {
+   Directional->bAtmosphereSunLight=false;
+   Directional->bPerPixelAtmosphereTransmittance=false;
+  }
+ }
+ Sun->FinishSpawning(SonnenLage);
+ // Die Lage aus dem Spawn kommt beim Licht nicht an; erst diese Zuweisung
+ // stellt die Sonne wirklich auf den gewuenschten Stand.
+ Sun->SetActorRotation(FRotator(-50,152,0));
+ SonnenLicht=Sun->GetLightComponent();
+ SonnenLicht->MarkRenderStateDirty();
+
+ // Aufhelllicht von der Gegenseite, ohne Schatten. In einer Altstadtgasse
+ // sieht eine Schattenfassade nur einen schmalen Streifen Himmel; ohne diese
+ // Fuellung bleibt sie fast schwarz.
+ const FTransform FuellLage(FRotator(-28,-20,0),FVector(0,0,15000));
+ auto* Fuell=GetWorld()->SpawnActorDeferred<ADirectionalLight>(ADirectionalLight::StaticClass(),FuellLage);
+ if(auto* F=Cast<UDirectionalLightComponent>(Fuell->GetLightComponent())) {
+  F->SetMobility(EComponentMobility::Movable);
+  F->Intensity=1.0f;                                        // nur noch Hauch
+  F->LightColor=FColor(206,222,255);
+  F->CastShadows=false;
+  F->bAtmosphereSunLight=false;
+  F->bAffectsWorld=true;
+  F->ForwardShadingPriority=0;
+ }
+ Fuell->FinishSpawning(FuellLage);
+ Fuell->SetActorRotation(FRotator(-28,-20,0));
+
+ GetWorld()->SpawnActor<ASkyAtmosphere>();
+
+ auto* Sky=GetWorld()->SpawnActorDeferred<ASkyLight>(ASkyLight::StaticClass(),FTransform(FVector(0,0,20000)));
+ auto* SkyComp=Cast<USkyLightComponent>(Sky->GetLightComponent());
+ if(SkyComp) {
+  SkyComp->SetMobility(EComponentMobility::Movable);
+  // Fest vorgegebener Tageshimmel. Die Echtzeitaufnahme der Atmosphaere
+  // lieferte in dieser Welt nachweislich nichts: mit abgeschaltetem Richtungs-
+  // licht war jede Flaeche absolut schwarz, mit diesem Cubemap hell und
+  // farbig. Alle Engine-Bedingungen fuer die Aufnahme waren erfuellt; die
+  // Ursache ist offen. -LaLaBergHimmelEchtzeit schaltet sie zum Pruefen ein.
+  if(!FParse::Param(FCommandLine::Get(),TEXT("LaLaBergHimmelEchtzeit"))) {
+   SkyComp->SourceType=SLS_SpecifiedCubemap;
+   SkyComp->Cubemap=LoadObject<UTextureCube>(nullptr,TEXT("/Engine/MapTemplates/Sky/DaylightAmbientCubemap.DaylightAmbientCubemap"));
+   SkyComp->bRealTimeCapture=false;
+   UE_LOG(LogTemp,Display,TEXT("LALABERG_HIMMEL cubemap=%d"),SkyComp->Cubemap!=nullptr);
+  } else {
+   SkyComp->SourceType=SLS_CapturedScene;                    // Himmelsfarbe aus der Atmosphaere
+   SkyComp->bRealTimeCapture=true;
+  }
+  // Ohne kraeftiges Himmelslicht sind die Schattenseiten in einer Gasse
+  // vollstaendig schwarz - eine Altstadt lebt aber vom Streulicht.
+  SkyComp->Intensity=1.6f;
+  SkyComp->bLowerHemisphereIsBlack=false;                    // Bodenlicht statt schwarzer Unterseite
+ }
+ Sky->FinishSpawning(FTransform(FVector(0,0,20000)));
+
+ auto* Nebel=GetWorld()->SpawnActor<AExponentialHeightFog>();
+ if(auto* NebelComp=Nebel->GetComponent()) {
+  // Nur so viel Dunst, dass Entfernung lesbar wird. Mehr davon nimmt der
+  // Stadt jede Farbe - die Daecher wurden grau statt ziegelrot.
+  NebelComp->SetFogDensity(0.0022f);
+  NebelComp->SetFogHeightFalloff(0.22f);
+  NebelComp->SetStartDistance(1200.0f);
+  NebelComp->SetFogInscatteringColor(FLinearColor(0.44f,0.52f,0.60f));
+ }
+
+ // Feste Belichtung nach Kameradaten: Blende 11, 1/250 s, ISO 100 ergibt
+ // rund EV100 15 - der Wert fuer klaren Tag. Automatik ist hier falsch, sie
+ // pumpt bei jedem Blick in einen Torbogen.
+ auto* Post=GetWorld()->SpawnActor<APostProcessVolume>();
+ Belichtung=Post;
+ Post->bUnbound=true;
+ FPostProcessSettings& PP=Post->Settings;
+ // Enges Automatikfenster: die Helligkeit steht praktisch fest, ohne dass die
+ // Werte an eine bestimmte Sonnenstaerke gekettet sind.
+ PP.bOverride_AutoExposureMethod=true;         PP.AutoExposureMethod=AEM_Histogram;
+ PP.bOverride_AutoExposureMinBrightness=true;  PP.AutoExposureMinBrightness=0.95f;
+ PP.bOverride_AutoExposureMaxBrightness=true;  PP.AutoExposureMaxBrightness=1.70f;
+ PP.bOverride_AutoExposureSpeedUp=true;        PP.AutoExposureSpeedUp=3.0f;
+ PP.bOverride_AutoExposureSpeedDown=true;      PP.AutoExposureSpeedDown=1.5f;
+ PP.bOverride_AutoExposureBias=true;           PP.AutoExposureBias=0.0f;
+ PP.bOverride_BloomIntensity=true;          PP.BloomIntensity=0.35f;
+ PP.bOverride_VignetteIntensity=true;       PP.VignetteIntensity=0.18f;
+ PP.bOverride_FilmGrainIntensity=true;      PP.FilmGrainIntensity=0.0f;
+ // Etwas Saettigung: die amtlichen Farbwerte sind blass, unter blauem
+ // Himmelslicht wirken sie sonst grau.
+ PP.bOverride_ColorSaturation=true;         PP.ColorSaturation=FVector4(1.04f,1.03f,1.00f,1.0f);
+ PP.bOverride_ColorContrast=true;           PP.ColorContrast=FVector4(1.05f,1.05f,1.05f,1.0f);
+ PP.bOverride_MotionBlurAmount=true;        PP.MotionBlurAmount=0.0f;
+ PP.bOverride_AmbientOcclusionIntensity=true; PP.AmbientOcclusionIntensity=0.55f;
+ PP.bOverride_AmbientOcclusionRadius=true;  PP.AmbientOcclusionRadius=120.0f;
+ // Startpunkt: die Ausleitung nennt ihn beim Namen, sonst der Nullpunkt.
+ double Ground=Data->GetNumberField(TEXT("spawnHeightCm"));
+ FVector StartOrt(0,0,Ground+110); FRotator Blick(0,0,0); FString StartName=TEXT("Hauptplatz");
+ const TSharedPtr<FJsonObject>* Ort;
+ if(Data->TryGetObjectField(TEXT("spawn"),Ort)) {
+  StartOrt=FVector((*Ort)->GetNumberField(TEXT("x")),(*Ort)->GetNumberField(TEXT("y")),(*Ort)->GetNumberField(TEXT("z"))+110);
+  Blick=FRotator(0,(*Ort)->GetNumberField(TEXT("blick")),0);
+  StartName=(*Ort)->GetStringField(TEXT("name"));
+  Ground=StartOrt.Z-110;
+ }
+ // Ohne diese Zuweisung sucht die Spielart sich selbst einen Startpunkt und
+ // landet am Nullpunkt - die Figur stand dann am Hauptplatz statt am Klinikum.
+ Startpunkt=GetWorld()->SpawnActor<APlayerStart>(StartOrt,Blick);
+ UE_LOG(LogTemp,Display,TEXT("LALABERG_START_ORT %s %s"),*StartName,*StartOrt.ToString());
+
+ // Ein fahrbarer Wagen neben dem Startpunkt. Er wird erst abgesetzt, wenn
+ // die Kollision der Stadt steht - sonst faellt er durch die Fahrbahn.
+ {
+  FTimerHandle H;
+  // Beim Klinikum-Parkplatz. Ein Stellplatz selbst taugt nicht: dort stand
+  // der Wagen mal auf einem Auto, mal fuhr er gleich ins naechste. Deshalb
+  // die naechste freie Fahrbahn suchen und den Wagen entlang der Strasse
+  // ausrichten.
+  const FVector WagenOrt(-153670,12480,StartOrt.Z);
+  GetWorldTimerManager().SetTimer(H,[this,WagenOrt]() {
+   bool bFrei=false;
+   const FTransform Platz=SucheFahrbahn(WagenOrt,bFrei);
+   auto* Wagen=GetWorld()->SpawnActor<ALaLaBergWagen>(Platz.GetLocation(),Platz.Rotator());
+   if(Wagen) {
+    Wagen->SetzeLack(FLinearColor(0.16f,0.22f,0.34f));
+    UE_LOG(LogTemp,Display,TEXT("LALABERG_WAGEN %s gier=%.0f frei=%d"),*Platz.GetLocation().ToString(),Platz.Rotator().Yaw,bFrei?1:0);
+   }
+  },2.0f,false);
+ }
+ UE_LOG(LogTemp,Display,TEXT("LALABERG_LICHT sonne=%d lux=%.1f richtung=%s atmo=%d himmel=%d"),
+  (int32)Sun->GetLightComponent()->Mobility.GetValue(),Sun->GetLightComponent()->Intensity,
+  *Sun->GetActorForwardVector().ToString(),Directional?(Directional->bAtmosphereSunLight?1:0):-1,
+  SkyComp?(int32)SkyComp->Mobility.GetValue():-1);
+ bSceneReady=true;
+ UE_LOG(LogTemp,Display,TEXT("LALABERG_SCENE_READY buildings=%d spawnGround=%.2f source=%s gesamt=%.1fs tangenten=%.1fs mesh=%.1fs"),BuildingCount,Ground,*FPaths::GetCleanFilename(Quelle),FPlatformTime::Seconds()-Start,TangentSekunden,MeshSekunden);
+}
+// Testergebnisse auch als Datei: Shipping-Builds schreiben kein Protokoll,
+// dort ist diese Datei der einzige Beleg. Liegt unter Saved/Logs.
+void ALaLaBergGameMode::Beleg(const FString& Zeile) {
+ UE_LOG(LogTemp,Display,TEXT("%s"),*Zeile);
+ const FString Datei=FPaths::ProjectSavedDir()/TEXT("Logs/LaLaBerg-Test.txt");
+ FFileHelper::SaveStringToFile(FDateTime::Now().ToString(TEXT("%H:%M:%S "))+Zeile+LINE_TERMINATOR,*Datei,
+  FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM,&IFileManager::Get(),FILEWRITE_Append);
+}
+
+// Welche Art Flaeche liegt unter einem Punkt? Liefert den Abschnittsnamen
+// (Road, Plaza, Ground, Roof, Auto ...) und die Hoehe der Oberflaeche.
+static bool BodenArt(UWorld* Welt,const FVector& P,FString& Art,float& Z) {
+ FHitResult Boden;
+ if(!Welt->LineTraceSingleByChannel(Boden,FVector(P.X,P.Y,P.Z+3000),FVector(P.X,P.Y,P.Z-3000),ECC_Visibility)) return false;
+ const auto* Netz=Cast<UStaticMeshComponent>(Boden.GetComponent());
+ Art=Netz&&Netz->GetStaticMesh()?Netz->GetStaticMesh()->GetName():FString();
+ Z=Boden.ImpactPoint.Z;
+ return true;
+}
+
+FTransform ALaLaBergGameMode::SucheFahrbahn(const FVector& Nahe,bool& bGefunden) const {
+ UWorld* Welt=GetWorld();
+ bGefunden=false;
+ // In Ringen nach aussen, alle 4 m ein Punkt, bis 120 m. Ein Punkt taugt,
+ // wenn er auf Fahrbahn liegt, frei ist und in einer von 16 Richtungen noch
+ // 16 m voraus und 4 m zurueck Fahrbahn folgt - also eine Strasse ist und
+ // kein Fleck Asphalt.
+ for(int32 Ring=0;Ring<=30;Ring++) {
+  const int32 Schritte=FMath::Max(1,Ring*6);
+  for(int32 s=0;s<Schritte;s++) {
+   const float Winkel=2.0f*PI*s/Schritte;
+   const FVector P=Nahe+FVector(FMath::Cos(Winkel),FMath::Sin(Winkel),0)*Ring*400.0f;
+   FString Art; float Z;
+   if(!BodenArt(Welt,P,Art,Z)||!Art.Contains(TEXT("_Road"))) continue;
+   for(int32 r=0;r<16;r++) {
+    const FRotator Richtung(0,r*22.5f,0);
+    const FVector V=Richtung.Vector();
+    // Auch 1,5 m links und rechts muss Fahrbahn sein - sonst stand der
+    // Wagen mit zwei Raedern in der Wiese.
+    const FVector Q=FVector(-V.Y,V.X,0)*150.0f;
+    bool bStrasse=true;
+    for(float D:{-400.0f,0.0f,400.0f,800.0f,1200.0f,1600.0f}) {
+     for(const FVector& Seite:{FVector::ZeroVector,Q,-Q}) {
+      FString A2; float Z2;
+      if(!BodenArt(Welt,P+V*D+Seite,A2,Z2)||!A2.Contains(TEXT("_Road"))||FMath::Abs(Z2-Z)>250.0f) { bStrasse=false; break; }
+     }
+     if(!bStrasse) break;
+    }
+    if(!bStrasse) continue;
+    const FVector Ort(P.X,P.Y,Z+92);
+    // Kasten etwas kleiner als der Wagen, leicht angehoben und nach vorn
+    // verlaengert: Boden und Bordstein zaehlen nicht, ein Auto oder eine
+    // Mauer auf den ersten zehn Metern schon.
+    if(Welt->OverlapAnyTestByChannel(Ort+V*400.0f+FVector(0,0,40),FQuat(Richtung),ECC_WorldStatic,
+        FCollisionShape::MakeBox(FVector(650,100,50)))) continue;
+    bGefunden=true;
+    return FTransform(Richtung,Ort);
+   }
+  }
+ }
+ return FTransform(FRotator(0,198,0),Nahe);
+}
+
+AActor* ALaLaBergGameMode::ChoosePlayerStart_Implementation(AController* Player) {
+ return Startpunkt?static_cast<AActor*>(Startpunkt):Super::ChoosePlayerStart_Implementation(Player);
+}
+
+void ALaLaBergGameMode::BeginPlay() {
+ Super::BeginPlay();
+ if(auto* PC=GetWorld()->GetFirstPlayerController()) {
+  PC->SetInputMode(FInputModeGameOnly()); PC->bShowMouseCursor=false;
+ }
+ // Startbild, sofern nicht gerade ein Rauchtest oder ein Bildlauf laeuft.
+ // Jeder automatische Lauf braucht eine laufende Welt. Das Startbild
+ // pausiert sie - der Fahrtest stand deshalb bei Bild 2 still, weil keiner
+ // seiner Zeitgeber je auslief.
+ const bool bAutomatisch=FParse::Param(FCommandLine::Get(),TEXT("LaLaBergSmoke")) ||
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergFoto")) ||
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergFahrtest"));
+ if(bAutomatisch) Beleg(FString::Printf(TEXT("LALABERG_SPIELBEGINN nach %.1fs Programmlaufzeit, %d Gebaeude"),FPlatformTime::Seconds()-GStartTime,BuildingCount));
+ if(!bAutomatisch) {
+  if(UGameInstance* Spiel=GetGameInstance()) {
+   if(auto* Menue=Spiel->GetSubsystem<ULaLaBergMenueSteuerung>()) {
+    FTimerHandle H;
+    GetWorldTimerManager().SetTimer(H,[Menue]() { Menue->ZeigeMenue(true); },0.4f,false);
+   }
+  }
+ }
+ if(auto* PC0=GetWorld()->GetFirstPlayerController()) {
+  if(APawn* Pawn0=PC0->GetPawn())
+   UE_LOG(LogTemp,Display,TEXT("LALABERG_START pawn=%s start=%d"),*Pawn0->GetActorLocation().ToString(),GetWorld()->GetAuthGameMode()!=nullptr);
+ }
+ // Claude: Belegbilder ohne Handgriff. -LaLaBergFoto stellt die Figur nach-
+ // einander an drei Stellen auf, loest je eine Aufnahme aus und beendet sich.
+ if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergFoto"))) {
+  struct FStandort { FVector Ort; FRotator Blick; bool bLuft=false; };
+  TArray<FStandort> Orte = {
+   // Freier Standpunkt im Hauptplatz - aus den Platzdaten gesucht, knapp
+   // 40 m von der naechsten Hausmitte - mit Blick nach Osten zum Schmalzturm.
+   {FVector(-1700,-2600,0),FRotator(-1,42,0)},         // Hauptplatz mit Marienbrunnen
+   {FVector(2200,-9700,0),FRotator(-5,-43,0)},         // Strasse mit parkenden Wagen
+   {FVector(-154430,13040,0),FRotator(-6,-36,0)},        // Der fahrbare Wagen am Klinikum
+   // Luftbild ueber dem unteren Hauptplatz Richtung Schmalzturm: auf ihm
+   // sieht man, welches Dach auf welchem Haus sitzt - vom Platz aus nicht.
+   {FVector(-5200,-6400,0),FRotator(-30,40,0),true},
+  };
+  // -LaLaBergReihe stellt statt der drei Ansichten eine Messreihe: gleicher
+  // Blick, verschiedene Sonnen- und Belichtungswerte. So laesst sich klaeren,
+  // ob ein dunkles Bild an der Belichtung oder am Licht selbst haengt.
+  const bool Reihe=FParse::Param(FCommandLine::Get(),TEXT("LaLaBergReihe"));
+  if(Reihe) { Orte.Empty(); for(int32 i=0;i<6;i++) Orte.Add({FVector(-9000,12000,9000),FRotator(-28,-52,0)}); }
+  for(int32 i=0;i<Orte.Num();i++) {
+   FTimerHandle H;
+   GetWorldTimerManager().SetTimer(H,[this,i,Orte,Reihe]() {
+    auto* PC=GetWorld()->GetFirstPlayerController();
+    APawn* Pawn=PC?PC->GetPawn():nullptr;
+    if(!PC||!Pawn) return;
+    FVector Ort=Orte[i].Ort;
+    FRotator Blick=Orte[i].Blick;
+    // Der Wagen steht dort, wo die Fahrbahnsuche ihn hingestellt hat -
+    // die dritte Ansicht folgt ihm, statt auf einer festen Zahl zu stehen.
+    if(i==2&&!Reihe) {
+     for(TActorIterator<ALaLaBergWagen> It(GetWorld());It;++It) {
+      Ort=It->GetActorLocation()+It->GetActorForwardVector()*560.0f+It->GetActorRightVector()*380.0f;
+      Blick=(It->GetActorLocation()-FVector(Ort.X,Ort.Y,It->GetActorLocation().Z+120.0f)).Rotation();
+      break;
+     }
+    }
+    // Alle drei Standorte stehen jetzt auf dem Boden. Vorher blieb einer auf
+    // seiner Zahl stehen - und die lag unter dem Gelaende.
+    {                                                 // auf dem Boden absetzen
+     FHitResult Hit; FCollisionQueryParams Params; Params.AddIgnoredActor(Pawn);
+     if(GetWorld()->LineTraceSingleByChannel(Hit,FVector(Ort.X,Ort.Y,30000),FVector(Ort.X,Ort.Y,-30000),ECC_Visibility,Params)) Ort.Z=Hit.ImpactPoint.Z+180;
+    }
+    if(Orte[i].bLuft) {                               // 45 m ueber dem Boden schweben
+     Ort.Z+=4500.0f;
+     Pawn->GetMovementComponent()->StopMovementImmediately();
+     if(auto* Bewegung=Cast<UCharacterMovementComponent>(Pawn->GetMovementComponent())) Bewegung->SetMovementMode(MOVE_Flying);
+    }
+    Pawn->SetActorLocation(Ort,false,nullptr,ETeleportType::TeleportPhysics);
+    PC->SetControlRotation(Blick);
+    if(auto* Anzeige=Cast<ALaLaBergHUD>(PC->GetHUD())) Anzeige->OrtSofort();
+    if(Reihe) {
+     static const float Lux[6]={75000,75000,75000,10,10,120000};
+     static const float Bias[6]={0,6,12,6,12,0};
+     static const bool Atmo[6]={true,true,true,true,false,true};
+     if(SonnenLicht) { SonnenLicht->SetIntensity(Lux[i]); if(auto* D=Cast<UDirectionalLightComponent>(SonnenLicht)) { D->bAtmosphereSunLight=Atmo[i]; D->MarkRenderStateDirty(); } }
+     if(Belichtung) { Belichtung->Settings.AutoExposureBias=Bias[i]; }
+     UE_LOG(LogTemp,Display,TEXT("LALABERG_REIHE %d lux=%.0f bias=%.0f atmo=%d"),i,Lux[i],Bias[i],Atmo[i]?1:0);
+    }
+    // Probe: ein Engine-Wuerfel mit Engine-Material vor der Kamera. Bleibt der
+    // dunkel, liegt es am Licht; ist er hell, liegt es an unserem Netz.
+    if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergWuerfel")) && i==1) {
+     const FVector Vorn=Ort+Orte[i].Blick.Vector()*3000.0;
+     auto* Wuerfel=GetWorld()->SpawnActor<AStaticMeshActor>(Vorn,FRotator::ZeroRotator);
+     auto* Netz=Wuerfel->GetStaticMeshComponent();
+     Netz->SetMobility(EComponentMobility::Movable);
+     Netz->SetStaticMesh(LoadObject<UStaticMesh>(nullptr,TEXT("/Engine/BasicShapes/Cube.Cube")));
+     Netz->SetMaterial(0,LoadObject<UMaterialInterface>(nullptr,TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial")));
+     Wuerfel->SetActorScale3D(FVector(12,12,12));
+     UE_LOG(LogTemp,Display,TEXT("LALABERG_WUERFEL bei %s netz=%d"),*Vorn.ToString(),Netz->GetStaticMesh()!=nullptr);
+    }
+    // Probe: eine helle Punktlampe unmittelbar an der Kamera. Bleibt das Bild
+    // auch damit schwarz, liegt es an Netz oder Material, nicht an der Sonne.
+    if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergLampe")) && i==1) {
+     auto* Lampe=GetWorld()->SpawnActorDeferred<APointLight>(APointLight::StaticClass(),FTransform(Ort+FVector(0,0,500)));
+     if(auto* LK=Cast<UPointLightComponent>(Lampe->GetLightComponent())) {
+      LK->SetMobility(EComponentMobility::Movable);
+      LK->Intensity=50000000.0f; LK->AttenuationRadius=40000.0f; LK->bUseInverseSquaredFalloff=false;
+     }
+     Lampe->FinishSpawning(FTransform(Ort+FVector(0,0,500)));
+     UE_LOG(LogTemp,Display,TEXT("LALABERG_LAMPE gesetzt"));
+    }
+    PC->ConsoleCommand(TEXT("HighResShot 1600x900"));
+    UE_LOG(LogTemp,Display,TEXT("LALABERG_FOTO %d bei %s"),i,*Ort.ToString());
+   },8.0f+i*3.0f,false);
+  }
+  FTimerHandle Ende;
+  GetWorldTimerManager().SetTimer(Ende,[]() { FPlatformMisc::RequestExitWithStatus(false,0); },8.0f+Orte.Num()*3.0f,false);
+ }
+ // Fahrtest: Wagen uebernehmen, vier Sekunden Gas geben, Weg messen. Ohne
+ // diesen Test waere "der Wagen faehrt" eine Behauptung.
+ if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergFahrtest"))) {
+  // Erst als Figur neben den Wagen treten - dort muss "E Einsteigen"
+  // erscheinen - dann ueber denselben Weg einsteigen wie mit der Taste.
+  FTimerHandle Hin;
+  GetWorldTimerManager().SetTimer(Hin,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr;
+   for(TActorIterator<ALaLaBergWagen> It(GetWorld());It&&Figur;++It) {
+    const FVector Ziel=It->GetActorLocation()-It->GetActorForwardVector()*450.0f-It->GetActorRightVector()*250.0f+FVector(0,0,40);
+    Figur->SetActorLocation(Ziel,false,nullptr,ETeleportType::TeleportPhysics);
+    PC->SetControlRotation((It->GetActorLocation()-Ziel).Rotation()+FRotator(-8,0,0));
+    break;
+   }
+  },4.6f,false);
+  FTimerHandle Hinweis;
+  GetWorldTimerManager().SetTimer(Hinweis,[this]() {
+   FScreenshotRequest::RequestScreenshot(FPaths::ScreenShotDir()/TEXT("Fahrtest_Hinweis.png"),true,false);
+  },5.4f,false);
+  // Mitten in der Fahrt die GPU-Zeiten je Renderschritt ins Log - daran
+  // sieht man, was ein Bild kostet. Nur im Editor-Spiel, nicht in Shipping.
+  if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergGpu"))) {
+   FTimerHandle Gpu;
+   GetWorldTimerManager().SetTimer(Gpu,[this]() {
+    if(auto* PC=GetWorld()->GetFirstPlayerController()) PC->ConsoleCommand(TEXT("ProfileGPU"));
+   },7.6f,false);
+  }
+  FTimerHandle Tacho;
+  GetWorldTimerManager().SetTimer(Tacho,[this]() {
+   FScreenshotRequest::RequestScreenshot(FPaths::ScreenShotDir()/TEXT("Fahrtest_Tacho.png"),true,false);
+  },8.6f,false);
+  FTimerHandle Start;
+  GetWorldTimerManager().SetTimer(Start,[this]() {
+   for(TActorIterator<ALaLaBergWagen> It(GetWorld());It;++It) {
+    auto* PC=GetWorld()->GetFirstPlayerController();
+    auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr;
+    if(Figur) Figur->Einsteigen();
+    if(PC && PC->GetPawn()!=*It) PC->Possess(*It);
+    It->TestSteuerung(1.0f,0.0f);
+    FahrtStart=It->GetActorLocation();
+    FahrtBilder=GFrameCounter; FahrtZeit=FPlatformTime::Seconds(); FahrtSchlechteste=1000.0f;
+    Beleg(FString::Printf(TEXT("LALABERG_FAHRTEST start %s nach %.1fs Programmlaufzeit"),*FahrtStart.ToString(),FPlatformTime::Seconds()-GStartTime));
+    break;
+   }
+  },6.0f,false);
+  // Halbsekundlich Tempo, Weg und Radkontakt - daran sieht man, ob der Wagen
+  // gegen etwas faehrt, abhebt oder nur schwach beschleunigt.
+  GetWorldTimerManager().SetTimer(FahrtUhr,[this]() {
+   for(TActorIterator<ALaLaBergWagen> It(GetWorld());It;++It) {
+    // Bildrate je halbe Sekunde; die schlechteste zaehlt fuer das Ergebnis.
+    const uint64 Bilder=GFrameCounter; const double Uhr=FPlatformTime::Seconds();
+    const float Fps=FahrtLetzteUhr>0?(Bilder-FahrtLetzteBilder)/(Uhr-FahrtLetzteUhr):0.0f;
+    if(FahrtLetzteUhr>0) FahrtSchlechteste=FMath::Min(FahrtSchlechteste,Fps);
+    FahrtLetzteBilder=Bilder; FahrtLetzteUhr=Uhr;
+    Beleg(FString::Printf(TEXT("LALABERG_FAHRT tempo=%.1fkmh weg=%.1fm raeder=%d z=%.0f fps=%.0f"),
+     It->GetVelocity().Size()*0.036f,FVector::Dist2D(It->GetActorLocation(),FahrtStart)/100.0f,
+     It->RaederAmBoden(),It->GetActorLocation().Z,Fps));
+    break;
+   }
+  },0.5f,true,6.5f);
+  // Kurz vor Ende ein Bild aus der Wagenkamera: Beleg fuer die Fahrt und
+  // zugleich ein Blick auf die Fassaden am Klinikum.
+  FTimerHandle Bild;
+  GetWorldTimerManager().SetTimer(Bild,[this]() {
+   if(auto* PC=GetWorld()->GetFirstPlayerController()) PC->ConsoleCommand(TEXT("HighResShot 1600x900"));
+  },9.2f,false);
+  FTimerHandle Ende;
+  GetWorldTimerManager().SetTimer(Ende,[this]() {
+   for(TActorIterator<ALaLaBergWagen> It(GetWorld());It;++It) {
+    const FVector Jetzt=It->GetActorLocation();
+    const float Weg=FVector::Dist2D(Jetzt,FahrtStart);
+    const float Tempo=It->GetVelocity().Size()*0.036f;   // cm/s in km/h
+    const bool bAufraedern=FVector::DotProduct(It->GetActorUpVector(),FVector::UpVector)>0.7f;
+    const float Mittel=(GFrameCounter-FahrtBilder)/FMath::Max(0.001,FPlatformTime::Seconds()-FahrtZeit);
+    Beleg(FString::Printf(TEXT("LALABERG_FAHRTEST %s weg=%.1fm tempo=%.0fkmh aufraedern=%d fps_mittel=%.0f fps_schlechteste=%.0f aufloesung=%s"),
+     (Weg>800.0f&&bAufraedern)?TEXT("PASS"):TEXT("FAIL"),Weg/100.0f,Tempo,bAufraedern?1:0,Mittel,FahrtSchlechteste,
+     GEngine&&GEngine->GameViewport?*FString::Printf(TEXT("%dx%d"),GEngine->GameViewport->Viewport->GetSizeXY().X,GEngine->GameViewport->Viewport->GetSizeXY().Y):TEXT("?")));
+    break;
+   }
+   FPlatformMisc::RequestExitWithStatus(false,0);
+  },10.5f,false);
+ }
+ if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergSmoke"))) {
+  FTimerHandle Handle;
+  GetWorldTimerManager().SetTimer(Handle,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   APawn* Pawn=PC?PC->GetPawn():nullptr;
+   FHitResult Hit; FCollisionQueryParams Params; if(Pawn) Params.AddIgnoredActor(Pawn);
+   const FVector P=Pawn?Pawn->GetActorLocation():FVector::ZeroVector;
+   const bool Ground=GetWorld()->LineTraceSingleByChannel(Hit,P,P-FVector(0,0,300),ECC_Visibility,Params);
+   const bool Passed=bSceneReady && BuildingCount>0 && Pawn && Ground;
+   FHitResult Weit; const bool Tief=GetWorld()->LineTraceSingleByChannel(Weit,FVector(0,0,20000),FVector(0,0,-20000),ECC_Visibility,Params);
+   int32 Fertig=0,Gesamt=0;
+   for(TObjectIterator<UProceduralMeshComponent> It;It;++It) { if(It->GetWorld()!=GetWorld()) continue; Gesamt++; if(It->GetBodySetup() && It->GetBodySetup()->bCreatedPhysicsMeshes) Fertig++; }
+   UE_LOG(LogTemp,Display,TEXT("LALABERG_PHYSIK fertig=%d von=%d"),Fertig,Gesamt);
+   UE_LOG(LogTemp,Display,TEXT("LALABERG_SMOKE %s buildings=%d pawn=%d ground=%d z=%.0f v=%.0f tief=%d trefferZ=%.0f"),Passed?TEXT("PASS"):TEXT("FAIL"),BuildingCount,Pawn!=nullptr,Ground,P.Z,Pawn?Pawn->GetVelocity().Z:0.0,Tief,Tief?Weit.ImpactPoint.Z:0.0);
+   FPlatformMisc::RequestExitWithStatus(false,Passed?0:1);
+  },3.0f,false);
+ }
+}
+
+
+// Die Stadt aus fertigen Assets: je Sektor und Klasse ein Netz, alle in
+// Weltkoordinaten gebaut, also am Ursprung eingesetzt. Fehlt das Verzeichnis
+// oder ein Netz, kehrt die Funktion zurueck und der Laufzeitweg uebernimmt.
+bool ALaLaBergGameMode::LadeAusAssets(TSharedPtr<FJsonObject>& Metadaten) {
+ const FString Wurzel=FPaths::ProjectContentDir()/TEXT("SourceData/Sectors");
+ FString Text;
+ TSharedPtr<FJsonObject> Verzeichnis;
+ if(!FFileHelper::LoadFileToString(Text,*(Wurzel/TEXT("manifest.json"))) ||
+    !FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text),Verzeichnis) || !Verzeichnis.IsValid())
+  return false;
+ Metadaten=Verzeichnis;
+
+ const double Start=FPlatformTime::Seconds();
+ int32 Netze=0, Fehlend=0;
+ for(const auto& Wert:Verzeichnis->GetArrayField(TEXT("sectors"))) {
+  const auto Sektor=Wert->AsObject();
+  const FString Id=Sektor->GetStringField(TEXT("id"));
+  for(const auto& Name:Sektor->GetArrayField(TEXT("sections"))) {
+   const FString Klasse=Name->AsString();
+   const FString Pfad=FString::Printf(TEXT("/Game/City/Sectors/%s/SM_%s_%s.SM_%s_%s"),
+    *Id,*Id,*Klasse,*Id,*Klasse);
+   auto* Netz=LoadObject<UStaticMesh>(nullptr,*Pfad);
+   if(!Netz) { Fehlend++; continue; }
+   auto* Actor=GetWorld()->SpawnActor<AStaticMeshActor>(FVector::ZeroVector,FRotator::ZeroRotator);
+   if(!Actor) { Fehlend++; continue; }
+   auto* Teil=Actor->GetStaticMeshComponent();
+   // Beweglich, nicht statisch: ohne gebautes Licht bekommt statische
+   // Geometrie ihr indirektes Licht aus einem leeren Zwischenspeicher, und
+   // jede Schattenseite wird schwarz - Himmels- und Fuelllicht kamen nicht an.
+   Teil->SetMobility(EComponentMobility::Movable);
+   Teil->SetStaticMesh(Netz);
+   Teil->SetCollisionProfileName(TEXT("BlockAll"));
+   Actor->Tags.Add(FName(*Klasse));
+   Netze++;
+  }
+ }
+ if(Netze==0) return false;
+ if(Fehlend>0) UE_LOG(LogTemp,Warning,TEXT("LALABERG_ASSETS_UNVOLLSTAENDIG fehlend=%d"),Fehlend);
+ BuildingCount=Verzeichnis->GetIntegerField(TEXT("buildingCount"));
+ UE_LOG(LogTemp,Display,TEXT("LALABERG_ASSETS netze=%d fehlend=%d dauer=%.1fs"),
+  Netze,Fehlend,FPlatformTime::Seconds()-Start);
+ return true;
+}
