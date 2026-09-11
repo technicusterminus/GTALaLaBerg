@@ -15,11 +15,14 @@ struct FLaLaBergWegfolger {
  FVector Start() const { return Gueltig() ? Route[0] : FVector::ZeroVector; }
 
  // Bewegt Ort bis zu "Strecke" Zentimeter entlang der Route. Liefert die
- // Blickrichtung (letzte Bewegungsrichtung, waagerecht). Ohne gueltige
- // Route bleibt Ort unveraendert.
+ // Blickrichtung (letzte Bewegungsrichtung, waagerecht) oder den Nullvektor,
+ // wenn sich in diesem Bild nichts bewegt hat (z.B. an einer roten Ampel) -
+ // der Aufrufer soll dann die bisherige Ausrichtung beibehalten, statt
+ // gegen einen willkuerlichen Standardwert zu drehen. Ohne gueltige Route
+ // bleibt Ort unveraendert.
  FVector Bewege(FVector& Ort, float Strecke) {
-  if (!Gueltig()) return FVector::ForwardVector;
-  FVector LetzteRichtung = FVector::ForwardVector;
+  if (!Gueltig()) return FVector::ZeroVector;
+  FVector LetzteRichtung = FVector::ZeroVector;
   // Mehrere Wegpunkte je Bild sind moeglich (kurze Segmente, hohes Tempo) -
   // eine feste Obergrenze verhindert eine Endlosschleife bei einer Route
   // aus zwei identischen Punkten.

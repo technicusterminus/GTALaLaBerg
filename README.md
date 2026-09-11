@@ -14,9 +14,9 @@ Codex und Claude arbeiten beide in diesem Projekt. Zwischen den beiden Assistent
 
 - **Die ganze Stadt:** 7207 Gebäude aus amtlichen LoD2-Daten, Laser-Gelände, Straßen, Plätze, Lech mit Wehr und 13 320 Bäume. Das Ganze sind 2060 statische Nanite-Meshes in 101 Sektoren zu je 500 m, geladen in etwa 6 s.
 - **Altstadt nach Fotovorlage:** Putzfarben und Dachdeckung der Innenstadt, Sockel, Gesimse, Ladenzonen, Gauben, Türen, Brandmauern und in 11,5-m-Häuser geteilte Zeilen. Dazu Rathaus, Marienbrunnen und Hauptplatz sowie der Klinikum-Campus.
-- **Leben:** 1078 geparkte Autos und 371 Passanten als gebaute Stadtgeometrie, dazu 70 KI-Autos und 90 KI-Passanten als eigenständige Figuren, die auf den längsten Straßen bzw. Gehwegen der Altstadt hin und zurück fahren/gehen (`Tools/Export/prepare-verkehr.cjs`). Die Autos haben Radkästen, Felgen, Fenster mit Säulen, Scheinwerfer, Rückleuchten, Kennzeichen und Spiegel.
+- **Leben:** 1078 geparkte Autos und 371 Passanten als gebaute Stadtgeometrie, dazu 70 KI-Autos, 90 KI-Passanten und 44 Ampeln an amtlichen Standorten (OSM `highway=traffic_signals`) als eigenständige Akteure (`Tools/Export/prepare-verkehr.cjs`). Die KI-Autos fahren ihre Straße ab und zurück, bremsen vor einem Auto voraus und vor Rot; die KI-Passanten gehen ihren Gehweg ab und zurück mit einem Gelenk-Rig aus Hüfte, Knie und Schulter (kein importiertes Skelett-Mesh, aber echte Gelenkwinkel statt starrer Kästen) und bremsen vor einem anderen Passanten. Die Autos haben Radkästen, Felgen, Fenster mit Säulen, Scheinwerfer, Rückleuchten, Kennzeichen und Spiegel.
 - **Fahrbarer Wagen:** Federung über vier Strahlen, Antrieb bis etwa 120 km/h, Bremse und Parkbremse. Er steht beim Start auf der nächsten freien Straße am Klinikum.
-- **Waffen – ein abgerundetes Spektrum, alle mit Paintball statt Geschossen:** Pistole, MP (Dauerfeuer), Schrotflinte (7 Kugeln im Streukegel) und ein Werfer (langsam, große Wucht, großer Klecks). Ein Treffer hinterlässt einen Farbklecks auf jeder Fläche; trifft er den fahrbaren Wagen, einen KI-Wagen oder einen KI-Passanten, färbt sich der auch selbst um (und bremst kurz bzw. stolpert).
+- **Waffen – ein abgerundetes Spektrum, alle mit Paintball statt Geschossen:** Pistole, MP (Dauerfeuer), Schrotflinte (7 Kugeln im Streukegel) und ein Werfer (langsam, große Wucht, großer Klecks). Ein Treffer hinterlässt einen Farbklecks (Decal) an der Trefferstelle, der mit der getroffenen Fläche mitfährt/-geht; die Fläche selbst behält ihre Farbe. Trifft er den fahrbaren Wagen, einen KI-Wagen oder einen KI-Passanten, bremst der kurz bzw. stolpert, ohne sich umzufärben.
 - **Einblendungen:** Tacho, „E – Einsteigen“ neben einem Wagen, Fadenkreuz mit Waffenname und Schusszahl, eine Tastenleiste und die Ortsanzeige. Die zeigt links unten den Platz, das Wahrzeichen oder die Straße, darunter Ortsteil und Stadt (263 Straßen, 12 Plätze, 40 Wahrzeichen).
 - **Menü:** Startbild, Pause, Einstellungen für Auflösung, Fenstermodus, Grafikstufe 0–3 und Lautstärke.
 
@@ -40,7 +40,7 @@ UnrealEditor-Cmd … -run=LaLaBergImport -Sector=alle → /Game/City/Sectors/<id
 Tools/baue_texturen.py, Tools/baue_materialien.py → /Game/Art (Texturen, Materialien)
 Tools/Export/prepare-orte.cjs                    → Content/SourceData/Orte/orte.json (Straßen-, Platz- und Ortsnamen)
 Tools/Export/prepare-wagen.cjs                   → Content/SourceData/Fahrzeug/wagen.json (Form des fahrbaren Wagens)
-Tools/Export/prepare-verkehr.cjs                 → Content/SourceData/Verkehr/verkehr.json (Wegpunkte für KI-Autos und -Passanten)
+Tools/Export/prepare-verkehr.cjs                 → Content/SourceData/Verkehr/verkehr.json (Wegpunkte für KI-Autos/-Passanten, Ampelstandorte)
 Tools/baue_farbklecks.py                         → M_Farbklecks (Decal-Material für Paintball-Treffer)
 ```
 
@@ -64,7 +64,7 @@ Das gepackte Spiel nimmt dieselben Schalter: `GTALaLaBerg.exe -windowed -ResX=16
 | `-LaLaBergHimmelEchtzeit` | Himmelslicht aus Echtzeit-Aufnahme statt fester Cubemap (siehe Grenzen) |
 | `-LaLaBergGpu` | Zusammen mit `-LaLaBergFahrtest`: GPU-Zeiten je Renderschritt ins Log |
 | `-LaLaBergWaffentest` | Vier Schüsse (je eine Waffenart) auf den fahrbaren Wagen, dann einer auf eine Hauswand: `LALABERG_WAFFENTEST PASS` ab einem gezählten Treffer, Bilder von Wagen und Wand |
-| `-LaLaBergVerkehrFoto` | Teleportiert zum ersten KI-Auto und zum ersten KI-Passanten, je ein Bild: `LALABERG_VERKEHRFOTO PASS autos=70 passanten=90` |
+| `-LaLaBergVerkehrFoto` | Teleportiert zum ersten KI-Auto und zum ersten KI-Passanten, je ein Bild: `LALABERG_VERKEHRFOTO PASS autos=70 passanten=90` (Ampelzahl steht in `LALABERG_VERKEHR`) |
 
 ## Paket bauen
 
@@ -88,8 +88,9 @@ Die Kaskadenschatten rasterten die ganze Nanite-Stadt je Kaskade neu, viermal pr
 ## Bekannte Grenzen
 
 - **Kein Lumen:** Die Beleuchtung nutzt SSGI und SSR statt Lumen. Das Himmelslicht ist eine feste Cubemap, weil die Echtzeit-Aufnahme in dieser Welt kein Licht liefert; die Ursache ist offen. Ein Tag-Nacht-Wechsel braucht deshalb noch Arbeit.
-- **Einfache Wagen und Passanten:** Alle Figuren sind aus Querschnitten und Kästen gebaut, keine Modelle mit Skelett oder Animation. Kein Missionssystem.
-- **Keine Straßenführung, keine Rücksicht:** Der fahrbare Wagen hält keine Spur; KI-Autos fahren ihre Route stur ab und weichen weder dem Spieler noch einander aus. Es gibt keine Ampeln, keine Vorfahrt, keine Kollisionsvermeidung zwischen KI-Fahrzeugen.
+- **Kein importiertes Skelett-Mesh:** Der Passanten-Rig (Hüfte/Knie/Schulter) ist von Hand aus SceneComponents gebaut, keine UAnimSequence, kein Blending, keine Fußauftritts-Erkennung – die Gelenkwinkel folgen einer festen Sinuskurve. Wagen und Waffen bleiben starre Kästen und Zylinder ohne jede Animation. Kein Missionssystem.
+- **Ampeln ohne Kreuzungsgraph:** Jede der 44 Ampeln schaltet für sich, mit zufälligem Zeitversatz – keine Zuordnung, welche Ampeln zur selben Kreuzung gehören oder sich ergänzen sollten. KI-Autos bremsen vor der nächsten roten Ampel auf ihrer Strecke, unabhängig davon, ob sie „ihre“ ist. Echte Vorfahrtsregeln (wer zuerst darf) gibt es nicht.
+- **Keine Straßenführung, kein Ausweichen:** Der fahrbare Wagen hält keine Spur. KI-Autos und KI-Passanten bremsen vor einem gleichartigen Hindernis voraus, weichen aber nicht zur Seite aus und nehmen auf den Spieler keine Rücksicht.
 - **Farbklecks ohne Textur:** Das Decal-Material `M_Farbklecks` ist ein einfarbiges, halbtransparentes Feld ohne weichen Rand. Ein erster Versuch mit einem von Hand gerechneten radialen Verlauf rendert nicht wie erwartet (siehe Kommentar im Skript); ohne Zugriff auf den Material-Editor ließ sich die Ursache nicht weiter eingrenzen.
 
 ## Datenquellen und Lizenzen
@@ -99,4 +100,5 @@ Code, Konfiguration, Werkzeuge und Materialien stehen unter der [MIT-Lizenz](LIC
 - **Straßen, Plätze, Namen, Gebäudeumrisse, Bäume:** © OpenStreetMap-Mitwirkende, [ODbL 1.0](https://opendatacommons.org/licenses/odbl/). Die daraus abgeleiteten Stadtdaten in `Content/SourceData` und die Stadt-Assets in `Content/City` stehen ebenfalls unter der ODbL.
 - **Gebäudehöhen und Dachformen (LoD2):** Bayerische Vermessungsverwaltung – [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/); Daten für GTA LaLaBerg bearbeitet.
 - **Schmalzturm:** Beschreibung nach [Wikipedia](https://de.wikipedia.org/wiki/Schmalzturm_(Landsberg_am_Lech)); die Farbbänder des Helms sind eine Annäherung.
+- **Fahrzeugmodell „Car Concept“** (`Content/SourceData/Vehicles`, `Content/Art/Vehicles`): [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), siehe `CarConcept-LICENSE.md` im selben Ordner.
 - **Git LFS:** `.uasset`, `.umap` und die großen JSON-Dateien liegen in Git LFS. Nach dem Klonen `git lfs pull`.

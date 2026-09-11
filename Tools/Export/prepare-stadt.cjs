@@ -840,9 +840,13 @@ for (const r of city.roads) {
   // verdeckt zugleich das Terrain direkt unter dem Strassenband.
   const mx = r.p[0], mz = r.p[1];
   if (inAltstadt([mx, mz])) {
-    gehwegTeile += band(ziel('Sidewalk', farbe(0x77736B)), r.p, breite + 1.45, 0.105);
+    // Nur vier Zentimeter ueber dem Scan: Pflaster hat eine Bordkante, wirkt
+    // aber nicht wie eine aufgeklebte Platte.
+    gehwegTeile += band(ziel('Sidewalk', farbe(0x77736B)), r.p, breite + 1.45, 0.04);
   }
-  strassenTeile += band(ziel('Road', farbe(STRASSE[Math.min(r.c || 0, 3)])), r.p, breite, 0.16);
+  // Asphalt liegt fast buendig auf dem Terrain; der Gehweg bleibt sichtbar
+  // hoeher und bildet damit die reale Bordsteinkante.
+  strassenTeile += band(ziel('Road', farbe(STRASSE[Math.min(r.c || 0, 3)])), r.p, breite, 0.012);
 }
 let gleisTeile = 0;
 for (const r of city.rails) gleisTeile += band(ziel('Rail', farbe(0x4a4038)), r.p, r.w || 3.2, 0.20);

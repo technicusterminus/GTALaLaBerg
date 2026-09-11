@@ -19,9 +19,15 @@ public:
  // Vor BeginPlay setzen: die Wegpunkte in Unreal-Zentimetern.
  void SetzeRoute(const TArray<FVector>& Punkte, float TempoKmh);
  virtual void ErhalteFarbe(const FLinearColor& Farbe, const FVector& AusRichtung) override;
+ // Eigene, kurze Liste statt TActorIterator: bei 70 Autos, die einander
+ // jedes Bild abfragen, durchsuchte TActorIterator sonst die ganze Stadt -
+ // Tausende Akteure statt der paar Dutzend eigenen. Kostete spuerbar
+ // Bildrate (26 auf 16 fps beim Hinzukommen der Ampeln).
+ static TArray<ALaLaBergVerkehrsauto*> Alle;
 
 protected:
  virtual void BeginPlay() override;
+ virtual void EndPlay(const EEndPlayReason::Type Grund) override;
 
 private:
  UPROPERTY() TObjectPtr<class UBoxComponent> Rumpf = nullptr;

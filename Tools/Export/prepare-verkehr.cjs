@@ -105,8 +105,33 @@ for (const r of KANDIDATEN) {
   }
 }
 
-const ergebnis = { schema: 1, autos, passanten };
+// Ampeln: die amtlichen Standorte echter Lichtsignalanlagen (OSM
+// highway=traffic_signals). Richtung aus der Strassenachse am naechsten
+// Punkt - eine Ampel steht quer zur Fahrbahn, nicht zufaellig gedreht.
+function naechsteStrassenrichtung(x, z) {
+  let beste = Infinity, richtung = [1, 0];
+  for (const r of city.roads) {
+    const p = r.p;
+    for (let i = 0; i + 3 < p.length; i += 2) {
+      const ax = p[i], az = p[i + 1], bx = p[i + 2], bz = p[i + 3];
+      const dx = bx - ax, dz = bz - az, len2 = dx * dx + dz * dz || 1;
+      const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / len2));
+      const px = ax + dx * t, pz = az + dz * t;
+      const d = Math.hypot(x - px, z - pz);
+      if (d < beste) { beste = d; const l = Math.hypot(dx, dz) || 1; richtung = [dx / l, dz / l]; }
+    }
+  }
+  return richtung;
+}
+const ampeln = (city.signals || []).map(s => {
+  const [rx, rz] = naechsteStrassenrichtung(s.x, s.z);
+  // Quer zur Fahrbahn drehen, damit die Ampel dem Verkehr zugewandt steht.
+  const gierGrad = Math.atan2(rz, rx) * 180 / Math.PI + 90;
+  return { x: ux(s.x), y: uz(s.z), z: Math.round(boden(s.x, s.z) * M), gier: Math.round(gierGrad) };
+});
+
+const ergebnis = { schema: 1, autos, passanten, ampeln };
 const out = path.resolve(REPO, 'Content/SourceData/Verkehr/verkehr.json');
 fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, JSON.stringify(ergebnis));
-console.log(JSON.stringify({ autos: autos.length, passanten: passanten.length, bytes: fs.statSync(out).size }));
+console.log(JSON.stringify({ autos: autos.length, passanten: passanten.length, ampeln: ampeln.length, bytes: fs.statSync(out).size }));

@@ -24,22 +24,43 @@ namespace {
   hinzu(P, K, F, Farbe, E(-1, -1, 1), E(1, -1, 1), E(1, 1, 1), E(-1, 1, 1));       // +Z
   hinzu(P, K, F, Farbe, E(1, -1, -1), E(-1, -1, -1), E(-1, 1, -1), E(1, 1, -1));   // -Z
  }
- // Zylinder, Achse entlang lokal X, Basis bei x0, Deckel bei x1, quer um dy/dz versetzt.
- void zylinder(TArray<FVector>& P, TArray<int32>& K, TArray<FLinearColor>& F, const FLinearColor& Farbe,
-              float x0, float x1, float R, int32 Seiten, float dy = 0, float dz = 0) {
-  TArray<FVector> Unten, Oben;
-  for (int32 i = 0; i < Seiten; i++) {
-   const float A = 2 * PI * i / Seiten, y = FMath::Cos(A) * R + dy, z = FMath::Sin(A) * R + dz;
-   Unten.Add(FVector(x0, y, z)); Oben.Add(FVector(x1, y, z));
+ // Runder Lauf mit weichem Rundungs-Schatten: die Ringpunkte der Mantelflaeche
+ // sind zwischen benachbarten Feldern geteilt statt (wie bei kasten()) je
+ // Flaeche neu angelegt, dadurch mitteln sich ihre Flaechennormalen in der
+ // spaeteren Normalenberechnung zu einer runden Roehre statt zu einem
+ // facettierten Vieleck - vorher sah jeder Lauf wie aus Pappe gefaltet aus.
+ // R0/R1 erlauben eine leichte Verjuengung (Muendung schmaler als Wurzel).
+ void zylinderGlatt(TArray<FVector>& P, TArray<int32>& K, TArray<FLinearColor>& F, const FLinearColor& Farbe,
+                    float x0, float x1, float R0, float R1, int32 Seiten, float dy = 0, float dz = 0,
+                    bool KappeVorne = true, bool KappeHinten = false) {
+  const int32 Basis = P.Num();
+  for (int32 i = 0; i <= Seiten; i++) {
+   const float A = 2 * PI * i / Seiten, cy = FMath::Cos(A), cz = FMath::Sin(A);
+   P.Add(FVector(x0, cy * R0 + dy, cz * R0 + dz)); F.Add(Farbe);
+   P.Add(FVector(x1, cy * R1 + dy, cz * R1 + dz)); F.Add(Farbe);
   }
   for (int32 i = 0; i < Seiten; i++) {
-   const int32 j = (i + 1) % Seiten;
-   hinzu(P, K, F, Farbe, Unten[i], Unten[j], Oben[j], Oben[i]);
+   const int32 a = Basis + i * 2, b = a + 2;
+   K.Append({ a, a + 1, b + 1, a, b + 1, b });
   }
-  const int32 mu = P.Num(); P.Add(FVector(x0, dy, dz)); F.Add(Farbe);
-  for (int32 i = 0; i < Seiten; i++) { const int32 j = (i + 1) % Seiten; K.Append({ mu, mu + 1 + j, mu + 1 + i }); P.Add(Unten[j]); F.Add(Farbe); }
-  const int32 mo = P.Num(); P.Add(FVector(x1, dy, dz)); F.Add(Farbe);
-  for (int32 i = 0; i < Seiten; i++) { const int32 j = (i + 1) % Seiten; K.Append({ mo, mo + 1 + i, mo + 1 + j }); P.Add(Oben[i]); F.Add(Farbe); }
+  if (KappeVorne) {
+   const int32 mo = P.Num(); P.Add(FVector(x1, dy, dz)); F.Add(Farbe);
+   for (int32 i = 0; i < Seiten; i++) K.Append({ mo, Basis + i * 2 + 1, Basis + (i + 1) * 2 + 1 });
+  }
+  if (KappeHinten) {
+   const int32 mu = P.Num(); P.Add(FVector(x0, dy, dz)); F.Add(Farbe);
+   for (int32 i = 0; i < Seiten; i++) K.Append({ mu, Basis + (i + 1) * 2, Basis + i * 2 });
+  }
+ }
+ // Ein duenner rechteckiger Rahmen in der YZ-Ebene bei x - der Abzugsbuegel,
+ // aus vier kasten()-Stegen statt einer Flaeche, damit die Mitte offen bleibt.
+ void buegel(TArray<FVector>& P, TArray<int32>& K, TArray<FLinearColor>& F, const FLinearColor& Farbe,
+            float x, float y0, float z0, float y1, float z1, float Steg) {
+  const float my = (y0 + y1) * 0.5f, mz = (z0 + z1) * 0.5f, hy = (y1 - y0) * 0.5f, hz = (z1 - z0) * 0.5f;
+  kasten(P, K, F, Farbe, FVector(x, my, z0), FVector(Steg, hy, Steg * 0.5f));
+  kasten(P, K, F, Farbe, FVector(x, my, z1), FVector(Steg, hy, Steg * 0.5f));
+  kasten(P, K, F, Farbe, FVector(x, y0, mz), FVector(Steg, Steg * 0.5f, hz));
+  kasten(P, K, F, Farbe, FVector(x, y1, mz), FVector(Steg, Steg * 0.5f, hz));
  }
  // Die kraeftigen Farben eines Paintballs - Fuellfarbe pro Kugel, nicht die
  // Markerfarbe (die bleibt neutrales Grau/Gelb/Oliv).

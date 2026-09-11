@@ -37,6 +37,7 @@
 #include "LaLaBergWaffe.h"
 #include "LaLaBergVerkehrsauto.h"
 #include "LaLaBergPassantKI.h"
+#include "LaLaBergAmpel.h"
 #include "LaLaBergHUD.h"
 #include "UObject/UObjectIterator.h"
 #include "EngineUtils.h"
@@ -766,7 +767,12 @@ void ALaLaBergGameMode::LadeVerkehr() {
    PassantZahl++;
   }
  }
- UE_LOG(LogTemp,Display,TEXT("LALABERG_VERKEHR autos=%d passanten=%d"),AutoZahl,PassantZahl);
+ for(const auto& Wert:Wurzel->GetArrayField(TEXT("ampeln"))) {
+  const auto Obj=Wert->AsObject();
+  const FVector Ort(Obj->GetNumberField(TEXT("x")),Obj->GetNumberField(TEXT("y")),Obj->GetNumberField(TEXT("z")));
+  if(GetWorld()->SpawnActor<ALaLaBergAmpel>(Ort,FRotator(0,Obj->GetNumberField(TEXT("gier")),0))) AmpelZahl++;
+ }
+ UE_LOG(LogTemp,Display,TEXT("LALABERG_VERKEHR autos=%d passanten=%d ampeln=%d"),AutoZahl,PassantZahl,AmpelZahl);
 }
 
 bool ALaLaBergGameMode::LadeAusAssets(TSharedPtr<FJsonObject>& Metadaten) {

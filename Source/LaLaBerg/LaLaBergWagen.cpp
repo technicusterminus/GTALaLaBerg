@@ -149,10 +149,10 @@ void ALaLaBergWagen::BeginPlay() {
 // Leuchten, Felgen. Geteilt mit den KI-Verkehrswagen (LaLaBergWagenForm).
 bool ALaLaBergWagen::BaueAusVorlage() { return LaLaBergWagenForm::BaueNetz(Netz, Lack); }
 
-// ILaLaBergFarbbar: umlackieren und ein kleiner Stoss. Fahrfuehig bleibt der
-// Wagen trotzdem - ein Farbklecks ist ein Aergernis, kein Totalschaden.
+// ILaLaBergFarbbar: nur ein kleiner Stoss. Der Klecks selbst ist schon das
+// Decal, das die Kugel beim Aufprall setzt (siehe LaLaBergFarbkugel) - der
+// Wagen behaelt seinen eigenen Lack, ein Treffer faerbt nicht das ganze Auto um.
 void ALaLaBergWagen::ErhalteFarbe(const FLinearColor& Farbe, const FVector& AusRichtung) {
- SetzeLack(Farbe);
  if (Rumpf && Rumpf->IsSimulatingPhysics()) Rumpf->AddImpulse(AusRichtung.GetSafeNormal() * 1800.0f * Rumpf->GetMass());
 }
 

@@ -93,8 +93,16 @@ void ALaLaBergFarbkugel::Aufprall(UPrimitiveComponent* TroffeneKomponente, AActo
  if (Material) {
   const FRotator Ausrichtung = Treffer.ImpactNormal.Rotation();
   const float Groesse = FMath::FRandRange(KleckMin, KleckMax);
-  if (auto* Decal = UGameplayStatics::SpawnDecalAtLocation(this, Material, FVector(4.0f, Groesse, Groesse),
-                                                            Treffer.Location, Ausrichtung, 45.0f)) {
+  // An die getroffene Flaeche angeheftet, nicht frei im Raum plaziert: sonst
+  // bliebe der Klecks auf einem fahrenden Wagen oder einem gehenden
+  // Passanten an der Trefferstelle in der Luft haengen, statt mit der
+  // Flaeche mitzufahren. Fuer unbewegliche Waende bewegt sich der Elternteil
+  // ohnehin nie, das Ergebnis ist dasselbe wie vorher.
+  UDecalComponent* Decal = AndereKomponente
+   ? UGameplayStatics::SpawnDecalAttached(Material, FVector(4.0f, Groesse, Groesse), AndereKomponente, NAME_None,
+                                          Treffer.Location, Ausrichtung, EAttachLocation::KeepWorldPosition, 45.0f)
+   : UGameplayStatics::SpawnDecalAtLocation(this, Material, FVector(4.0f, Groesse, Groesse), Treffer.Location, Ausrichtung, 45.0f);
+  if (Decal) {
    if (auto* Dyn = Decal->CreateDynamicMaterialInstance()) Dyn->SetVectorParameterValue(TEXT("Farbe"), Farbe);
   }
  }
