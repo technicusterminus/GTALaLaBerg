@@ -34,6 +34,9 @@
 #include "Engine/GameInstance.h"
 #include "LaLaBergMenueSteuerung.h"
 #include "LaLaBergWagen.h"
+#include "LaLaBergWaffe.h"
+#include "LaLaBergVerkehrsauto.h"
+#include "LaLaBergPassantKI.h"
 #include "LaLaBergHUD.h"
 #include "UObject/UObjectIterator.h"
 #include "EngineUtils.h"
@@ -311,6 +314,13 @@ void ALaLaBergGameMode::InitGame(const FString& MapName,const FString& Options,F
    }
   },2.0f,false);
  }
+ // KI-Verkehr und Passanten, aus demselben Grund erst verzoegert wie der
+ // fahrbare Wagen: die Stadtkollision muss stehen, bevor jemand darauf
+ // faehrt oder geht.
+ {
+  FTimerHandle H;
+  GetWorldTimerManager().SetTimer(H,[this]() { LadeVerkehr(); },2.3f,false);
+ }
  UE_LOG(LogTemp,Display,TEXT("LALABERG_LICHT sonne=%d lux=%.1f richtung=%s atmo=%d himmel=%d"),
   (int32)Sun->GetLightComponent()->Mobility.GetValue(),Sun->GetLightComponent()->Intensity,
   *Sun->GetActorForwardVector().ToString(),Directional?(Directional->bAtmosphereSunLight?1:0):-1,
@@ -396,7 +406,9 @@ void ALaLaBergGameMode::BeginPlay() {
  // seiner Zeitgeber je auslief.
  const bool bAutomatisch=FParse::Param(FCommandLine::Get(),TEXT("LaLaBergSmoke")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergFoto")) ||
-                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergFahrtest"));
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergFahrtest")) ||
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergWaffentest")) ||
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergVerkehrFoto"));
  if(bAutomatisch) Beleg(FString::Printf(TEXT("LALABERG_SPIELBEGINN nach %.1fs Programmlaufzeit, %d Gebaeude"),FPlatformTime::Seconds()-GStartTime,BuildingCount));
  if(!bAutomatisch) {
   if(UGameInstance* Spiel=GetGameInstance()) {
@@ -581,6 +593,120 @@ void ALaLaBergGameMode::BeginPlay() {
    FPlatformMisc::RequestExitWithStatus(false,0);
   },10.5f,false);
  }
+ // Waffentest: Figur vor den fahrbaren Wagen stellen (er ist die einzige
+ // eigenstaendige Figur, die einen Treffer auch sichtbar aendert), auf ihn
+ // zielen und mit jeder Waffenart einmal feuern. PASS ab einem gezaehlten
+ // Treffer.
+ if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergWaffentest"))) {
+  FTimerHandle Hin;
+  GetWorldTimerManager().SetTimer(Hin,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr;
+   for(TActorIterator<ALaLaBergWagen> It(GetWorld());It&&Figur;++It) {
+    const FVector Ziel=It->GetActorLocation()-It->GetActorForwardVector()*550.0f+FVector(0,0,40);
+    Figur->SetActorLocation(Ziel,false,nullptr,ETeleportType::TeleportPhysics);
+    PC->SetControlRotation((It->GetActorLocation()-Ziel).Rotation());
+    break;
+   }
+  },4.6f,false);
+  const TArray<ELaLaBergWaffenArt> Arten={ELaLaBergWaffenArt::Pistole,ELaLaBergWaffenArt::Maschine,
+   ELaLaBergWaffenArt::Schrotflinte,ELaLaBergWaffenArt::Raketenwerfer};
+  for(int32 i=0;i<Arten.Num();i++) {
+   FTimerHandle Schuss;
+   GetWorldTimerManager().SetTimer(Schuss,[this,Art=Arten[i]]() {
+    auto* PC=GetWorld()->GetFirstPlayerController();
+    auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr;
+    if(Figur&&Figur->HoleWaffe()) { Figur->HoleWaffe()->SetzeArt(Art); Figur->Feuern(); }
+   },5.2f+i*1.0f,false);
+  }
+  FTimerHandle Bild;
+  GetWorldTimerManager().SetTimer(Bild,[this]() {
+   if(auto* PC=GetWorld()->GetFirstPlayerController()) PC->ConsoleCommand(TEXT("HighResShot 1600x900"));
+  },9.6f,false);
+  // Dicht vor eine Hauswand treten und einmal schiessen: der Klecks selbst
+  // ist auf dem umlackierten Wagen kaum zu sehen, weil jeder Treffer den
+  // ganzen Wagen neu einfaerbt.
+  FTimerHandle Wand;
+  GetWorldTimerManager().SetTimer(Wand,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr;
+   if(!Figur) return;
+   // Der Wagen zaehlt hier nicht als Wand: er faerbt sich selbst um, und ein
+   // Treffer auf ihn zeigt keinen bleibenden Klecks.
+   FHitResult Treffer; FCollisionQueryParams Params; Params.AddIgnoredActor(Figur);
+   for(TActorIterator<ALaLaBergWagen> It(GetWorld());It;++It) Params.AddIgnoredActor(*It);
+   const FVector Start=Figur->GetActorLocation();
+   for(const FVector& Richtung:{FVector(1,0,0),FVector(-1,0,0),FVector(0,1,0),FVector(0,-1,0)}) {
+    if(GetWorld()->LineTraceSingleByChannel(Treffer,Start,Start+Richtung*3000.0f,ECC_Visibility,Params)) {
+     const FVector Ziel=Treffer.ImpactPoint-Richtung*260.0f;
+     Figur->SetActorLocation(Ziel,false,nullptr,ETeleportType::TeleportPhysics);
+     PC->SetControlRotation(Richtung.Rotation());
+     if(auto* Anzeige=Cast<ALaLaBergHUD>(PC->GetHUD())) Anzeige->OrtSofort();
+     break;
+    }
+   }
+  },10.6f,false);
+  FTimerHandle SchussWand;
+  GetWorldTimerManager().SetTimer(SchussWand,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr;
+   if(Figur&&Figur->HoleWaffe()) { Figur->HoleWaffe()->SetzeArt(ELaLaBergWaffenArt::Pistole); Figur->Feuern(); }
+  },11.0f,false);
+  FTimerHandle BildWand;
+  GetWorldTimerManager().SetTimer(BildWand,[this]() {
+   if(auto* PC=GetWorld()->GetFirstPlayerController()) PC->ConsoleCommand(TEXT("HighResShot 1600x900"));
+  },11.6f,false);
+  FTimerHandle Ende;
+  GetWorldTimerManager().SetTimer(Ende,[this]() {
+   const bool bPass=HoleFarbtreffer()>0;
+   Beleg(FString::Printf(TEXT("LALABERG_WAFFENTEST %s treffer=%d"),bPass?TEXT("PASS"):TEXT("FAIL"),HoleFarbtreffer()));
+   FPlatformMisc::RequestExitWithStatus(false,bPass?0:1);
+  },12.6f,false);
+ }
+ // Verkehrsfoto: zum ersten KI-Auto und zum ersten KI-Passanten teleportieren
+ // und je ein Bild machen, nachdem sie sich eine Weile bewegt haben konnten -
+ // ein Bild an einem zufaelligen Standpunkt zeigt sie sonst so gut wie nie.
+ if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergVerkehrFoto"))) {
+  FTimerHandle ZumAuto;
+  GetWorldTimerManager().SetTimer(ZumAuto,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   APawn* Pawn=PC?PC->GetPawn():nullptr;
+   for(TActorIterator<ALaLaBergVerkehrsauto> It(GetWorld());It&&Pawn;++It) {
+    const FVector Ort=It->GetActorLocation()-It->GetActorForwardVector()*900.0f+FVector(0,0,250);
+    Pawn->SetActorLocation(Ort,false,nullptr,ETeleportType::TeleportPhysics);
+    PC->SetControlRotation((It->GetActorLocation()-Ort).Rotation());
+    if(auto* Anzeige=Cast<ALaLaBergHUD>(PC->GetHUD())) Anzeige->OrtSofort();
+    Beleg(FString::Printf(TEXT("LALABERG_VERKEHR_AUTO bei %s"),*It->GetActorLocation().ToString()));
+    break;
+   }
+  },3.4f,false);
+  FTimerHandle BildAuto;
+  GetWorldTimerManager().SetTimer(BildAuto,[this]() {
+   if(auto* PC=GetWorld()->GetFirstPlayerController()) PC->ConsoleCommand(TEXT("HighResShot 1600x900"));
+  },5.4f,false);
+  FTimerHandle ZumPassant;
+  GetWorldTimerManager().SetTimer(ZumPassant,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   APawn* Pawn=PC?PC->GetPawn():nullptr;
+   for(TActorIterator<ALaLaBergPassantKI> It(GetWorld());It&&Pawn;++It) {
+    const FVector Ort=It->GetActorLocation()-It->GetActorForwardVector()*380.0f+FVector(0,0,60);
+    Pawn->SetActorLocation(Ort,false,nullptr,ETeleportType::TeleportPhysics);
+    PC->SetControlRotation((It->GetActorLocation()-Ort).Rotation());
+    if(auto* Anzeige=Cast<ALaLaBergHUD>(PC->GetHUD())) Anzeige->OrtSofort();
+    Beleg(FString::Printf(TEXT("LALABERG_VERKEHR_PASSANT bei %s"),*It->GetActorLocation().ToString()));
+    break;
+   }
+  },6.4f,false);
+  FTimerHandle BildPassant;
+  GetWorldTimerManager().SetTimer(BildPassant,[this]() {
+   if(auto* PC=GetWorld()->GetFirstPlayerController()) PC->ConsoleCommand(TEXT("HighResShot 1600x900"));
+  },8.4f,false);
+  FTimerHandle Ende;
+  GetWorldTimerManager().SetTimer(Ende,[this]() {
+   Beleg(FString::Printf(TEXT("LALABERG_VERKEHRFOTO PASS autos=%d passanten=%d"),AutoZahl,PassantZahl));
+   FPlatformMisc::RequestExitWithStatus(false,0);
+  },9.4f,false);
+ }
  if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergSmoke"))) {
   FTimerHandle Handle;
   GetWorldTimerManager().SetTimer(Handle,[this]() {
@@ -604,6 +730,44 @@ void ALaLaBergGameMode::BeginPlay() {
 // Die Stadt aus fertigen Assets: je Sektor und Klasse ein Netz, alle in
 // Weltkoordinaten gebaut, also am Ursprung eingesetzt. Fehlt das Verzeichnis
 // oder ein Netz, kehrt die Funktion zurueck und der Laufzeitweg uebernimmt.
+// Wegpunkte fuer KI-Verkehr und Passanten: ein Auto je Route, ein Tempo
+// zwischen 28 und 46 km/h zufaellig je Wagen, damit nicht die ganze Stadt im
+// Gleichschritt faehrt. Passanten gehen mit gewoehnlichem Gehtempo.
+void ALaLaBergGameMode::LadeVerkehr() {
+ FString Text;
+ TSharedPtr<FJsonObject> Wurzel;
+ const FString Datei=FPaths::ProjectContentDir()/TEXT("SourceData/Verkehr/verkehr.json");
+ if(!FFileHelper::LoadFileToString(Text,*Datei) ||
+    !FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text),Wurzel) || !Wurzel.IsValid()) {
+  UE_LOG(LogTemp,Warning,TEXT("LALABERG_VERKEHR fehlt: %s"),*Datei);
+  return;
+ }
+ auto LiesRoute=[](const TSharedPtr<FJsonObject>& Obj)->TArray<FVector> {
+  TArray<FVector> Route;
+  const auto& Zahlen=Obj->GetArrayField(TEXT("p"));
+  for(int32 i=0;i+2<Zahlen.Num();i+=3)
+   Route.Add(FVector(Zahlen[i]->AsNumber(),Zahlen[i+1]->AsNumber(),Zahlen[i+2]->AsNumber()));
+  return Route;
+ };
+ for(const auto& Wert:Wurzel->GetArrayField(TEXT("autos"))) {
+  const TArray<FVector> Route=LiesRoute(Wert->AsObject());
+  if(Route.Num()<2) continue;
+  if(auto* Auto=GetWorld()->SpawnActor<ALaLaBergVerkehrsauto>(Route[0],FRotator::ZeroRotator)) {
+   Auto->SetzeRoute(Route,FMath::FRandRange(28.0f,46.0f));
+   AutoZahl++;
+  }
+ }
+ for(const auto& Wert:Wurzel->GetArrayField(TEXT("passanten"))) {
+  const TArray<FVector> Route=LiesRoute(Wert->AsObject());
+  if(Route.Num()<2) continue;
+  if(auto* Passant=GetWorld()->SpawnActor<ALaLaBergPassantKI>(Route[0],FRotator::ZeroRotator)) {
+   Passant->SetzeRoute(Route,FMath::FRandRange(4.2f,5.6f));
+   PassantZahl++;
+  }
+ }
+ UE_LOG(LogTemp,Display,TEXT("LALABERG_VERKEHR autos=%d passanten=%d"),AutoZahl,PassantZahl);
+}
+
 bool ALaLaBergGameMode::LadeAusAssets(TSharedPtr<FJsonObject>& Metadaten) {
  const FString Wurzel=FPaths::ProjectContentDir()/TEXT("SourceData/Sectors");
  FString Text;

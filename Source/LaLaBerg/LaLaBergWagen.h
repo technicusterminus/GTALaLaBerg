@@ -1,6 +1,7 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "GameFramework/Pawn.h"
+#include "LaLaBergFarbbar.h"
 #include "LaLaBergWagen.generated.h"
 
 // Ein fahrbarer Wagen ohne Skelettnetz: die Karosserie entsteht zur Laufzeit
@@ -8,9 +9,13 @@
 // vier Strahlen nach unten. Das reicht fuer eine Stadt, in der man faehrt,
 // und kommt ohne vorbereitete Fahrzeug-Assets aus.
 UCLASS()
-class LALABERG_API ALaLaBergWagen : public APawn {
+class LALABERG_API ALaLaBergWagen : public APawn, public ILaLaBergFarbbar {
  GENERATED_BODY()
 public:
+ // ILaLaBergFarbbar: ein Paintball-Treffer faerbt den Lack um und stoesst
+ // leicht in Trefferrichtung - ein Wagen soll spuerbar getroffen wirken,
+ // nicht nur die Farbe wechseln.
+ virtual void ErhalteFarbe(const FLinearColor& Farbe, const FVector& AusRichtung) override;
  ALaLaBergWagen();
  virtual void Tick(float Zeit) override;
  virtual void SetupPlayerInputComponent(UInputComponent* Eingabe) override;

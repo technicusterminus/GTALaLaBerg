@@ -31,6 +31,14 @@ private:
  UPROPERTY() TObjectPtr<class ULightComponent> SonnenLicht=nullptr;
  UPROPERTY() TObjectPtr<class APostProcessVolume> Belichtung=nullptr;
  UPROPERTY() TObjectPtr<class APlayerStart> Startpunkt=nullptr;
+ int32 FarbtrefferZahl=0;
+ // Wegpunkte fuer KI-Verkehr und Passanten laden und die Figuren dazu
+ // erzeugen (Tools/Export/prepare-verkehr.cjs -> Content/SourceData/Verkehr).
+ void LadeVerkehr();
+ int32 AutoZahl=0, PassantZahl=0;
 public:
  virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
+ // Von jeder Farbkugel beim Aufprall gerufen - fuer HUD und Waffentest.
+ void ZaehleFarbtreffer() { FarbtrefferZahl++; }
+ int32 HoleFarbtreffer() const { return FarbtrefferZahl; }
 };

@@ -1,5 +1,7 @@
 #include "LaLaBergHUD.h"
 #include "LaLaBergWagen.h"
+#include "LaLaBergWaffe.h"
+#include "LaLaBergCharacter.h"
 #include "LaLaBergMenueSteuerung.h"
 #include "Engine/Canvas.h"
 #include "Engine/Engine.h"
@@ -85,7 +87,23 @@ void ALaLaBergHUD::DrawHUD() {
   if (FVector::Dist(It->GetActorLocation(), Figur->GetActorLocation()) < Reichweite) { bWagenNah = true; break; }
  }
  if (bWagenNah) Hinweis(TEXT("E"), TEXT("Einsteigen"));
- Tastenleiste(TEXT("WASD  Gehen      Maus  Umsehen      Leertaste  Springen      E  Einsteigen      Esc  Menü"));
+ if (auto* Held = Cast<ALaLaBergCharacter>(Figur)) Fadenkreuz(Held->HoleWaffe());
+ Tastenleiste(TEXT("WASD  Gehen      Maus  Umsehen      Leertaste  Springen      Maus links  Feuern      1-4  Waffe      E  Einsteigen      Esc  Menü"));
+}
+
+// Bildmitte: ein kleines Kreuz, darunter der Name der Waffe und wie oft
+// schon geschossen wurde - ohne Munitionsknappheit genuegt eine Zaehlung
+// als Rueckmeldung, dass ueberhaupt etwas passiert.
+void ALaLaBergHUD::Fadenkreuz(ALaLaBergWaffe* Waffe) {
+ if (!Waffe) return;
+ const float S = Massstab, MX = Canvas->ClipX * 0.5f, MY = Canvas->ClipY * 0.5f, L = 9.0f * S, D = 3.0f * S;
+ const FLinearColor Kreuz(0.94f, 0.94f, 0.90f, 0.85f);
+ Tafel(MX - L, MY - 1.0f * S, L - D, 2.0f * S, Kreuz);
+ Tafel(MX + D, MY - 1.0f * S, L - D, 2.0f * S, Kreuz);
+ Tafel(MX - 1.0f * S, MY - L, 2.0f * S, L - D, Kreuz);
+ Tafel(MX - 1.0f * S, MY + D, 2.0f * S, L - D, Kreuz);
+ Schrift(FString::Printf(TEXT("%s  ·  %d Schuss"), *Waffe->ArtName(), Waffe->Schuesse()),
+         MX, MY + 22.0f * S, 13, Leise, false, true);
 }
 
 // Rechts unten, gross und ruhig: Zahl mit Einheit dicht daneben und ein Band,

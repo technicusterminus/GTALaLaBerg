@@ -162,7 +162,10 @@ def baue(name, textur, kachel_cm, rauheit, spiegelung, kontrast=1.0, uv=False, g
 gebaut = [
     baue("M_Putz", "T_Fassade_D", 0.0, 0.88, 0.32, 1.0, uv=True, glas=True),   # Fassaden
     baue("M_Ziegel",  "T_Ziegel_D",  190.0, 0.76, 0.35, 1.1),   # Daecher
-    baue("M_Asphalt", "T_Asphalt_D", 420.0, 0.66, 0.40, 0.9),   # Fahrbahn und Gleis
+    # Neue, detailreiche Asphaltoberflaeche: die fruehere prozedurale Textur
+    # war bei normaler Kameradistanz fast einfarbig und liess jede Fahrbahn
+    # wie eine graue Grundplatte aussehen.
+    baue("M_Asphalt", "T_Asphalt_Real_D", 260.0, 0.72, 0.28, 1.15), # Fahrbahn und Gleis
     baue("M_Boden",   "T_Wiese_D",   950.0, 0.94, 0.20, 1.0),   # Wiese, Acker, Wald
     baue("M_Wasser",  "T_Wasser_D",  900.0, 0.26, 0.50, 0.6),   # Lech und Teiche
     baue("M_Laub",    "T_Wiese_D",   140.0, 0.92, 0.18, 1.2),   # Kronen und Staemme

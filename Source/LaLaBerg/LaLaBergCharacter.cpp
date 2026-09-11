@@ -8,14 +8,15 @@
 #include "Engine/GameInstance.h"
 #include "LaLaBergMenueSteuerung.h"
 #include "LaLaBergWagen.h"
+#include "LaLaBergWaffe.h"
 #include "EngineUtils.h"
 #include "GameFramework/PlayerController.h"
 
 ALaLaBergCharacter::ALaLaBergCharacter() {
- auto* Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
- Camera->SetupAttachment(GetRootComponent());
- Camera->SetRelativeLocation(FVector(0,0,64));
- Camera->bUsePawnControlRotation = true;
+ Kamera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
+ Kamera->SetupAttachment(GetRootComponent());
+ Kamera->SetRelativeLocation(FVector(0,0,64));
+ Kamera->bUsePawnControlRotation = true;
  bUseControllerRotationYaw = true;
  GetCharacterMovement()->MaxWalkSpeed = 450;
  GetCharacterMovement()->JumpZVelocity = 420;
@@ -28,6 +29,18 @@ void ALaLaBergCharacter::BeginPlay() {
  Super::BeginPlay();
  GetCharacterMovement()->SetMovementMode(MOVE_None);
  GetWorldTimerManager().SetTimer(BodenUhr,this,&ALaLaBergCharacter::WarteAufBoden,0.1f,true);
+
+ // Der Paintball-Marker haengt an der Kamera wie ein Ansichtsmodell in
+ // jedem Shooter - unten rechts im Bild, leicht nach vorn.
+ FActorSpawnParameters Params; Params.Owner = this; Params.Instigator = this;
+ Waffe = GetWorld()->SpawnActor<ALaLaBergWaffe>(GetActorLocation(), FRotator::ZeroRotator, Params);
+ if (Waffe) Waffe->AttachToComponent(Kamera, FAttachmentTransformRules::KeepRelativeTransform);
+ if (Waffe) Waffe->SetActorRelativeTransform(FTransform(FRotator(-2,4,0), FVector(24, 12, -14)));
+}
+
+void ALaLaBergCharacter::Tick(float DeltaSeconds) {
+ Super::Tick(DeltaSeconds);
+ if (bFeuerKnopf) Feuern();
 }
 
 void ALaLaBergCharacter::WarteAufBoden() {
@@ -55,7 +68,23 @@ void ALaLaBergCharacter::SetupPlayerInputComponent(UInputComponent* Input) {
  Input->BindAction("Recover",IE_Pressed,this,&ALaLaBergCharacter::Recover);
  Input->BindAction("Quit",IE_Pressed,this,&ALaLaBergCharacter::Quit);
  Input->BindAction("Einsteigen",IE_Pressed,this,&ALaLaBergCharacter::Einsteigen);
+ Input->BindAction("Feuern",IE_Pressed,this,&ALaLaBergCharacter::FeuerStart);
+ Input->BindAction("Feuern",IE_Released,this,&ALaLaBergCharacter::FeuerStop);
+ Input->BindAction("Waffe1",IE_Pressed,this,&ALaLaBergCharacter::Waffe1);
+ Input->BindAction("Waffe2",IE_Pressed,this,&ALaLaBergCharacter::Waffe2);
+ Input->BindAction("Waffe3",IE_Pressed,this,&ALaLaBergCharacter::Waffe3);
+ Input->BindAction("Waffe4",IE_Pressed,this,&ALaLaBergCharacter::Waffe4);
 }
+// Schuss aus Blickrichtung, ein Stueck vor der Kamera - sonst trifft die
+// Kugel im selben Bild die eigene Kapsel.
+void ALaLaBergCharacter::Feuern() {
+ if (!Waffe) return;
+ Waffe->Feuern(Kamera->GetComponentLocation() + Kamera->GetForwardVector() * 70.0f, Kamera->GetForwardVector());
+}
+void ALaLaBergCharacter::Waffe1() { if (Waffe) Waffe->SetzeArt(ELaLaBergWaffenArt::Pistole); }
+void ALaLaBergCharacter::Waffe2() { if (Waffe) Waffe->SetzeArt(ELaLaBergWaffenArt::Maschine); }
+void ALaLaBergCharacter::Waffe3() { if (Waffe) Waffe->SetzeArt(ELaLaBergWaffenArt::Schrotflinte); }
+void ALaLaBergCharacter::Waffe4() { if (Waffe) Waffe->SetzeArt(ELaLaBergWaffenArt::Raketenwerfer); }
 void ALaLaBergCharacter::Forward(float Value) {
  if (Controller) AddMovementInput(FRotationMatrix(FRotator(0,Controller->GetControlRotation().Yaw,0)).GetUnitAxis(EAxis::X),Value);
 }

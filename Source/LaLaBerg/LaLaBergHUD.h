@@ -24,6 +24,7 @@ private:
  FSlateFontInfo Font(float Punkt, bool bFett) const;
  void Tafel(float X, float Y, float B, float H, const FLinearColor& Farbe);
  void Tacho(class ALaLaBergWagen* Wagen);
+ void Fadenkreuz(class ALaLaBergWaffe* Waffe);
  void Hinweis(const FString& Taste, const FString& Text);
  void Tastenleiste(const FString& Text);
  float Massstab = 1.0f;
