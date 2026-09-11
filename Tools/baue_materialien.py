@@ -12,7 +12,17 @@ import os
 import unreal
 
 WURZEL = unreal.Paths.project_dir()
-QUELLE = os.path.join(WURZEL, "Tools", "Texturen")
+# Unreal speichert den beim Import angegebenen Pfad dauerhaft im Paket - auch
+# als rohe Zeichenkette, die sich nachtraeglich nicht zuverlaessig entfernen
+# laesst (siehe git-Historie: "Factory_<Pfad>" blieb trotz AssetImportData-
+# Patch stehen). Im oeffentlichen Repo darf da kein Benutzername drinstehen.
+# NEUTRALE_QUELLE zeigt auf eine Kopie der PNGs ausserhalb des Benutzer-
+# ordners; ohne Angabe wird lokal aus dem Projekt importiert (Warnung).
+QUELLE = os.environ.get("LALABERG_NEUTRALE_QUELLE") or os.path.join(WURZEL, "Tools", "Texturen")
+if "LALABERG_NEUTRALE_QUELLE" not in os.environ:
+    unreal.log_warning("LALABERG_TEXTUR_PFAD kein neutraler Pfad gesetzt - der Importpfad "
+                        "landet dauerhaft im Paket. LALABERG_NEUTRALE_QUELLE setzen fuer den "
+                        "oeffentlichen Stand.")
 ORDNER_M = "/Game/Art/Materials"
 ORDNER_T = "/Game/Art/Textures"
 

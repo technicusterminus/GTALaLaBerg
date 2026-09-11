@@ -86,6 +86,8 @@ Die Kaskadenschatten rasterten die ganze Nanite-Stadt je Kaskade neu, viermal pr
 
 ## Datenquellen und Lizenzen
 
+Code, Konfiguration, Werkzeuge und Materialien stehen unter der [MIT-Lizenz](LICENSE). Die Stadtdaten nicht – für sie gilt:
+
 - **Straßen, Plätze, Namen, Gebäudeumrisse, Bäume:** © OpenStreetMap-Mitwirkende, [ODbL 1.0](https://opendatacommons.org/licenses/odbl/). Die daraus abgeleiteten Stadtdaten in `Content/SourceData` und die Stadt-Assets in `Content/City` stehen ebenfalls unter der ODbL.
 - **Gebäudehöhen und Dachformen (LoD2):** Bayerische Vermessungsverwaltung – [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/); Daten für GTA LaLaBerg bearbeitet.
 - **Schmalzturm:** Beschreibung nach [Wikipedia](https://de.wikipedia.org/wiki/Schmalzturm_(Landsberg_am_Lech)); die Farbbänder des Helms sind eine Annäherung.
