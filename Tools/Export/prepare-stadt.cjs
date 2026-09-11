@@ -832,7 +832,18 @@ function band(s, pts, breite, hoch) {
 
 const STRASSE = [0x3c3c3f, 0x44443f, 0x4a4438, 0x585048];
 let strassenTeile = 0;
-for (const r of city.roads) strassenTeile += band(ziel('Road', farbe(STRASSE[Math.min(r.c || 0, 3)])), r.p, Math.max(2, r.w || 3), 0.16);
+let gehwegTeile = 0;
+for (const r of city.roads) {
+  const breite = Math.max(2, r.w || 3);
+  // Ein Altstadtweg besteht nicht aus einer Asphaltflaeche mitten in der
+  // Wiese. Der breite Pflasterstreifen macht Bordkante und Gehweg lesbar und
+  // verdeckt zugleich das Terrain direkt unter dem Strassenband.
+  const mx = r.p[0], mz = r.p[1];
+  if (inAltstadt([mx, mz])) {
+    gehwegTeile += band(ziel('Sidewalk', farbe(0x77736B)), r.p, breite + 1.45, 0.105);
+  }
+  strassenTeile += band(ziel('Road', farbe(STRASSE[Math.min(r.c || 0, 3)])), r.p, breite, 0.16);
+}
 let gleisTeile = 0;
 for (const r of city.rails) gleisTeile += band(ziel('Rail', farbe(0x4a4038)), r.p, r.w || 3.2, 0.20);
 
@@ -1055,13 +1066,35 @@ for (let i = 0; i + 2 < baumListe.length; i += 3) {
     dreieck(st, unten + k, oben + j, oben + k);
   }
 
-  const mitte = ring(s, x, z, y + stammH + (hoehe - stammH) * 0.30, kroneR, 8);
-  const spitze = punkt(s, x, y + hoehe, z);
-  const fuss = punkt(s, x, y + stammH * 0.85, z);
-  for (let k = 0; k < 8; k++) {
-    const j = (k + 1) % 8;
-    dreieck(s, mitte + k, mitte + j, spitze);
-    dreieck(s, mitte + j, mitte + k, fuss);
+  // Mehrere unregelmaessige Kronenringe statt einer einzigen Diamantkrone.
+  // Der Baum bleibt performant und bekommt dennoch Volumen, eine sichtbare
+  // Unterkrone und je nach Lage eine eigene Silhouette.
+  const seiten = 10;
+  const y0 = y + stammH * 0.82;
+  if (nadel) {
+    const r0 = ring(s, x, z, y0, kroneR * 0.92, seiten);
+    const r1 = ring(s, x, z, y0 + (hoehe - (y0 - y)) * 0.30, kroneR * 0.72, seiten);
+    const r2 = ring(s, x, z, y0 + (hoehe - (y0 - y)) * 0.56, kroneR * 0.46, seiten);
+    const top = punkt(s, x, y + hoehe, z);
+    for (let k = 0; k < seiten; k++) {
+      const j = (k + 1) % seiten;
+      dreieck(s, r0 + k, r0 + j, r1 + j); dreieck(s, r0 + k, r1 + j, r1 + k);
+      dreieck(s, r1 + k, r1 + j, r2 + j); dreieck(s, r1 + k, r2 + j, r2 + k);
+      dreieck(s, r2 + k, r2 + j, top);
+    }
+  } else {
+    const r0 = ring(s, x, z, y0, kroneR * 0.70, seiten);
+    const r1 = ring(s, x, z, y0 + (hoehe - stammH) * 0.20, kroneR, seiten);
+    const r2 = ring(s, x, z, y0 + (hoehe - stammH) * 0.56, kroneR * 0.82, seiten);
+    const r3 = ring(s, x, z, y0 + (hoehe - stammH) * 0.82, kroneR * 0.45, seiten);
+    const top = punkt(s, x, y + hoehe, z);
+    for (let k = 0; k < seiten; k++) {
+      const j = (k + 1) % seiten;
+      dreieck(s, r0 + k, r0 + j, r1 + j); dreieck(s, r0 + k, r1 + j, r1 + k);
+      dreieck(s, r1 + k, r1 + j, r2 + j); dreieck(s, r1 + k, r2 + j, r2 + k);
+      dreieck(s, r2 + k, r2 + j, r3 + j); dreieck(s, r2 + k, r3 + j, r3 + k);
+      dreieck(s, r3 + k, r3 + j, top);
+    }
   }
   baeume++;
 }
@@ -1097,5 +1130,5 @@ fs.writeFileSync(out, JSON.stringify(ergebnis));
 console.log(JSON.stringify({
   ausgabe: out, mb: +(fs.statSync(out).size / 1048576).toFixed(1), sektionen: liste.length,
   haeuser: city.buildings.length, wandFlaechen, dachFlaechen, baenderFlaechen, kamine, brandmauern, tueren, gauben: gaubenZahl, umrissDaecher, viereckDaecher, uebersprungen, umgefaerbt, gefasst,
-  strassenTeile, gleisTeile, platzTeile, autos, passanten, entartet, gelaendeTeile, baeume, dreiecke, spawnHeightCm: ergebnis.spawnHeightCm,
+  strassenTeile, gehwegTeile, gleisTeile, platzTeile, autos, passanten, entartet, gelaendeTeile, baeume, dreiecke, spawnHeightCm: ergebnis.spawnHeightCm,
 }, null, 1));

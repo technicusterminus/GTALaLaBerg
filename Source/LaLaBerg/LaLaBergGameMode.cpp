@@ -127,6 +127,7 @@ void ALaLaBergGameMode::InitGame(const FString& MapName,const FString& Options,F
   if(Klasse.StartsWith(TEXT("Wall"))) Material=MPutz;
   else if(Klasse.StartsWith(TEXT("Roof"))) Material=MZiegel;
   else if(Klasse.StartsWith(TEXT("Road")) || Klasse.StartsWith(TEXT("Rail")) || Klasse.StartsWith(TEXT("Plaza"))) Material=MAsphalt;
+ else if(Klasse.StartsWith(TEXT("Sidewalk"))) Material=MStein;
   else if(Klasse.StartsWith(TEXT("Water"))) Material=MWasser;
   else if(Klasse.StartsWith(TEXT("Tree")) || Klasse.StartsWith(TEXT("Trunk"))) Material=MLaub;
   else if(Klasse.StartsWith(TEXT("Stone")) || Klasse.StartsWith(TEXT("Figure"))) Material=MStein;

@@ -51,6 +51,7 @@ namespace
   if (Name.StartsWith(TEXT("Wall"))) Path = TEXT("/Game/Art/Materials/M_Putz.M_Putz");
   else if (Name.StartsWith(TEXT("Roof"))) Path = TEXT("/Game/Art/Materials/M_Ziegel.M_Ziegel");
   // Claude: Pflaster matt statt Asphalt - gegen die Sonne spiegelte der
+ else if (Name.StartsWith(TEXT("Sidewalk"))) Path = TEXT("/Game/Art/Materials/M_Pflaster.M_Pflaster");
   // Hauptplatz sonst fast weiss.
   else if (Name.StartsWith(TEXT("Plaza"))) Path = TEXT("/Game/Art/Materials/M_Pflaster.M_Pflaster");
   else if (Name.StartsWith(TEXT("Road")) || Name.StartsWith(TEXT("Rail"))) Path = TEXT("/Game/Art/Materials/M_Asphalt.M_Asphalt");
@@ -74,7 +75,7 @@ namespace
  bool IsSurfaceSection(const FString& Name)
  {
   return Name.StartsWith(TEXT("Ground")) || Name.StartsWith(TEXT("Road")) ||
-   Name.StartsWith(TEXT("Rail")) || Name.StartsWith(TEXT("Plaza")) ||
+   Name.StartsWith(TEXT("Rail")) || Name.StartsWith(TEXT("Plaza")) || Name.StartsWith(TEXT("Sidewalk")) ||
    Name.StartsWith(TEXT("Water"));
  }
 
