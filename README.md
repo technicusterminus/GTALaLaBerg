@@ -42,6 +42,9 @@ Tools/Export/prepare-orte.cjs                    → Content/SourceData/Orte/ort
 Tools/Export/prepare-wagen.cjs                   → Content/SourceData/Fahrzeug/wagen.json (Form des fahrbaren Wagens)
 Tools/Export/prepare-verkehr.cjs                 → Content/SourceData/Verkehr/verkehr.json (Wegpunkte für KI-Autos/-Passanten, Ampelstandorte)
 Tools/baue_farbklecks.py                         → M_Farbklecks (Decal-Material für Paintball-Treffer)
+Tools/baue_waffenmetall.py, Tools/erzeuge_waffentextur.py → M_Waffenmetall (Material der Waffen-Ansichtsmodelle)
+Tools/importiere_waffen.py                       → /Game/Art/Waffen (lizenzierte Waffenmodelle, CC0)
+Tools/erzeuge_sounds.py, Tools/importiere_sounds.py → /Game/Audio (Schuss-, Einschlag-, Schritt- und Motorsound)
 ```
 
 Die Autoform steht an genau einer Stelle, in `Tools/Export/wagen-form.cjs`. Die geparkten Wagen (über `prepare-stadt.cjs`) und der fahrbare Wagen (über `wagen.json`) entstehen beide daraus. Wer die Form ändert, lässt beide Ausleitungen neu laufen.
@@ -88,10 +91,9 @@ Die Kaskadenschatten rasterten die ganze Nanite-Stadt je Kaskade neu, viermal pr
 ## Bekannte Grenzen
 
 - **Kein Lumen:** Die Beleuchtung nutzt SSGI und SSR statt Lumen. Das Himmelslicht ist eine feste Cubemap, weil die Echtzeit-Aufnahme in dieser Welt kein Licht liefert; die Ursache ist offen. Ein Tag-Nacht-Wechsel braucht deshalb noch Arbeit.
-- **Kein importiertes Skelett-Mesh:** Der Passanten-Rig (Hüfte/Knie/Schulter) ist von Hand aus SceneComponents gebaut, keine UAnimSequence, kein Blending, keine Fußauftritts-Erkennung – die Gelenkwinkel folgen einer festen Sinuskurve. Wagen und Waffen bleiben starre Kästen und Zylinder ohne jede Animation. Kein Missionssystem.
+- **Kein importiertes Skelett-Mesh für Passanten:** Der Passanten-Rig (Hüfte/Knie/Schulter) ist von Hand aus SceneComponents gebaut, keine UAnimSequence, kein Blending, keine Fußauftritts-Erkennung – die Gelenkwinkel folgen einer festen Sinuskurve. Die Waffen-Ansichtsmodelle sind dagegen echte, lizenzierte Meshes (CC0, Quaternius, siehe `Content/SourceData/Waffen/LIZENZ.md`) mit Rückstoßanimation; der fahrbare Wagen bleibt ein prozeduraler Kasten ohne Animation. Kein Missionssystem.
 - **Ampeln ohne Kreuzungsgraph:** Jede der 44 Ampeln schaltet für sich, mit zufälligem Zeitversatz – keine Zuordnung, welche Ampeln zur selben Kreuzung gehören oder sich ergänzen sollten. KI-Autos bremsen vor der nächsten roten Ampel auf ihrer Strecke, unabhängig davon, ob sie „ihre“ ist. Echte Vorfahrtsregeln (wer zuerst darf) gibt es nicht.
 - **Keine Straßenführung, kein Ausweichen:** Der fahrbare Wagen hält keine Spur. KI-Autos und KI-Passanten bremsen vor einem gleichartigen Hindernis voraus, weichen aber nicht zur Seite aus und nehmen auf den Spieler keine Rücksicht.
-- **Farbklecks ohne Textur:** Das Decal-Material `M_Farbklecks` ist ein einfarbiges, halbtransparentes Feld ohne weichen Rand. Ein erster Versuch mit einem von Hand gerechneten radialen Verlauf rendert nicht wie erwartet (siehe Kommentar im Skript); ohne Zugriff auf den Material-Editor ließ sich die Ursache nicht weiter eingrenzen.
 
 ## Datenquellen und Lizenzen
 
@@ -101,4 +103,5 @@ Code, Konfiguration, Werkzeuge und Materialien stehen unter der [MIT-Lizenz](LIC
 - **Gebäudehöhen und Dachformen (LoD2):** Bayerische Vermessungsverwaltung – [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/); Daten für GTA LaLaBerg bearbeitet.
 - **Schmalzturm:** Beschreibung nach [Wikipedia](https://de.wikipedia.org/wiki/Schmalzturm_(Landsberg_am_Lech)); die Farbbänder des Helms sind eine Annäherung.
 - **Fahrzeugmodell „Car Concept“** (`Content/SourceData/Vehicles`, `Content/Art/Vehicles`): [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), siehe `CarConcept-LICENSE.md` im selben Ordner.
+- **Waffenmodelle** (`Content/SourceData/Waffen`, `Content/Art/Waffen`): [Public Domain (CC0 1.0)](https://creativecommons.org/publicdomain/zero/1.0/), Quaternius/Toon Shooter Game Kit, siehe `LIZENZ.md` im selben Ordner.
 - **Git LFS:** `.uasset`, `.umap` und die großen JSON-Dateien liegen in Git LFS. Nach dem Klonen `git lfs pull`.

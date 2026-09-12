@@ -410,7 +410,8 @@ void ALaLaBergGameMode::BeginPlay() {
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergFoto")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergFahrtest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergWaffentest")) ||
-                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergVerkehrFoto"));
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergVerkehrFoto")) ||
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergLechFoto"));
  if(bAutomatisch) Beleg(FString::Printf(TEXT("LALABERG_SPIELBEGINN nach %.1fs Programmlaufzeit, %d Gebaeude"),FPlatformTime::Seconds()-GStartTime,BuildingCount));
  if(!bAutomatisch) {
   if(UGameInstance* Spiel=GetGameInstance()) {
@@ -511,6 +512,24 @@ void ALaLaBergGameMode::BeginPlay() {
   }
   FTimerHandle Ende;
   GetWorldTimerManager().SetTimer(Ende,[]() { FPlatformMisc::RequestExitWithStatus(false,0); },8.0f+Orte.Num()*3.0f,false);
+ }
+ // Eigener Sichttest am Lech: Blick quer über das Wasser, mit genug Abstand
+ // zur Ufergeometrie. So ist das animierte Material tatsächlich im Bild.
+ if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergLechFoto"))) {
+  FTimerHandle LechBild;
+  GetWorldTimerManager().SetTimer(LechBild,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   APawn* Pawn=PC?PC->GetPawn():nullptr;
+   if(!PC||!Pawn) return;
+   const FVector Ort(-11000.0f,25000.0f,1450.0f);
+   Pawn->SetActorLocation(Ort,false,nullptr,ETeleportType::TeleportPhysics);
+   if(auto* Bewegung=Cast<UCharacterMovementComponent>(Pawn->GetMovementComponent())) Bewegung->SetMovementMode(MOVE_Flying);
+   PC->SetControlRotation(FRotator(-19.0f,5.0f,0.0f));
+   PC->ConsoleCommand(TEXT("HighResShot 1600x900"));
+   UE_LOG(LogTemp,Display,TEXT("LALABERG_LECH_FOTO ort=%s"),*Ort.ToString());
+  },8.0f,false);
+  FTimerHandle LechEnde;
+  GetWorldTimerManager().SetTimer(LechEnde,[]() { FPlatformMisc::RequestExitWithStatus(false,0); },13.0f,false);
  }
  // Fahrtest: Wagen uebernehmen, vier Sekunden Gas geben, Weg messen. Ohne
  // diesen Test waere "der Wagen faehrt" eine Behauptung.

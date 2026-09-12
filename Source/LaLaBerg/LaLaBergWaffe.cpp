@@ -1,5 +1,7 @@
 #include "LaLaBergWaffe.h"
 #include "ProceduralMeshComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
 #include "Materials/MaterialInterface.h"
 #include "LaLaBergFarbkugel.h"
 #include "LaLaBergEinschlagblitz.h"
@@ -105,14 +107,50 @@ namespace {
   };
   return T[static_cast<uint8>(Art)];
  }
+
+ // Das lizenzierte Ansichtsmodell je Waffenart (CC0, Quaternius - siehe
+ // Content/SourceData/Waffen/LIZENZ.md). Skalierung und Versatz von Hand
+ // abgeglichen: die Rohmodelle sind rund 2.5x groesser als die vorherigen
+ // Kaesten und muessen zur Kamera hin ausgerichtet werden.
+ struct FModell {
+  const TCHAR* Pfad;
+  FVector Versatz;
+  FRotator Drehung;
+  float Skalierung;
+ };
+ const FModell& ModellInfo(ELaLaBergWaffenArt Art) {
+  static const FModell M[] = {
+   /* Pistole       */ { TEXT("/Game/Art/Waffen/Pistol/StaticMeshes/SM_Pistole.SM_Pistole"),
+                          FVector(27.0f, 0, -1.0f), FRotator(0, 0, 0), 0.40f },
+   /* Maschine      */ { TEXT("/Game/Art/Waffen/Smg/StaticMeshes/SM_Maschine.SM_Maschine"),
+                          FVector(40.0f, 0, -6.0f), FRotator(0, 0, 0), 0.40f },
+   /* Schrotflinte  */ { TEXT("/Game/Art/Waffen/Shotgun/StaticMeshes/SM_Schrotflinte.SM_Schrotflinte"),
+                          FVector(48.0f, 0, -4.0f), FRotator(0, 0, 0), 0.40f },
+   /* Raketenwerfer */ { TEXT("/Game/Art/Waffen/RocketLauncher/StaticMeshes/SM_Raketenwerfer.SM_Raketenwerfer"),
+                          FVector(30.0f, 0, -8.0f), FRotator(0, 0, 0), 0.40f },
+  };
+  return M[static_cast<uint8>(Art)];
+ }
 }
 
 ALaLaBergWaffe::ALaLaBergWaffe() {
  PrimaryActorTick.bCanEverTick = true;
+ // Eigene, unrotierte Wurzel: die Figur setzt per SetActorRelativeTransform()
+ // den Kamera-Versatz einmal in BeginPlay - der Rueckstoss darf diese Basis
+ // nicht ueberschreiben, sondern dreht Netz/NetzEcht obendrauf (siehe Tick()).
+ Wurzel = CreateDefaultSubobject<USceneComponent>(TEXT("Wurzel"));
+ SetRootComponent(Wurzel);
+
  Netz = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("Netz"));
+ Netz->SetupAttachment(Wurzel);
  Netz->SetCollisionEnabled(ECollisionEnabled::NoCollision);
  Netz->SetCastShadow(false);          // ein Ansichtsmodell wirft keinen Schatten in die eigene Kamera
- SetRootComponent(Netz);
+
+ NetzEcht = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("NetzEcht"));
+ NetzEcht->SetupAttachment(Wurzel);
+ NetzEcht->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+ NetzEcht->SetCastShadow(false);
+ NetzEcht->SetVisibility(false);
 }
 
 FString ALaLaBergWaffe::ArtName() const {
@@ -126,17 +164,33 @@ FString ALaLaBergWaffe::ArtName() const {
 }
 
 void ALaLaBergWaffe::SetzeArt(ELaLaBergWaffenArt Neu) {
- if (Art == Neu && Netz->GetNumSections() > 0) return;
+ const bool bSchonGebaut = (NetzEcht && NetzEcht->GetStaticMesh()) || (Netz && Netz->GetNumSections() > 0);
+ if (Art == Neu && bSchonGebaut) return;
  Art = Neu;
  if (HasActorBegunPlay()) BaueModell();
 }
 
-// Vier Silhouetten aus denselben Bausteinen (Kasten, Zylinder): eine
-// kompakte Pistole, eine MP mit Magazin und langem Lauf, eine Schrotflinte
-// mit zwei Laeufen und Schaft, ein schultergestuetzter Werfer mit weitem
-// Rohr. Niemand fasst das Modell an - die Silhouette muss nur erkennbar
-// unterschiedlich sein.
+// Bevorzugt das lizenzierte GLB-Modell (siehe ModellInfo) - nur wenn das
+// fehlt (z.B. frischer Checkout ohne Content/SourceData/Waffen), faellt die
+// Waffe auf die alte, von Hand gebaute Silhouette aus Kaesten und Zylindern
+// zurueck, dieselbe wie zuvor, samt Hand und Unterarm am Griff.
 void ALaLaBergWaffe::BaueModell() {
+ const FModell& M = ModellInfo(Art);
+ if (auto* Mesh = LoadObject<UStaticMesh>(nullptr, M.Pfad)) {
+  ModellDrehung = M.Drehung;
+  NetzEcht->SetStaticMesh(Mesh);
+  NetzEcht->SetRelativeLocation(M.Versatz);
+  NetzEcht->SetRelativeRotation(M.Drehung);
+  NetzEcht->SetRelativeScale3D(FVector(M.Skalierung));
+  NetzEcht->SetVisibility(true);
+  Netz->SetVisibility(false);
+  Netz->ClearAllMeshSections();
+  return;
+ }
+ ModellDrehung = FRotator::ZeroRotator;
+ NetzEcht->SetVisibility(false);
+ Netz->SetVisibility(true);
+
  TArray<FVector> P; TArray<int32> K; TArray<FLinearColor> F;
  const FLinearColor Koerper(0.07f, 0.075f, 0.08f), Lauf(0.04f, 0.04f, 0.045f), Trichter(0.85f, 0.72f, 0.08f),
                     Oliv(0.20f, 0.22f, 0.14f), Rohr(0.16f, 0.17f, 0.15f);
@@ -199,7 +253,7 @@ void ALaLaBergWaffe::BaueModell() {
  for (int32 i = 0; i < P.Num(); i++) UVs.Add(FVector2D(P[i].X / 40.0, P[i].Y / 40.0));
  Netz->ClearAllMeshSections();
  Netz->CreateMeshSection_LinearColor(0, P, K, Normalen, UVs, F, Tangenten, false);
- if (auto* M = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Art/Materials/M_Waffenmetall.M_Waffenmetall"))) Netz->SetMaterial(0, M);
+ if (auto* Metall = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Art/Materials/M_Waffenmetall.M_Waffenmetall"))) Netz->SetMaterial(0, Metall);
 }
 
 void ALaLaBergWaffe::BeginPlay() {
@@ -215,9 +269,15 @@ void ALaLaBergWaffe::Tick(float Zeit) {
  if (const AActor* Halter = GetOwner()) SetActorHiddenInGame(Halter->IsHidden());
  // Rueckstoss klingt zuegig ab - der Lauf soll sichtbar hochschlagen und
  // gleich wieder auf Ziellinie sein, nicht lange nachwackeln.
+ // Auf Netz UND NetzEcht - beide sitzen unrotiert an Wurzel, welche Figur
+ // per SetActorRelativeTransform() den Kamera-Versatz traegt (siehe
+ // BeginPlay in LaLaBergCharacter.cpp). Wuerde der Rueckstoss stattdessen
+ // Wurzel selbst drehen, ueberschriebe er diesen Versatz bei jedem Schuss.
  if (RueckstossGrad > 0.001f) {
   RueckstossGrad = FMath::FInterpTo(RueckstossGrad, 0.0f, Zeit, 14.0f);
-  Netz->SetRelativeRotation(FRotator(RueckstossGrad, 0, 0));
+  const FRotator Kick = FRotator(RueckstossGrad, 0, 0) + ModellDrehung;
+  Netz->SetRelativeRotation(Kick);
+  NetzEcht->SetRelativeRotation(Kick);
  }
 }
 
@@ -250,7 +310,10 @@ bool ALaLaBergWaffe::Feuern(const FVector& Ort, const FVector& Richtung) {
  RueckstossGrad = FMath::Min(K.RueckstossGrad * 2.2f, RueckstossGrad + K.RueckstossGrad);
  if (auto* Sound = LoadObject<USoundBase>(nullptr, *FString::Printf(TEXT("/Game/Audio/%s.%s"), K.SoundName, K.SoundName)))
   UGameplayStatics::PlaySoundAtLocation(this, Sound, Ort, 1.0f, K.TonHoehe * FMath::FRandRange(0.97f, 1.03f));
- const FVector MuendungOrt = Netz->GetComponentTransform().TransformPosition(FVector(K.MuendungX, 0, 0));
+ // Ueber Wurzel statt Netz/NetzEcht: welches der beiden gerade sichtbar ist,
+ // haengt vom geladenen Modell ab (siehe BaueModell), die Muendung liegt in
+ // beiden Faellen ungefaehr denselben Abstand vor der Wurzel.
+ const FVector MuendungOrt = Wurzel->GetComponentLocation() + Wurzel->GetForwardVector() * K.MuendungX;
  if (auto* Blitz = GetWorld()->SpawnActor<ALaLaBergEinschlagblitz>(MuendungOrt, FRotator::ZeroRotator))
   Blitz->Einrichten(FLinearColor(1.0f, 0.86f, 0.55f), 6000.0f, 320.0f, 0.06f);
 

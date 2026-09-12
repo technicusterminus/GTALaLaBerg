@@ -37,7 +37,20 @@ protected:
 private:
  void BaueModell();
 
+ // Wurzel statt direkt Netz/NetzEcht als Root: die Figur setzt per
+ // SetActorRelativeTransform() den Ansichtsmodell-Versatz zur Kamera einmal
+ // in BeginPlay - der Rueckstoss darf diese Basis nicht ueberschreiben,
+ // sondern muss auf den Kindern obendrauf kommen.
+ UPROPERTY() TObjectPtr<class USceneComponent> Wurzel = nullptr;
+ // Fallback ohne importiertes Modell (z.B. frischer Checkout ohne die
+ // lizenzierten GLBs): dieselbe Kasten/Zylinder-Bauweise wie zuvor, dazu
+ // Hand und Unterarm am Griff.
  UPROPERTY() TObjectPtr<class UProceduralMeshComponent> Netz = nullptr;
+ // Das eigentliche Ansichtsmodell: ein lizenziertes GLB (CC0, Quaternius -
+ // siehe Content/SourceData/Waffen/LIZENZ.md), gleiches Vorgehen wie beim
+ // CarConcept-Fahrzeugmodell. Ersetzt die frueheren Kaesten/Zylinder, sobald
+ // vorhanden.
+ UPROPERTY() TObjectPtr<class UStaticMeshComponent> NetzEcht = nullptr;
  ELaLaBergWaffenArt Art = ELaLaBergWaffenArt::Pistole;
  float LetzterSchuss = -10.0f;
  int32 SchussZahl = 0;
@@ -46,4 +59,7 @@ private:
  // und klingt wieder ab, dazu ein Muendungsblitz und ein Schusssound je
  // Waffenart (Tonhoehe/Lautstaerke aus derselben Kennzahl wie die Ballistik).
  float RueckstossGrad = 0.0f;
+ // Grundausrichtung des aktuellen Modells (siehe ModellInfo) - der
+ // Rueckstosskick in Tick() setzt sich obendrauf, statt sie zu ersetzen.
+ FRotator ModellDrehung = FRotator::ZeroRotator;
 };
