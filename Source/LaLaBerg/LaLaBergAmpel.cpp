@@ -39,6 +39,21 @@ namespace {
  // constexpr-Feldern in einer DLL-Schnittstellenklasse (LALABERG_API) einen
  // Linker-/DLL-Interface-Konflikt meldet (C2487).
  constexpr float ROT_S = 7.0f, GRUEN_S = 6.0f, GELB_S = 1.6f;
+ constexpr float ZYKLUS_S = ROT_S + GRUEN_S + GELB_S;
+
+ // Zustand und Restzeit fuer einen Zeitpunkt "t" innerhalb eines Zyklus -
+ // dieselbe Rot->Gruen->Gelb-Abfolge, aber aus der Uhrzeit berechnet statt
+ // schrittweise gezaehlt. So lassen sich zwei Ampeln exakt synchron (gleiche
+ // Gruppe, gleiche Phase) oder exakt gegenphasig (Phase 1 = Phase 0 + halber
+ // Zyklus) halten, ohne dass eine die andere kennen muesste.
+ void ZustandBei(float t, int32& Zustand, float& Rest) {
+  t = FMath::Fmod(t, ZYKLUS_S); if (t < 0) t += ZYKLUS_S;
+  if (t < ROT_S) { Zustand = 0; Rest = ROT_S - t; return; }
+  t -= ROT_S;
+  if (t < GRUEN_S) { Zustand = 1; Rest = GRUEN_S - t; return; }
+  t -= GRUEN_S;
+  Zustand = 2; Rest = GELB_S - t;
+ }
 }
 
 ALaLaBergAmpel::ALaLaBergAmpel() {
@@ -52,9 +67,16 @@ TArray<ALaLaBergAmpel*> ALaLaBergAmpel::Alle;
 
 void ALaLaBergAmpel::BeginPlay() {
  Super::BeginPlay();
- // Nicht alle im Gleichtakt: eigener Zeitversatz je Ampel.
- Versatz = FMath::FRandRange(0.0f, ROT_S + GRUEN_S + GELB_S);
- Zustand = 0; Bis = GetWorld()->GetTimeSeconds() + Versatz + ROT_S;
+ // Kreuzungen sollen nicht alle im Gleichtakt schalten - ein fester, aus der
+ // Gruppen-ID abgeleiteter Versatz (statt Zufall) verteilt sie ueber die
+ // Zykluszeit, bleibt aber fuer jede Ampel derselben Kreuzung gleich.
+ const float GruppenVersatz = FMath::Fmod(Gruppe * 7.31f, ZYKLUS_S);
+ // Phase 1 laeuft exakt gegenphasig zu Phase 0 derselben Kreuzung - so hat
+ // eine kreuzende Fahrbahnachse nie gleichzeitig Gruen.
+ const float PhasenVersatz = Phase == 1 ? ZYKLUS_S * 0.5f : 0.0f;
+ float Rest;
+ ZustandBei(GetWorld()->GetTimeSeconds() + GruppenVersatz + PhasenVersatz, Zustand, Rest);
+ Bis = GetWorld()->GetTimeSeconds() + Rest;
  BaueKopf();
  Alle.Add(this);
 }

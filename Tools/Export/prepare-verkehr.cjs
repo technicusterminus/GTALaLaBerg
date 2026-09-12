@@ -123,12 +123,55 @@ function naechsteStrassenrichtung(x, z) {
   }
   return richtung;
 }
-const ampeln = (city.signals || []).map(s => {
+const ampelnRoh = (city.signals || []).map(s => {
   const [rx, rz] = naechsteStrassenrichtung(s.x, s.z);
   // Quer zur Fahrbahn drehen, damit die Ampel dem Verkehr zugewandt steht.
   const gierGrad = Math.atan2(rz, rx) * 180 / Math.PI + 90;
-  return { x: ux(s.x), y: uz(s.z), z: Math.round(boden(s.x, s.z) * M), gier: Math.round(gierGrad) };
+  return { x: s.x, z: s.z, gier: gierGrad };
 });
+
+// Kreuzungsgruppen: Ampeln innerhalb von 45 m gehoeren zur selben Kreuzung
+// (einfaches Union-Find ueber die Paarabstaende, keine echte OSM-Kreuzungs-
+// relation - die liegt in den Quelldaten nicht vor). Innerhalb einer Gruppe
+// schalten zwei Phasen abwechselnd auf Gruen: Ampeln, deren Fahrbahnachse
+// (aus "gier") ungefaehr gleich oder um 180 Grad gedreht verlaeuft, gehoeren
+// zur selben Phase - ungefaehr senkrechte Achsen zur anderen. Damit haben
+// sich kreuzende Strassen nie gleichzeitig Gruen, ohne dass eine echte
+// Kreuzungstopologie ausgewertet werden muesste.
+const KREUZUNGS_RADIUS = 45;
+const eltern = ampelnRoh.map((_, i) => i);
+function find(i) { while (eltern[i] !== i) { eltern[i] = eltern[eltern[i]]; i = eltern[i]; } return i; }
+function vereinige(a, b) { const ra = find(a), rb = find(b); if (ra !== rb) eltern[ra] = rb; }
+for (let i = 0; i < ampelnRoh.length; i++) {
+  for (let j = i + 1; j < ampelnRoh.length; j++) {
+    const d = Math.hypot(ampelnRoh[i].x - ampelnRoh[j].x, ampelnRoh[i].z - ampelnRoh[j].z);
+    if (d <= KREUZUNGS_RADIUS) vereinige(i, j);
+  }
+}
+// Gruppen-IDs zu 0..n-1 verdichten, damit sie sich als seed fuer den
+// Kreuzungs-Zeitversatz eignen (siehe LaLaBergAmpel.cpp).
+const gruppenIndex = new Map();
+const gruppe = ampelnRoh.map((_, i) => {
+  const wurzel = find(i);
+  if (!gruppenIndex.has(wurzel)) gruppenIndex.set(wurzel, gruppenIndex.size);
+  return gruppenIndex.get(wurzel);
+});
+// Phase je Ampel: 0 fuer die Achse mit dem ersten "gier"-Winkel in einer
+// Gruppe (auf 180 Grad reduziert), 1 fuer alles, was um rund 90 Grad
+// dagegen verdreht ist.
+const gruppenAchse = new Map();
+const phase = ampelnRoh.map((a, i) => {
+  const g = gruppe[i];
+  const achse = ((a.gier % 180) + 180) % 180;
+  if (!gruppenAchse.has(g)) { gruppenAchse.set(g, achse); return 0; }
+  const bezug = gruppenAchse.get(g);
+  let diff = Math.abs(achse - bezug); if (diff > 90) diff = 180 - diff;
+  return diff > 45 ? 1 : 0;
+});
+const ampeln = ampelnRoh.map((s, i) => ({
+  x: ux(s.x), y: uz(s.z), z: Math.round(boden(s.x, s.z) * M), gier: Math.round(s.gier),
+  gruppe: gruppe[i], phase: phase[i],
+}));
 
 const ergebnis = { schema: 1, autos, passanten, ampeln };
 const out = path.resolve(REPO, 'Content/SourceData/Verkehr/verkehr.json');

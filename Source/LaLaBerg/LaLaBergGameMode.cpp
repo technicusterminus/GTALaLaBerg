@@ -412,7 +412,8 @@ void ALaLaBergGameMode::BeginPlay() {
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergWaffentest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergVerkehrFoto")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergLechFoto")) ||
-                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergKoerperFoto"));
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergKoerperFoto")) ||
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergAmpelTest"));
  if(bAutomatisch) Beleg(FString::Printf(TEXT("LALABERG_SPIELBEGINN nach %.1fs Programmlaufzeit, %d Gebaeude"),FPlatformTime::Seconds()-GStartTime,BuildingCount));
  if(!bAutomatisch) {
   if(UGameInstance* Spiel=GetGameInstance()) {
@@ -758,6 +759,35 @@ void ALaLaBergGameMode::BeginPlay() {
    FPlatformMisc::RequestExitWithStatus(false,0);
   },9.4f,false);
  }
+ // Prueft ueber eine volle Zyklusdauer, ob zwei Ampeln derselben Kreuzung
+ // (gleiche Gruppe, verschiedene Phase - siehe LaLaBergAmpel::SetzeGruppe)
+ // je gleichzeitig Gruen zeigen. Ohne diesen Test waere "kreuzende Strassen
+ // haben nie gleichzeitig Gruen" nur eine Behauptung ueber den Code, der die
+ // Zeitrechnung dafuer aufstellt, nicht ueber das tatsaechliche Verhalten.
+ if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergAmpelTest"))) {
+  auto Pruefe=[this]() {
+   int32 Verstoesse=0;
+   TMap<int32,TArray<ALaLaBergAmpel*>> Gruppen;
+   for(ALaLaBergAmpel* A:ALaLaBergAmpel::Alle) if(A) Gruppen.FindOrAdd(A->HoleGruppe()).Add(A);
+   for(const auto& Paar:Gruppen) {
+    const TArray<ALaLaBergAmpel*>& Liste=Paar.Value;
+    for(int32 i=0;i<Liste.Num();i++) for(int32 j=i+1;j<Liste.Num();j++) {
+     if(Liste[i]->HolePhase()==Liste[j]->HolePhase()) continue;
+     if(!Liste[i]->HaeltAn() && !Liste[j]->HaeltAn()) Verstoesse++;
+    }
+   }
+   return Verstoesse;
+  };
+  static int32 GesamtVerstoesse=0;
+  FTimerHandle Takt;
+  GetWorldTimerManager().SetTimer(Takt,[this,Pruefe]() { GesamtVerstoesse+=Pruefe(); },0.5f,true,2.0f);
+  FTimerHandle Ende;
+  GetWorldTimerManager().SetTimer(Ende,[this]() {
+   Beleg(FString::Printf(TEXT("LALABERG_AMPELTEST %s verstoesse=%d ampeln=%d"),
+    GesamtVerstoesse==0?TEXT("PASS"):TEXT("FAIL"),GesamtVerstoesse,AmpelZahl));
+   FPlatformMisc::RequestExitWithStatus(false,0);
+  },18.0f,false);
+ }
  if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergSmoke"))) {
   FTimerHandle Handle;
   GetWorldTimerManager().SetTimer(Handle,[this]() {
@@ -819,7 +849,15 @@ void ALaLaBergGameMode::LadeVerkehr() {
  for(const auto& Wert:Wurzel->GetArrayField(TEXT("ampeln"))) {
   const auto Obj=Wert->AsObject();
   const FVector Ort(Obj->GetNumberField(TEXT("x")),Obj->GetNumberField(TEXT("y")),Obj->GetNumberField(TEXT("z")));
-  if(GetWorld()->SpawnActor<ALaLaBergAmpel>(Ort,FRotator(0,Obj->GetNumberField(TEXT("gier")),0))) AmpelZahl++;
+  const FTransform Lage(FRotator(0,Obj->GetNumberField(TEXT("gier")),0),Ort);
+  // Gruppe/Phase (Kreuzungszuordnung aus prepare-verkehr.cjs) muessen vor
+  // BeginPlay stehen - SpawnActor riefe BeginPlay schon auf, bevor SetzeGruppe
+  // je zum Zug kaeme (siehe LaLaBergFarbkugel fuer dasselbe Vorgehen).
+  if(auto* Ampel=GetWorld()->SpawnActorDeferred<ALaLaBergAmpel>(ALaLaBergAmpel::StaticClass(),Lage)) {
+   Ampel->SetzeGruppe(Obj->GetIntegerField(TEXT("gruppe")),Obj->GetIntegerField(TEXT("phase")));
+   Ampel->FinishSpawning(Lage);
+   AmpelZahl++;
+  }
  }
  UE_LOG(LogTemp,Display,TEXT("LALABERG_VERKEHR autos=%d passanten=%d ampeln=%d"),AutoZahl,PassantZahl,AmpelZahl);
 }
