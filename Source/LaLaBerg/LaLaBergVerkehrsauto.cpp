@@ -52,6 +52,12 @@ namespace {
   if (FVector::DotProduct(Diff / Dist, Vorwaerts) < 0.5f) return 1.0f;
   return FMath::Clamp((Dist - 260.0f) / 640.0f, 0.05f, 1.0f);
  }
+ // Groesster seitlicher Versatz, den ein Wagen einem Hindernis ausweicht -
+ // nach rechts, wie im echten Verkehr ueblich. Keine Fahrspur-Erkennung: der
+ // Versatz ist ein fester Wert, kein Blick darauf, ob rechts ueberhaupt noch
+ // Fahrbahn ist. Nur vor Autos/Spieler, nicht vor einer roten Ampel - dort
+ // soll stehenbleiben, nicht vorbeischleichen, das richtige Verhalten sein.
+ constexpr float MAX_SEITVERSATZ = 220.0f;
 }
 
 ALaLaBergVerkehrsauto::ALaLaBergVerkehrsauto() {
@@ -104,11 +110,19 @@ void ALaLaBergVerkehrsauto::Tick(float Zeit) {
  const bool bGestoert = GetWorld()->GetTimeSeconds() < StoerungBis;
  FVector Ort = GetActorLocation();
  const FVector Vorwaerts = GetActorForwardVector();
- const float Bremse = FMath::Min(FMath::Min(BremseVorAndauto(this, Ort, Vorwaerts), BremseVorAmpel(Ort, Vorwaerts)),
-                                  BremseVorSpieler(GetWorld(), Ort, Vorwaerts));
+ const float BremseObjekt = FMath::Min(BremseVorAndauto(this, Ort, Vorwaerts), BremseVorSpieler(GetWorld(), Ort, Vorwaerts));
+ const float Bremse = FMath::Min(BremseObjekt, BremseVorAmpel(Ort, Vorwaerts));
  const FVector Richtung = Weg.Bewege(Ort, Tempo * Zeit * (bGestoert ? 0.08f : 1.0f) * Bremse);
  SetActorLocation(Ort);
  if (!Richtung.IsNearlyZero()) SetActorRotation(FMath::RInterpTo(GetActorRotation(), Richtung.Rotation(), Zeit, 5.0f));
+
+ // Weicht einem Auto oder dem Spieler direkt voraus seitlich aus (nach
+ // rechts), statt nur davor stehenzubleiben - nicht vor einer roten Ampel,
+ // da soll die Fahrt tatsaechlich enden. Keine Fahrspur-Erkennung: ein
+ // fester Versatz, sanft ein- und wieder ausgeblendet.
+ const float SeitZiel = BremseObjekt < 0.9f ? MAX_SEITVERSATZ : 0.0f;
+ Seitversatz = FMath::FInterpTo(Seitversatz, SeitZiel, Zeit, 0.7f);
+ if (FMath::Abs(Seitversatz) > 0.5f) SetActorLocation(GetActorLocation() + GetActorRightVector() * Seitversatz);
 }
 
 // ILaLaBergFarbbar: nur kurz abbremsen. Der Klecks ist schon das Decal der

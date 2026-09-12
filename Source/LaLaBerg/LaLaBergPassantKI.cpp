@@ -44,6 +44,9 @@ namespace {
   if (FVector::DotProduct(Diff / Dist, Vorwaerts) < 0.5f) return 1.0f;
   return FMath::Clamp((Dist - 70.0f) / 180.0f, 0.05f, 1.0f);
  }
+ // Seitlicher Versatz zum Ausweichen, kleiner als bei Autos (siehe
+ // LaLaBergVerkehrsauto.cpp) - ein Gehweg bietet weniger Platz.
+ constexpr float MAX_SEITVERSATZ = 55.0f;
 }
 
 TArray<ALaLaBergPassantKI*> ALaLaBergPassantKI::Alle;
@@ -166,6 +169,12 @@ void ALaLaBergPassantKI::Tick(float Zeit) {
  const FVector Richtung = Weg.Bewege(Ort, Tempo * Zeit * Faktor);
  SetActorLocation(Ort);
  if (!Richtung.IsNearlyZero()) SetActorRotation(FMath::RInterpTo(GetActorRotation(), Richtung.Rotation(), Zeit, 4.0f));
+
+ // Weicht einer Person oder dem Spieler direkt voraus seitlich aus, statt
+ // nur davor stehenzubleiben - sanft ein- und wieder ausgeblendet.
+ const float SeitZiel = Bremse < 0.9f ? MAX_SEITVERSATZ : 0.0f;
+ Seitversatz = FMath::FInterpTo(Seitversatz, SeitZiel, Zeit, 0.7f);
+ if (FMath::Abs(Seitversatz) > 0.5f) SetActorLocation(GetActorLocation() + GetActorRightVector() * Seitversatz);
 
  // Schrittfrequenz an das tatsaechliche Tempo gekoppelt: schneller gehen
  // heisst schneller schwingende Gelenke, nicht nur schnellere Fuesse ueber

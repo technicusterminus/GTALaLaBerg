@@ -49,6 +49,7 @@ private:
  FLaLaBergWegfolger Weg;
  float Tempo = 140.0f;             // cm/s, gewoehnliches Gehtempo
  float StolpertBis = -10.0f;       // ein Treffer bremst kurz
+ float Seitversatz = 0.0f;         // seitliches Ausweichen, siehe Tick
  float Gehphase = 0.0f;
  FLinearColor Jacke;
  float Groesse = 1.72f;

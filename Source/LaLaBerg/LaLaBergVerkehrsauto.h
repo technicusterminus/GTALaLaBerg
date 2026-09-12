@@ -35,5 +35,8 @@ private:
  FLaLaBergWegfolger Weg;
  float Tempo = 900.0f;          // cm/s
  float StoerungBis = -10.0f;    // ein Treffer bremst kurz ab
+ // Seitlicher Versatz zum Ausweichen vor einem Hindernis (siehe Tick) -
+ // weicht sanft aus und wieder zurueck, statt starr auf der Route zu bremsen.
+ float Seitversatz = 0.0f;
  FLinearColor Lack = FLinearColor(0.6f, 0.6f, 0.6f);
 };
