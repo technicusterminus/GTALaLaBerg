@@ -1,8 +1,11 @@
 #include "LaLaBergPassantKI.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SceneComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "ProceduralMeshComponent.h"
 #include "Materials/MaterialInterface.h"
+#include "Engine/SkeletalMesh.h"
+#include "Animation/AnimSequence.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/Pawn.h"
@@ -107,6 +110,35 @@ ALaLaBergPassantKI::ALaLaBergPassantKI() {
   Oberarm[s]->SetupAttachment(Schulter[s]);
   Oberarm[s]->SetCollisionEnabled(ECollisionEnabled::NoCollision);
  }
+
+ // Skeletal-Mesh-Alternative zum Kasten-Rig oben (siehe BeginPlay) - vier
+ // Teile desselben modularen Pakets, am Boden (Huelle-relativ -86, wie
+ // Netz) statt in Huelle-Mitte, weil das importierte Skelett seine eigene
+ // Bodenreferenz mitbringt.
+ SkelettKoerper = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("SkelettKoerper"));
+ SkelettKoerper->SetupAttachment(Huelle);
+ SkelettKoerper->SetRelativeLocation(FVector(0, 0, -86));
+ SkelettKoerper->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+ SkelettKoerper->SetVisibility(false);
+ // Dieselbe Bodenversatz -86 wie SkelettKoerper: SetLeaderPoseComponent
+ // uebernimmt nur die Knochen-Transforms, nicht die eigene Komponenten-
+ // Transform - ohne diesen Versatz schwebte der Kopf um 86 Einheiten zu
+ // hoch ueber dem Koerper (im Test bestaetigt, deutlich sichtbar).
+ SkelettKopf = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("SkelettKopf"));
+ SkelettKopf->SetupAttachment(Huelle);
+ SkelettKopf->SetRelativeLocation(FVector(0, 0, -86));
+ SkelettKopf->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+ SkelettKopf->SetVisibility(false);
+ SkelettFuesse = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("SkelettFuesse"));
+ SkelettFuesse->SetupAttachment(Huelle);
+ SkelettFuesse->SetRelativeLocation(FVector(0, 0, -86));
+ SkelettFuesse->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+ SkelettFuesse->SetVisibility(false);
+ SkelettBeine = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("SkelettBeine"));
+ SkelettBeine->SetupAttachment(Huelle);
+ SkelettBeine->SetRelativeLocation(FVector(0, 0, -86));
+ SkelettBeine->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+ SkelettBeine->SetVisibility(false);
 }
 
 // Ein Kasten, dessen Ursprung oben am Gelenk liegt und der um "Laenge" nach
@@ -144,14 +176,48 @@ void ALaLaBergPassantKI::SetzeRoute(const TArray<FVector>& Punkte, float TempoKm
  if (Weg.Gueltig()) SetActorLocation(Weg.Start());
 }
 
+// Bevorzugt das lizenzierte Skeletal Mesh (siehe Header) - alle vier Teile
+// muessen laden, sonst bleibt es konsistent beim Kasten-Rig statt eine
+// Figur halb echt, halb Kasten zusammenzusetzen.
+namespace {
+ USkeletalMesh* LadeNPCTeil(const TCHAR* Name) {
+  return LoadObject<USkeletalMesh>(nullptr, *FString::Printf(TEXT("/Game/Art/People/Farmer/SK_Farmer_%s.SK_Farmer_%s"), Name, Name));
+ }
+}
+
 void ALaLaBergPassantKI::BeginPlay() {
  Super::BeginPlay();
- BaueOberkoerper();
- const FLinearColor Hose = HOSEN[FMath::RandRange(0, UE_ARRAY_COUNT(HOSEN) - 1)];
- for (int32 s = 0; s < 2; s++) {
-  BaueGlied(Oberschenkel[s], Hose, 8.0f, OberschenkelL);
-  BaueGlied(Unterschenkel[s], Hose, 7.0f, UnterschenkelL);
-  BaueGlied(Oberarm[s], Jacke, 5.5f, OberarmL);
+
+ USkeletalMesh* MeshKoerper = LadeNPCTeil(TEXT("Body"));
+ USkeletalMesh* MeshKopf = LadeNPCTeil(TEXT("Head"));
+ USkeletalMesh* MeshFuesse = LadeNPCTeil(TEXT("Feet"));
+ USkeletalMesh* MeshBeine = LadeNPCTeil(TEXT("Legs"));
+ if (MeshKoerper && MeshKopf && MeshFuesse && MeshBeine) {
+  bSkelettGenutzt = true;
+  SkelettKoerper->SetSkeletalMesh(MeshKoerper);
+  SkelettKopf->SetSkeletalMesh(MeshKopf);
+  SkelettFuesse->SetSkeletalMesh(MeshFuesse);
+  SkelettBeine->SetSkeletalMesh(MeshBeine);
+  // Kopf/Fuesse/Beine folgen der Pose von SkelettKoerper, statt selbst eine
+  // AnimSequence abzuspielen - vier Teile, eine Animation.
+  SkelettKopf->SetLeaderPoseComponent(SkelettKoerper);
+  SkelettFuesse->SetLeaderPoseComponent(SkelettKoerper);
+  SkelettBeine->SetLeaderPoseComponent(SkelettKoerper);
+  for (USkeletalMeshComponent* Teil : { SkelettKoerper, SkelettKopf, SkelettFuesse, SkelettBeine }) Teil->SetVisibility(true);
+  Netz->SetVisibility(false);
+  for (int32 s = 0; s < 2; s++) {
+   Oberschenkel[s]->SetVisibility(false); Unterschenkel[s]->SetVisibility(false); Oberarm[s]->SetVisibility(false);
+  }
+  if (auto* Anim = LoadObject<UAnimSequence>(nullptr, TEXT("/Game/Art/People/Animations/Anim_HumansCharacterArmature_Idle_Neutral.Anim_HumansCharacterArmature_Idle_Neutral")))
+   SkelettKoerper->PlayAnimation(Anim, true);
+ } else {
+  BaueOberkoerper();
+  const FLinearColor Hose = HOSEN[FMath::RandRange(0, UE_ARRAY_COUNT(HOSEN) - 1)];
+  for (int32 s = 0; s < 2; s++) {
+   BaueGlied(Oberschenkel[s], Hose, 8.0f, OberschenkelL);
+   BaueGlied(Unterschenkel[s], Hose, 7.0f, UnterschenkelL);
+   BaueGlied(Oberarm[s], Jacke, 5.5f, OberarmL);
+  }
  }
  Alle.Add(this);
 }
@@ -179,6 +245,20 @@ void ALaLaBergPassantKI::Tick(float Zeit) {
  Seitversatz = FMath::FInterpTo(Seitversatz, SeitZiel, Zeit, 0.7f);
  if (FMath::Abs(Seitversatz) > 0.5f) SetActorLocation(GetActorLocation() + GetActorRightVector() * Seitversatz);
 
+ if (bSkelettGenutzt) {
+  // Echte Animation statt Gelenkwinkel von Hand: nur beim Wechsel zwischen
+  // Stehen und Gehen die AnimSequence tauschen, nicht jedes Bild neu
+  // abspielen (das rissee sie sonst staendig auf Bild 0 zurueck).
+  const bool bLaeuftJetzt = Faktor > 0.05f;
+  if (bLaeuftJetzt != bLaeuftGerade) {
+   bLaeuftGerade = bLaeuftJetzt;
+   const TCHAR* Pfad = bLaeuftGerade
+    ? TEXT("/Game/Art/People/Animations/Anim_HumansCharacterArmature_Walk.Anim_HumansCharacterArmature_Walk")
+    : TEXT("/Game/Art/People/Animations/Anim_HumansCharacterArmature_Idle_Neutral.Anim_HumansCharacterArmature_Idle_Neutral");
+   if (auto* Anim = LoadObject<UAnimSequence>(nullptr, Pfad)) SkelettKoerper->PlayAnimation(Anim, true);
+  }
+  return;
+ }
  // Schrittfrequenz an das tatsaechliche Tempo gekoppelt: schneller gehen
  // heisst schneller schwingende Gelenke, nicht nur schnellere Fuesse ueber
  // denselben traegen Takt. Steht die Figur (Faktor nahe 0), bleiben die

@@ -46,6 +46,19 @@ private:
  UPROPERTY() TObjectPtr<class USceneComponent> Schulter[2] = {};
  UPROPERTY() TObjectPtr<class UProceduralMeshComponent> Oberarm[2] = {};
 
+ // Bevorzugt: ein echtes, lizenziertes Skeletal Mesh mit echter Animation
+ // (CC0, Quaternius - siehe Content/SourceData/People/LIZENZ.md) statt des
+ // von Hand gebauten Kasten-Rigs oben. Rumpf (SkelettKoerper) traegt die
+ // Animation, Kopf/Fuesse/Beine folgen per LeaderPoseComponent derselben
+ // Pose - vier Teile aus demselben modularen Paket, ein Skelett. Nur wenn
+ // die Assets fehlen, bleibt es beim Kasten-Rig (siehe BeginPlay).
+ UPROPERTY() TObjectPtr<class USkeletalMeshComponent> SkelettKoerper = nullptr;
+ UPROPERTY() TObjectPtr<class USkeletalMeshComponent> SkelettKopf = nullptr;
+ UPROPERTY() TObjectPtr<class USkeletalMeshComponent> SkelettFuesse = nullptr;
+ UPROPERTY() TObjectPtr<class USkeletalMeshComponent> SkelettBeine = nullptr;
+ bool bSkelettGenutzt = false;
+ bool bLaeuftGerade = false;    // aktuell Walk- statt Idle-Animation
+
  FLaLaBergWegfolger Weg;
  float Tempo = 140.0f;             // cm/s, gewoehnliches Gehtempo
  float StolpertBis = -10.0f;       // ein Treffer bremst kurz

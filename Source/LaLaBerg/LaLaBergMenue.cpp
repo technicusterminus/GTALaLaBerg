@@ -15,7 +15,7 @@
 namespace {
  // Ein knapper, ruhiger Satz Farben. Kontrast gegen den hellen Himmel und
  // gegen dunkle Gassen, damit die Schrift in beiden Faellen lesbar bleibt.
- const FLinearColor Grund(0.05f, 0.06f, 0.08f, 0.86f);
+ const FLinearColor Hintergrundfarbe(0.05f, 0.06f, 0.08f, 0.86f);
  const FLinearColor Schrift(0.94f, 0.93f, 0.90f, 1.0f);
  const FLinearColor Gedaempft(0.72f, 0.71f, 0.68f, 1.0f);
 
@@ -37,7 +37,7 @@ void SLaLaBergMenue::Construct(const FArguments& InArgs) {
   [
    SNew(SBorder)
    .BorderImage(FCoreStyle::Get().GetBrush("WhiteBrush"))
-   .BorderBackgroundColor(Grund)
+   .BorderBackgroundColor(Hintergrundfarbe)
    .Padding(FMargin(56, 40))
    [
     SAssignNew(Inhalt, SBox).WidthOverride(520)[ BaueSeite() ]
