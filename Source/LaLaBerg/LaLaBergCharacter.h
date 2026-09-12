@@ -30,8 +30,26 @@ public:
  class ALaLaBergWaffe* HoleWaffe() const { return Waffe; }
 
 private:
+ UPROPERTY() TObjectPtr<class USpringArmComponent> Ausleger = nullptr;
  UPROPERTY() TObjectPtr<class UCameraComponent> Kamera = nullptr;
  UPROPERTY() TObjectPtr<class ALaLaBergWaffe> Waffe = nullptr;
+
+ // Von Hand gebauter Koerper (kein Skelett-Mesh, siehe LaLaBergPassantKI) -
+ // sonst schwebt die Waffe in dritter Person an einer unsichtbaren Kapsel.
+ void BaueOberkoerper();
+ void BaueGlied(class UProceduralMeshComponent* Netz, const FLinearColor& Farbe, float HalbBreite, float Laenge);
+ UPROPERTY() TObjectPtr<class UProceduralMeshComponent> Netz = nullptr;
+ // Je Seite: 0 = rechts (haelt die Waffe), 1 = links.
+ UPROPERTY() TObjectPtr<class USceneComponent> Huefte[2] = {};
+ UPROPERTY() TObjectPtr<class UProceduralMeshComponent> Oberschenkel[2] = {};
+ UPROPERTY() TObjectPtr<class USceneComponent> Knie[2] = {};
+ UPROPERTY() TObjectPtr<class UProceduralMeshComponent> Unterschenkel[2] = {};
+ UPROPERTY() TObjectPtr<class USceneComponent> Schulter[2] = {};
+ UPROPERTY() TObjectPtr<class UProceduralMeshComponent> Oberarm[2] = {};
+ UPROPERTY() TObjectPtr<class USceneComponent> WaffenHalter = nullptr;
+ float BeinL = 0.0f, OberschenkelL = 0.0f, UnterschenkelL = 0.0f, OberarmL = 0.0f;
+ float Gehphase = 0.0f;
+
  void Waffe1(); void Waffe2(); void Waffe3(); void Waffe4();
  // Gedrueckt gehalten, feuert die Waffe weiter - ihre eigene Feuerrate
  // begrenzt, wie schnell. So wird aus der MP eine Dauerfeuerwaffe, ohne

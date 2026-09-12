@@ -411,7 +411,8 @@ void ALaLaBergGameMode::BeginPlay() {
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergFahrtest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergWaffentest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergVerkehrFoto")) ||
-                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergLechFoto"));
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergLechFoto")) ||
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergKoerperFoto"));
  if(bAutomatisch) Beleg(FString::Printf(TEXT("LALABERG_SPIELBEGINN nach %.1fs Programmlaufzeit, %d Gebaeude"),FPlatformTime::Seconds()-GStartTime,BuildingCount));
  if(!bAutomatisch) {
   if(UGameInstance* Spiel=GetGameInstance()) {
@@ -530,6 +531,21 @@ void ALaLaBergGameMode::BeginPlay() {
   },8.0f,false);
   FTimerHandle LechEnde;
   GetWorldTimerManager().SetTimer(LechEnde,[]() { FPlatformMisc::RequestExitWithStatus(false,0); },13.0f,false);
+ }
+ // Sichttest fuer die Spielfigur selbst: waagerechte Kamera auf freiem Feld,
+ // ohne den schraegen Blickwinkel des Waffentests (der zum Wagen schaut) -
+ // klaert, ob Koerper/Arm/Waffe an sich richtig sitzen oder nur die
+ // Kameraneigung des anderen Tests den Eindruck verzerrt.
+ if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergKoerperFoto"))) {
+  FTimerHandle Bild;
+  GetWorldTimerManager().SetTimer(Bild,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   if(!PC) return;
+   PC->SetControlRotation(FRotator(0,0,0));
+   PC->ConsoleCommand(TEXT("HighResShot 1600x900"));
+  },4.0f,false);
+  FTimerHandle Ende;
+  GetWorldTimerManager().SetTimer(Ende,[]() { FPlatformMisc::RequestExitWithStatus(false,0); },7.0f,false);
  }
  // Fahrtest: Wagen uebernehmen, vier Sekunden Gas geben, Weg messen. Ohne
  // diesen Test waere "der Wagen faehrt" eine Behauptung.
