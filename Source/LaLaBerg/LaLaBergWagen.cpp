@@ -1,6 +1,8 @@
 #include "LaLaBergWagen.h"
 #include "ProceduralMeshComponent.h"
 #include "Components/BoxComponent.h"
+#include "Components/SceneComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Engine/World.h"
@@ -103,14 +105,17 @@ ALaLaBergWagen::ALaLaBergWagen() {
  Rumpf->InitBoxExtent(FVector(210, 88, 55));
  SetRootComponent(Rumpf);
 
- Netz = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("Karosserie"));
- Netz->SetupAttachment(Rumpf);
+ Karosseriepunkt = CreateDefaultSubobject<USceneComponent>(TEXT("Karosseriepunkt"));
+ Karosseriepunkt->SetupAttachment(Rumpf);
  // Der Wagen ruht auf der Federung: die Federstrahlen beginnen 55 cm unter
  // dem Kastenmittelpunkt und sind 88 cm lang; im Stand federt jedes Rad
  // 1250 kg * 9,8 / 4 / 34000 = 9 cm ein. Die Fahrbahn liegt also
  // 55 + 88 - 9 = 134 cm unter der Mitte. Mit den frueher angesetzten 88 cm
  // schwebte der Wagen sichtbar eine Handbreit ueber der Strasse.
- Netz->SetRelativeLocation(FVector(0, 0, -134));
+ Karosseriepunkt->SetRelativeLocation(FVector(0, 0, -134));
+
+ Netz = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("Karosserie"));
+ Netz->SetupAttachment(Karosseriepunkt);
  Netz->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
  Ausleger = CreateDefaultSubobject<USpringArmComponent>(TEXT("Ausleger"));
@@ -170,6 +175,19 @@ void ALaLaBergWagen::ErhalteFarbe(const FLinearColor& Farbe, const FVector& AusR
 }
 
 void ALaLaBergWagen::BaueKarosserie() {
+ // Bevorzugt das lizenzierte CarConcept-Fahrzeug (CC BY 4.0, siehe
+ // Content/SourceData/Vehicles/CarConcept-LICENSE.md) - deutlich mehr
+ // Detail als die prozedurale Form. Das Rohmodell hat seine Laengsachse
+ // (436 cm Ausdehnung) lokal auf Y statt auf X, deshalb die 90-Grad-
+ // Drehung; ohne Zugriff auf einen Modell-Editor war das nur per
+ // Testbild zu pruefen, nicht am Namen der Achsen abzulesen.
+ if (!CarConceptTeile.IsEmpty()) return;  // schon gebaut - CarConcept faerbt sich nicht per SetzeLack um
+ if (LaLaBergWagenForm::BaueCarConceptTeile(Karosseriepunkt, CarConceptTeile)) {
+  Karosseriepunkt->SetRelativeRotation(FRotator(0, -90, 0));
+  Netz->SetVisibility(false);
+  Netz->ClearAllMeshSections();
+  return;
+ }
  if (BaueAusVorlage()) return;
  TArray<FVector> Punkte; TArray<int32> Kanten;
  Loft(Karosse, UE_ARRAY_COUNT(Karosse), Punkte, Kanten);

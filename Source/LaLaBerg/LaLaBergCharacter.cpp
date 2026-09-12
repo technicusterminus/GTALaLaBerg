@@ -10,6 +10,7 @@
 #include "Engine/GameInstance.h"
 #include "LaLaBergMenueSteuerung.h"
 #include "LaLaBergWagen.h"
+#include "LaLaBergVerkehrsauto.h"
 #include "LaLaBergWaffe.h"
 #include "LaLaBergKoerperTeile.h"
 #include "ProceduralMeshComponent.h"
@@ -19,7 +20,12 @@
 #include "Sound/SoundBase.h"
 
 namespace {
- using namespace LaLaBergKoerperTeile;
+ // Kein "using namespace"/"using" hier: anonyme Namespaces sind pro
+ // Uebersetzungseinheit vereinigt, nicht pro Datei - im Unity-Build wirkt
+ // eine using-Deklaration hier sonst in andere .cpp-Dateien mit eigenem
+ // "kasten()" (z.B. LaLaBergWaffe.cpp) hinein und macht dessen Aufrufe
+ // mehrdeutig. Stattdessen wird unten LaLaBergKoerperTeile::kasten() usw.
+ // voll qualifiziert aufgerufen.
  const FLinearColor JACKE(0.20f, 0.22f, 0.25f), HOSE(0.15f, 0.16f, 0.18f), HAUT(0.79f, 0.63f, 0.51f);
  constexpr float HUEFT_GRAD = 22.0f, KNIE_GRAD = 38.0f, SCHULTER_GRAD = 16.0f;
 }
@@ -117,13 +123,13 @@ void ALaLaBergCharacter::BaueOberkoerper() {
  const float GroesseM = 1.78f;
  TArray<FVector> P; TArray<int32> K; TArray<FLinearColor> F;
  const float RumpfOben = BeinL + GroesseM * 46.0f;
- kasten(P, K, F, JACKE, FVector(0, 0, (BeinL + RumpfOben) * 0.5f), FVector(15.0f, 11.0f, (RumpfOben - BeinL) * 0.5f));
+ LaLaBergKoerperTeile::kasten(P, K, F, JACKE, FVector(0, 0, (BeinL + RumpfOben) * 0.5f), FVector(15.0f, 11.0f, (RumpfOben - BeinL) * 0.5f));
  const float HalsOben = RumpfOben + GroesseM * 4.0f;
- kasten(P, K, F, HAUT, FVector(0, 0, (RumpfOben + HalsOben) * 0.5f), FVector(5.0f, 5.0f, (HalsOben - RumpfOben) * 0.5f + 0.5f));
- kasten(P, K, F, HAUT, FVector(0, 0, HalsOben + GroesseM * 9.0f), FVector(9.0f, 9.5f, GroesseM * 9.0f));
+ LaLaBergKoerperTeile::kasten(P, K, F, HAUT, FVector(0, 0, (RumpfOben + HalsOben) * 0.5f), FVector(5.0f, 5.0f, (HalsOben - RumpfOben) * 0.5f + 0.5f));
+ LaLaBergKoerperTeile::kasten(P, K, F, HAUT, FVector(0, 0, HalsOben + GroesseM * 9.0f), FVector(9.0f, 9.5f, GroesseM * 9.0f));
 
  TArray<FVector> Normalen; TArray<FVector2D> UVs; TArray<FProcMeshTangent> Tangenten;
- normalen(P, K, Normalen);
+ LaLaBergKoerperTeile::normalen(P, K, Normalen);
  for (int32 i = 0; i < P.Num(); i++) UVs.Add(FVector2D(P[i].X / 60.0, P[i].Y / 60.0));
  Netz->ClearAllMeshSections();
  Netz->CreateMeshSection_LinearColor(0, P, K, Normalen, UVs, F, Tangenten, false);
@@ -134,9 +140,9 @@ void ALaLaBergCharacter::BaueOberkoerper() {
 // Gelenk, reicht um "Laenge" nach unten.
 void ALaLaBergCharacter::BaueGlied(UProceduralMeshComponent* GliedNetz, const FLinearColor& Farbe, float HalbBreite, float Laenge) {
  TArray<FVector> P; TArray<int32> K; TArray<FLinearColor> F;
- kasten(P, K, F, Farbe, FVector(0, 0, -Laenge * 0.5f), FVector(HalbBreite, HalbBreite, Laenge * 0.5f));
+ LaLaBergKoerperTeile::kasten(P, K, F, Farbe, FVector(0, 0, -Laenge * 0.5f), FVector(HalbBreite, HalbBreite, Laenge * 0.5f));
  TArray<FVector> Normalen; TArray<FVector2D> UVs; TArray<FProcMeshTangent> Tangenten;
- normalen(P, K, Normalen);
+ LaLaBergKoerperTeile::normalen(P, K, Normalen);
  for (const FVector& Pt : P) UVs.Add(FVector2D(Pt.X / 40.0, Pt.Y / 40.0));
  GliedNetz->CreateMeshSection_LinearColor(0, P, K, Normalen, UVs, F, Tangenten, false);
  if (auto* M = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Art/Materials/M_Stoff.M_Stoff"))) GliedNetz->SetMaterial(0, M);
@@ -278,6 +284,10 @@ void ALaLaBergCharacter::Quit() {
 
 
 // Sucht den naechsten Wagen im Umkreis von acht Metern und uebernimmt ihn.
+// Findet sich dort kein fahrbarer Wagen, aber ein KI-Auto: das wird an Ort
+// und Stelle zu einem fahrbaren Wagen, das KI-Auto verschwindet dafuer -
+// wie in einem echten GTA soll jedes Auto auf der Strasse nehmbar sein,
+// nicht nur das eine dafuer vorgesehene.
 void ALaLaBergCharacter::Einsteigen() {
  APlayerController* PC = Cast<APlayerController>(GetController());
  if (!PC) return;
@@ -286,6 +296,18 @@ void ALaLaBergCharacter::Einsteigen() {
  for (TActorIterator<ALaLaBergWagen> It(GetWorld()); It; ++It) {
   const float Abstand = FVector::Dist(It->GetActorLocation(), GetActorLocation());
   if (Abstand < Beste) { Beste = Abstand; Naechster = *It; }
+ }
+ if (!Naechster) {
+  ALaLaBergVerkehrsauto* NaechstesKI = nullptr;
+  float BesteKI = 800.0f;
+  for (TActorIterator<ALaLaBergVerkehrsauto> It(GetWorld()); It; ++It) {
+   const float Abstand = FVector::Dist(It->GetActorLocation(), GetActorLocation());
+   if (Abstand < BesteKI) { BesteKI = Abstand; NaechstesKI = *It; }
+  }
+  if (NaechstesKI) {
+   Naechster = GetWorld()->SpawnActor<ALaLaBergWagen>(NaechstesKI->GetActorLocation(), NaechstesKI->GetActorRotation());
+   if (Naechster) { Beste = BesteKI; NaechstesKI->Destroy(); }
+  }
  }
  if (!Naechster) return;
  Naechster->SetzeFahrer(this);

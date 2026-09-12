@@ -9,7 +9,10 @@
 #include "LaLaBergKoerperTeile.h"
 
 namespace {
- using namespace LaLaBergKoerperTeile;
+ // Kein "using namespace" hier: anonyme Namespaces sind pro Uebersetzungs-
+ // einheit vereinigt, nicht pro Datei - im Unity-Build wirkt eine using-
+ // Deklaration sonst in andere .cpp-Dateien mit eigenem "kasten()" hinein
+ // und macht deren Aufrufe mehrdeutig (siehe LaLaBergCharacter.cpp).
  // Landsberger Strassenbild in Kleidung: gedeckte Hosen, kraeftigere Jacken.
  const FLinearColor HOSEN[] = { FLinearColor(0.17f,0.19f,0.22f), FLinearColor(0.23f,0.24f,0.26f), FLinearColor(0.29f,0.24f,0.20f) };
  const FLinearColor JACKEN[] = { FLinearColor(0.55f,0.23f,0.20f), FLinearColor(0.18f,0.29f,0.36f), FLinearColor(0.24f,0.35f,0.25f),
@@ -110,9 +113,9 @@ ALaLaBergPassantKI::ALaLaBergPassantKI() {
 // unten reicht - der Baustein fuer jedes Glied des Rigs.
 void ALaLaBergPassantKI::BaueGlied(UProceduralMeshComponent* GliedNetz, const FLinearColor& Farbe, float HalbBreite, float Laenge) {
  TArray<FVector> P; TArray<int32> K; TArray<FLinearColor> F;
- kasten(P, K, F, Farbe, FVector(0, 0, -Laenge * 0.5f), FVector(HalbBreite, HalbBreite, Laenge * 0.5f));
+ LaLaBergKoerperTeile::kasten(P, K, F, Farbe, FVector(0, 0, -Laenge * 0.5f), FVector(HalbBreite, HalbBreite, Laenge * 0.5f));
  TArray<FVector> Normalen; TArray<FVector2D> UVs; TArray<FProcMeshTangent> Tangenten;
- normalen(P, K, Normalen);
+ LaLaBergKoerperTeile::normalen(P, K, Normalen);
  for (const FVector& Pt : P) UVs.Add(FVector2D(Pt.X / 40.0, Pt.Y / 40.0));
  GliedNetz->CreateMeshSection_LinearColor(0, P, K, Normalen, UVs, F, Tangenten, false);
  if (auto* M = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Art/Materials/M_Stoff.M_Stoff"))) GliedNetz->SetMaterial(0, M);
@@ -122,13 +125,13 @@ void ALaLaBergPassantKI::BaueGlied(UProceduralMeshComponent* GliedNetz, const FL
 void ALaLaBergPassantKI::BaueOberkoerper() {
  TArray<FVector> P; TArray<int32> K; TArray<FLinearColor> F;
  const float RumpfOben = BeinL + Groesse * 46.0f;
- kasten(P, K, F, Jacke, FVector(0, 0, (BeinL + RumpfOben) * 0.5f), FVector(15.0f, 11.0f, (RumpfOben - BeinL) * 0.5f));
+ LaLaBergKoerperTeile::kasten(P, K, F, Jacke, FVector(0, 0, (BeinL + RumpfOben) * 0.5f), FVector(15.0f, 11.0f, (RumpfOben - BeinL) * 0.5f));
  const float HalsOben = RumpfOben + Groesse * 4.0f;
- kasten(P, K, F, HAUT, FVector(0, 0, (RumpfOben + HalsOben) * 0.5f), FVector(5.0f, 5.0f, (HalsOben - RumpfOben) * 0.5f + 0.5f));
- kasten(P, K, F, HAUT, FVector(0, 0, HalsOben + Groesse * 9.0f), FVector(9.0f, 9.5f, Groesse * 9.0f));
+ LaLaBergKoerperTeile::kasten(P, K, F, HAUT, FVector(0, 0, (RumpfOben + HalsOben) * 0.5f), FVector(5.0f, 5.0f, (HalsOben - RumpfOben) * 0.5f + 0.5f));
+ LaLaBergKoerperTeile::kasten(P, K, F, HAUT, FVector(0, 0, HalsOben + Groesse * 9.0f), FVector(9.0f, 9.5f, Groesse * 9.0f));
 
  TArray<FVector> Normalen; TArray<FVector2D> UVs; TArray<FProcMeshTangent> Tangenten;
- normalen(P, K, Normalen);
+ LaLaBergKoerperTeile::normalen(P, K, Normalen);
  for (int32 i = 0; i < P.Num(); i++) UVs.Add(FVector2D(P[i].X / 60.0, P[i].Y / 60.0));
  Netz->ClearAllMeshSections();
  Netz->CreateMeshSection_LinearColor(0, P, K, Normalen, UVs, F, Tangenten, false);

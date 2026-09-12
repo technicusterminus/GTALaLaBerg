@@ -1,6 +1,6 @@
 {
 	"FileVersion": 3,
-	"EngineAssociation": "{869F716A-4CAE-7147-B2CA-94A0E48344D6}",
+	"EngineAssociation": "5.8",
 	"Category": "Games",
 	"Description": "GTA LaLaBerg native integration prototype",
 	"Modules": [

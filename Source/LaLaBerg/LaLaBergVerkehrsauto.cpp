@@ -1,8 +1,10 @@
 #include "LaLaBergVerkehrsauto.h"
 #include "Components/BoxComponent.h"
 #include "Components/SceneComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "ProceduralMeshComponent.h"
 #include "LaLaBergWagenForm.h"
+#include "LaLaBergAutoPool.h"
 #include "LaLaBergAmpel.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
@@ -58,6 +60,11 @@ namespace {
  // Fahrbahn ist. Nur vor Autos/Spieler, nicht vor einer roten Ampel - dort
  // soll stehenbleiben, nicht vorbeischleichen, das richtige Verhalten sein.
  constexpr float MAX_SEITVERSATZ = 220.0f;
+ // Sichtweiten-LOD (siehe Tick): jenseits davon der leichte Kasten statt
+ // des CarConcept-Detailmodells. 70 Autos gleichzeitig im Detailmodell
+ // druecken die Bildrate auf 2 fps (Glas/Chrom-Material, viele Dreiecke je
+ // Wagen) - mit diesem Radius sind es realistisch nur eine Handvoll.
+ constexpr float LOD_ABSTAND = 8000.0f;
 }
 
 ALaLaBergVerkehrsauto::ALaLaBergVerkehrsauto() {
@@ -79,9 +86,12 @@ ALaLaBergVerkehrsauto::ALaLaBergVerkehrsauto() {
  // trotzdem ein festes Hindernis fuer Spieler und Farbkugeln.
  Rumpf->SetSimulatePhysics(false);
 
+ Karosseriepunkt = CreateDefaultSubobject<USceneComponent>(TEXT("Karosseriepunkt"));
+ Karosseriepunkt->SetupAttachment(Rumpf);
+ Karosseriepunkt->SetRelativeLocation(FVector(0, 0, -75));
+
  Netz = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("Karosserie"));
- Netz->SetupAttachment(Rumpf);
- Netz->SetRelativeLocation(FVector(0, 0, -75));
+ Netz->SetupAttachment(Karosseriepunkt);
  Netz->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }
 
@@ -93,11 +103,24 @@ void ALaLaBergVerkehrsauto::SetzeRoute(const TArray<FVector>& Punkte, float Temp
 
 void ALaLaBergVerkehrsauto::BeginPlay() {
  Super::BeginPlay();
+ // Immer beide Formen anlegen: den leichten Kasten aus wagen.json (sichtbar
+ // per Default) und, falls verfuegbar, eine reservierte, zunaechst versteckte
+ // Instanz im CarConcept-Pool. Tick() blendet je nach Abstand zum Spieler
+ // zwischen beiden um - siehe bDetailliert. Selbst als gebuendelte Pool-
+ // Instanzen blieben alle 70 Autos gleichzeitig im Detailmodell zu teuer
+ // (Glas/Chrom, viele Dreiecke - 2 fps im Test), nur wenige nahe Autos
+ // gleichzeitig sind es nicht.
  LaLaBergWagenForm::BaueNetz(Netz, Lack);
+ if (ALaLaBergAutoPool::Instanz && ALaLaBergAutoPool::Instanz->Gueltig()) {
+  PoolIndizes = ALaLaBergAutoPool::Instanz->FuegeHinzu(FTransform(FVector(0, 0, -500000.0f)));
+  bPoolGenutzt = true;
+ }
  Alle.Add(this);
 }
 
 void ALaLaBergVerkehrsauto::EndPlay(const EEndPlayReason::Type Grund) {
+ // Nicht entfernen, nur verstecken - siehe ALaLaBergAutoPool::Verstecke.
+ if (bPoolGenutzt && ALaLaBergAutoPool::Instanz) ALaLaBergAutoPool::Instanz->Verstecke(PoolIndizes);
  Alle.RemoveSingleSwap(this);
  Super::EndPlay(Grund);
 }
@@ -123,6 +146,23 @@ void ALaLaBergVerkehrsauto::Tick(float Zeit) {
  const float SeitZiel = BremseObjekt < 0.9f ? MAX_SEITVERSATZ : 0.0f;
  Seitversatz = FMath::FInterpTo(Seitversatz, SeitZiel, Zeit, 0.7f);
  if (FMath::Abs(Seitversatz) > 0.5f) SetActorLocation(GetActorLocation() + GetActorRightVector() * Seitversatz);
+
+ // Sichtweiten-LOD: das Detailmodell (Pool-Instanz) nur nah am Spieler, sonst
+ // der leichte Kasten - siehe Begruendung in BeginPlay. Der Wechsel selbst
+ // (Sichtbarkeit umschalten) passiert nur bei einem tatsaechlichen Uebergang,
+ // nicht jedes Bild - waere sonst derselbe unnoetige Zustandswechsel 70-mal
+ // pro Sekunde.
+ if (bPoolGenutzt) {
+  const APawn* SpielerPawn = UGameplayStatics::GetPlayerPawn(GetWorld(), 0);
+  const bool bSollDetail = SpielerPawn && FVector::DistSquared(SpielerPawn->GetActorLocation(), GetActorLocation()) < LOD_ABSTAND * LOD_ABSTAND;
+  if (bSollDetail != bDetailliert) {
+   bDetailliert = bSollDetail;
+   Netz->SetVisibility(!bDetailliert);
+   if (!bDetailliert && ALaLaBergAutoPool::Instanz) ALaLaBergAutoPool::Instanz->Verstecke(PoolIndizes);
+  }
+  if (bDetailliert && ALaLaBergAutoPool::Instanz)
+   ALaLaBergAutoPool::Instanz->Aktualisiere(PoolIndizes, FTransform(GetActorRotation() + FRotator(0, -90, 0), GetActorLocation()));
+ }
 }
 
 // ILaLaBergFarbbar: nur kurz abbremsen. Der Klecks ist schon das Decal der

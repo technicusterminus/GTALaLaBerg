@@ -2,25 +2,14 @@
 #include "ProceduralMeshComponent.h"
 #include "Materials/MaterialInterface.h"
 #include "Engine/World.h"
+#include "LaLaBergKoerperTeile.h"
 
 namespace {
- void hinzu(TArray<FVector>& P, TArray<int32>& K, TArray<FLinearColor>& F, const FLinearColor& Farbe,
-           const FVector& A, const FVector& B, const FVector& C, const FVector& D) {
-  const int32 i = P.Num();
-  P.Append({ A, B, C, D }); F.Append({ Farbe, Farbe, Farbe, Farbe });
-  K.Append({ i, i + 1, i + 2, i, i + 2, i + 3 });
- }
- void kasten(TArray<FVector>& P, TArray<int32>& K, TArray<FLinearColor>& F, const FLinearColor& Farbe,
-            const FVector& Mitte, const FVector& Halb) {
-  const FVector M = Mitte, H = Halb;
-  const auto E = [&](float x, float y, float z) { return M + FVector(x * H.X, y * H.Y, z * H.Z); };
-  hinzu(P, K, F, Farbe, E(1, -1, -1), E(1, 1, -1), E(1, 1, 1), E(1, -1, 1));
-  hinzu(P, K, F, Farbe, E(-1, 1, -1), E(-1, -1, -1), E(-1, -1, 1), E(-1, 1, 1));
-  hinzu(P, K, F, Farbe, E(1, 1, -1), E(-1, 1, -1), E(-1, 1, 1), E(1, 1, 1));
-  hinzu(P, K, F, Farbe, E(-1, -1, -1), E(1, -1, -1), E(1, -1, 1), E(-1, -1, 1));
-  hinzu(P, K, F, Farbe, E(-1, -1, 1), E(1, -1, 1), E(1, 1, 1), E(-1, 1, 1));
-  hinzu(P, K, F, Farbe, E(1, -1, -1), E(-1, -1, -1), E(-1, 1, -1), E(1, 1, -1));
- }
+ // hinzu()/kasten() kommen aus LaLaBergKoerperTeile.h (voll qualifiziert,
+ // kein "using namespace" - siehe LaLaBergCharacter.cpp fuer den Grund:
+ // anonyme Namespaces sind pro Uebersetzungseinheit vereinigt, nicht pro
+ // Datei, ein zweites lokales "kasten()" hier kollidierte im Unity-Build
+ // mit dem gleichnamigen aus LaLaBergWaffe.cpp).
  void zylinder(TArray<FVector>& P, TArray<int32>& K, TArray<FLinearColor>& F, const FLinearColor& Farbe,
               float z0, float z1, float R, int32 Seiten) {
   TArray<FVector> Unten, Oben;
@@ -28,7 +17,7 @@ namespace {
    const float A = 2 * PI * i / Seiten, x = FMath::Cos(A) * R, y = FMath::Sin(A) * R;
    Unten.Add(FVector(x, y, z0)); Oben.Add(FVector(x, y, z1));
   }
-  for (int32 i = 0; i < Seiten; i++) { const int32 j = (i + 1) % Seiten; hinzu(P, K, F, Farbe, Unten[i], Unten[j], Oben[j], Oben[i]); }
+  for (int32 i = 0; i < Seiten; i++) { const int32 j = (i + 1) % Seiten; LaLaBergKoerperTeile::hinzu(P, K, F, Farbe, Unten[i], Unten[j], Oben[j], Oben[i]); }
  }
  // Lit/unlit statt echtem Leuchten (kein Emissive-Material in diesem
  // Projekt) - satt vs. stumpf grau, so bleibt der Zustand auch bei Tageslicht
@@ -91,10 +80,10 @@ void ALaLaBergAmpel::BaueKopf() {
  TArray<FVector> P; TArray<int32> K; TArray<FLinearColor> F;
  const FLinearColor Grau(0.30f, 0.30f, 0.32f);
  zylinder(P, K, F, Grau, 0.0f, 300.0f, 6.0f, 10);
- kasten(P, K, F, FLinearColor(0.08f, 0.08f, 0.09f), FVector(0, 0, 330.0f), FVector(9.0f, 9.0f, 32.0f));
+ LaLaBergKoerperTeile::kasten(P, K, F, FLinearColor(0.08f, 0.08f, 0.09f), FVector(0, 0, 330.0f), FVector(9.0f, 9.0f, 32.0f));
  const FLinearColor Farben[3] = { Zustand == 0 ? ROT_HELL : DUNKEL, Zustand == 1 ? GRUEN_HELL : DUNKEL, Zustand == 2 ? GELB_HELL : DUNKEL };
  const float ZHoehen[3] = { 352.0f, 330.0f, 308.0f };
- for (int32 i = 0; i < 3; i++) kasten(P, K, F, Farben[i], FVector(9.2f, 0, ZHoehen[i]), FVector(0.6f, 6.0f, 6.0f));
+ for (int32 i = 0; i < 3; i++) LaLaBergKoerperTeile::kasten(P, K, F, Farben[i], FVector(9.2f, 0, ZHoehen[i]), FVector(0.6f, 6.0f, 6.0f));
 
  TArray<FVector> Normalen; TArray<FVector2D> UVs; TArray<FProcMeshTangent> Tangenten;
  Normalen.Init(FVector::ZeroVector, P.Num());

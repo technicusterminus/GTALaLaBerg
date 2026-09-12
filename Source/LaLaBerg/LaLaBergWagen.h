@@ -54,7 +54,12 @@ private:
  void Loesen();
 
  UPROPERTY() TObjectPtr<class UBoxComponent> Rumpf = nullptr;
+ // Gemeinsamer Anschlusspunkt auf Fahrbahnhoehe fuer Netz (Procedural-
+ // Fallback) UND die CarConcept-Teile - beide sollen an derselben Stelle
+ // sitzen, nur einer davon ist zur Laufzeit tatsaechlich sichtbar.
+ UPROPERTY() TObjectPtr<class USceneComponent> Karosseriepunkt = nullptr;
  UPROPERTY() TObjectPtr<class UProceduralMeshComponent> Netz = nullptr;
+ UPROPERTY() TArray<TObjectPtr<class UStaticMeshComponent>> CarConceptTeile;
  UPROPERTY() TObjectPtr<class USpringArmComponent> Ausleger = nullptr;
  UPROPERTY() TObjectPtr<class UCameraComponent> Kamera = nullptr;
  UPROPERTY() TObjectPtr<class UAudioComponent> Motorklang = nullptr;

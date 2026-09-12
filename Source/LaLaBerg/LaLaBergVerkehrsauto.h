@@ -31,7 +31,17 @@ protected:
 
 private:
  UPROPERTY() TObjectPtr<class UBoxComponent> Rumpf = nullptr;
+ UPROPERTY() TObjectPtr<class USceneComponent> Karosseriepunkt = nullptr;
  UPROPERTY() TObjectPtr<class UProceduralMeshComponent> Netz = nullptr;
+ // Instanzen im gemeinsamen ALaLaBergAutoPool statt eigener Komponenten -
+ // bei 70 Autos sonst zu viele Draw-Calls (siehe LaLaBergAutoPool.h). Auch
+ // als Instanzen im Pool blieben alle 70 gleichzeitig sichtbaren Detail-
+ // Autos zu teuer (Glas/Chrom-Material, viele Dreiecke) - deshalb zusaetzlich
+ // ein einfaches Sichtweiten-LOD: nur Autos nah am Spieler zeigen das
+ // Detailmodell, weiter entfernte den leichten Kasten aus wagen.json.
+ TArray<int32> PoolIndizes;
+ bool bPoolGenutzt = false;
+ bool bDetailliert = false;
  FLaLaBergWegfolger Weg;
  float Tempo = 900.0f;          // cm/s
  float StoerungBis = -10.0f;    // ein Treffer bremst kurz ab

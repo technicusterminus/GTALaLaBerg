@@ -36,6 +36,7 @@
 #include "LaLaBergWagen.h"
 #include "LaLaBergWaffe.h"
 #include "LaLaBergVerkehrsauto.h"
+#include "LaLaBergAutoPool.h"
 #include "LaLaBergPassantKI.h"
 #include "LaLaBergAmpel.h"
 #include "LaLaBergHUD.h"
@@ -830,6 +831,9 @@ void ALaLaBergGameMode::LadeVerkehr() {
    Route.Add(FVector(Zahlen[i]->AsNumber(),Zahlen[i+1]->AsNumber(),Zahlen[i+2]->AsNumber()));
   return Route;
  };
+ // Vor den KI-Autos: die brauchen ALaLaBergAutoPool::Instanz schon in ihrem
+ // eigenen BeginPlay (siehe dort).
+ GetWorld()->SpawnActor<ALaLaBergAutoPool>();
  for(const auto& Wert:Wurzel->GetArrayField(TEXT("autos"))) {
   const TArray<FVector> Route=LiesRoute(Wert->AsObject());
   if(Route.Num()<2) continue;

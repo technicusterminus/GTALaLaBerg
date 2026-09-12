@@ -8,27 +8,14 @@
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundBase.h"
+#include "LaLaBergKoerperTeile.h"
 
 namespace {
- // Kasten und Zylinder, Sichtseiten nach aussen, eigene Eckpunkte je Flaeche
- // (scharfe Kanten) - derselbe Aufbau wie die Karosserie in LaLaBergWagen.cpp.
- void hinzu(TArray<FVector>& Punkte, TArray<int32>& Kanten, TArray<FLinearColor>& Farben, const FLinearColor& F,
-           const FVector& A, const FVector& B, const FVector& C, const FVector& D) {
-  const int32 i = Punkte.Num();
-  Punkte.Append({ A, B, C, D }); Farben.Append({ F, F, F, F });
-  Kanten.Append({ i, i + 1, i + 2, i, i + 2, i + 3 });
- }
- void kasten(TArray<FVector>& P, TArray<int32>& K, TArray<FLinearColor>& F, const FLinearColor& Farbe,
-            const FVector& Mitte, const FVector& Halb) {
-  const FVector M = Mitte, H = Halb;
-  const auto E = [&](float x, float y, float z) { return M + FVector(x * H.X, y * H.Y, z * H.Z); };
-  hinzu(P, K, F, Farbe, E(1, -1, -1), E(1, 1, -1), E(1, 1, 1), E(1, -1, 1));       // +X
-  hinzu(P, K, F, Farbe, E(-1, 1, -1), E(-1, -1, -1), E(-1, -1, 1), E(-1, 1, 1));   // -X
-  hinzu(P, K, F, Farbe, E(1, 1, -1), E(-1, 1, -1), E(-1, 1, 1), E(1, 1, 1));       // +Y
-  hinzu(P, K, F, Farbe, E(-1, -1, -1), E(1, -1, -1), E(1, -1, 1), E(-1, -1, 1));   // -Y
-  hinzu(P, K, F, Farbe, E(-1, -1, 1), E(1, -1, 1), E(1, 1, 1), E(-1, 1, 1));       // +Z
-  hinzu(P, K, F, Farbe, E(1, -1, -1), E(-1, -1, -1), E(-1, 1, -1), E(1, 1, -1));   // -Z
- }
+ // hinzu()/kasten() kommen aus LaLaBergKoerperTeile.h (voll qualifiziert,
+ // kein "using namespace": anonyme Namespaces sind pro Uebersetzungseinheit
+ // vereinigt, nicht pro Datei - ein zweites, gleichnamiges "kasten()" in
+ // einer im Unity-Build mitgebuendelten Datei fuehrte sonst zu einem
+ // Definitionskonflikt, siehe LaLaBergCharacter.cpp).
  // Runder Lauf mit weichem Rundungs-Schatten: die Ringpunkte der Mantelflaeche
  // sind zwischen benachbarten Feldern geteilt statt (wie bei kasten()) je
  // Flaeche neu angelegt, dadurch mitteln sich ihre Flaechennormalen in der
@@ -62,10 +49,10 @@ namespace {
  void buegel(TArray<FVector>& P, TArray<int32>& K, TArray<FLinearColor>& F, const FLinearColor& Farbe,
             float x, float y0, float z0, float y1, float z1, float Steg) {
   const float my = (y0 + y1) * 0.5f, mz = (z0 + z1) * 0.5f, hy = (y1 - y0) * 0.5f, hz = (z1 - z0) * 0.5f;
-  kasten(P, K, F, Farbe, FVector(x, my, z0), FVector(Steg, hy, Steg * 0.5f));
-  kasten(P, K, F, Farbe, FVector(x, my, z1), FVector(Steg, hy, Steg * 0.5f));
-  kasten(P, K, F, Farbe, FVector(x, y0, mz), FVector(Steg, Steg * 0.5f, hz));
-  kasten(P, K, F, Farbe, FVector(x, y1, mz), FVector(Steg, Steg * 0.5f, hz));
+  LaLaBergKoerperTeile::kasten(P, K, F, Farbe, FVector(x, my, z0), FVector(Steg, hy, Steg * 0.5f));
+  LaLaBergKoerperTeile::kasten(P, K, F, Farbe, FVector(x, my, z1), FVector(Steg, hy, Steg * 0.5f));
+  LaLaBergKoerperTeile::kasten(P, K, F, Farbe, FVector(x, y0, mz), FVector(Steg, Steg * 0.5f, hz));
+  LaLaBergKoerperTeile::kasten(P, K, F, Farbe, FVector(x, y1, mz), FVector(Steg, Steg * 0.5f, hz));
  }
  // Zwei Kaesten am Griff: eine Hand darum, ein Unterarm schraeg nach hinten-
  // unten zur angenommenen Schulter. Kein Skelett-Mesh im Projekt (siehe
@@ -73,8 +60,8 @@ namespace {
  // haette niemand sie in der Hand.
  void haende(TArray<FVector>& P, TArray<int32>& K, TArray<FLinearColor>& F, const FVector& GriffMitte) {
   const FLinearColor Haut(0.82f, 0.62f, 0.50f), Aermel(0.24f, 0.27f, 0.31f);
-  kasten(P, K, F, Haut, GriffMitte + FVector(0.3f, 0, -0.8f), FVector(2.1f, 2.3f, 2.7f));
-  kasten(P, K, F, Aermel, GriffMitte + FVector(-6.5f, 0, -6.2f), FVector(4.8f, 2.5f, 2.5f));
+  LaLaBergKoerperTeile::kasten(P, K, F, Haut, GriffMitte + FVector(0.3f, 0, -0.8f), FVector(2.1f, 2.3f, 2.7f));
+  LaLaBergKoerperTeile::kasten(P, K, F, Aermel, GriffMitte + FVector(-6.5f, 0, -6.2f), FVector(4.8f, 2.5f, 2.5f));
  }
  // Die kraeftigen Farben eines Paintballs - Fuellfarbe pro Kugel, nicht die
  // Markerfarbe (die bleibt neutrales Grau/Gelb/Oliv).
@@ -205,48 +192,48 @@ void ALaLaBergWaffe::BaueModell() {
  const FLinearColor Griff(0.05f, 0.05f, 0.055f), Messing(0.55f, 0.42f, 0.10f);
  switch (Art) {
   case ELaLaBergWaffenArt::Pistole:
-   kasten(P, K, F, Koerper, FVector(0, 0, 0), FVector(9.0f, 3.0f, 3.4f));                 // Rahmen
-   kasten(P, K, F, Koerper, FVector(1.5f, 0, 4.2f), FVector(8.5f, 2.6f, 1.6f));           // Schlitten, schmaler und hoeher
+   LaLaBergKoerperTeile::kasten(P, K, F, Koerper, FVector(0, 0, 0), FVector(9.0f, 3.0f, 3.4f));                 // Rahmen
+   LaLaBergKoerperTeile::kasten(P, K, F, Koerper, FVector(1.5f, 0, 4.2f), FVector(8.5f, 2.6f, 1.6f));           // Schlitten, schmaler und hoeher
    zylinderGlatt(P, K, F, Lauf, 8.5f, 22.5f, 1.15f, 1.0f, 12);                            // Lauf, leicht verjuengt
-   kasten(P, K, F, Griff, FVector(-6.5f, 0, -6.0f), FVector(2.6f, 2.4f, 5.8f));           // Griff
+   LaLaBergKoerperTeile::kasten(P, K, F, Griff, FVector(-6.5f, 0, -6.0f), FVector(2.6f, 2.4f, 5.8f));           // Griff
    buegel(P, K, F, Koerper, 0.0f, -2.6f, -5.8f, 3.0f, -2.4f, 0.5f);                       // Abzugsbuegel
-   kasten(P, K, F, Koerper, FVector(0.5f, 0, -3.4f), FVector(1.4f, 0.5f, 1.8f));          // Abzug
-   kasten(P, K, F, Messing, FVector(-8.3f, 0, 5.3f), FVector(0.5f, 0.35f, 0.9f));         // Kimme
-   kasten(P, K, F, Messing, FVector(9.6f, 0, 5.1f), FVector(0.5f, 0.30f, 0.7f));          // Korn
+   LaLaBergKoerperTeile::kasten(P, K, F, Koerper, FVector(0.5f, 0, -3.4f), FVector(1.4f, 0.5f, 1.8f));          // Abzug
+   LaLaBergKoerperTeile::kasten(P, K, F, Messing, FVector(-8.3f, 0, 5.3f), FVector(0.5f, 0.35f, 0.9f));         // Kimme
+   LaLaBergKoerperTeile::kasten(P, K, F, Messing, FVector(9.6f, 0, 5.1f), FVector(0.5f, 0.30f, 0.7f));          // Korn
    haende(P, K, F, FVector(-6.5f, 0, -6.0f));
    break;
   case ELaLaBergWaffenArt::Maschine:
-   kasten(P, K, F, Oliv, FVector(0, 0, 0), FVector(13.0f, 3.2f, 4.0f));                   // Gehaeuse
-   kasten(P, K, F, Koerper, FVector(0, 0, 3.9f), FVector(12.5f, 2.4f, 1.1f));             // Schienenaufsatz
+   LaLaBergKoerperTeile::kasten(P, K, F, Oliv, FVector(0, 0, 0), FVector(13.0f, 3.2f, 4.0f));                   // Gehaeuse
+   LaLaBergKoerperTeile::kasten(P, K, F, Koerper, FVector(0, 0, 3.9f), FVector(12.5f, 2.4f, 1.1f));             // Schienenaufsatz
    zylinderGlatt(P, K, F, Lauf, 13.0f, 34.0f, 1.35f, 1.1f, 12);                           // Lauf
-   kasten(P, K, F, Koerper, FVector(14.0f, 0, 1.6f), FVector(1.0f, 1.1f, 1.1f));          // Muendungsbremse
-   kasten(P, K, F, Griff, FVector(-2.5f, 0, -6.2f), FVector(2.2f, 2.2f, 5.6f));           // Pistolengriff
+   LaLaBergKoerperTeile::kasten(P, K, F, Koerper, FVector(14.0f, 0, 1.6f), FVector(1.0f, 1.1f, 1.1f));          // Muendungsbremse
+   LaLaBergKoerperTeile::kasten(P, K, F, Griff, FVector(-2.5f, 0, -6.2f), FVector(2.2f, 2.2f, 5.6f));           // Pistolengriff
    buegel(P, K, F, Oliv, -1.5f, -4.6f, -6.0f, 1.0f, -3.6f, 0.5f);                         // Abzugsbuegel
-   kasten(P, K, F, Koerper, FVector(-2.0f, 0, -6.5f), FVector(2.4f, 2.2f, 6.5f));         // Magazin
-   kasten(P, K, F, Oliv, FVector(-15.5f, 0, -0.5f), FVector(3.5f, 1.5f, 1.6f));           // Schaft
-   kasten(P, K, F, Oliv, FVector(-19.0f, 0, 1.6f), FVector(0.9f, 1.5f, 1.5f));            // Schulterplatte
-   kasten(P, K, F, Messing, FVector(8.5f, 0, 5.2f), FVector(0.4f, 0.3f, 0.8f));           // Visier
+   LaLaBergKoerperTeile::kasten(P, K, F, Koerper, FVector(-2.0f, 0, -6.5f), FVector(2.4f, 2.2f, 6.5f));         // Magazin
+   LaLaBergKoerperTeile::kasten(P, K, F, Oliv, FVector(-15.5f, 0, -0.5f), FVector(3.5f, 1.5f, 1.6f));           // Schaft
+   LaLaBergKoerperTeile::kasten(P, K, F, Oliv, FVector(-19.0f, 0, 1.6f), FVector(0.9f, 1.5f, 1.5f));            // Schulterplatte
+   LaLaBergKoerperTeile::kasten(P, K, F, Messing, FVector(8.5f, 0, 5.2f), FVector(0.4f, 0.3f, 0.8f));           // Visier
    haende(P, K, F, FVector(-2.5f, 0, -6.2f));
    break;
   case ELaLaBergWaffenArt::Schrotflinte:
-   kasten(P, K, F, Oliv, FVector(-1, 0, 0), FVector(10.0f, 3.6f, 4.6f));                  // Gehaeuse
+   LaLaBergKoerperTeile::kasten(P, K, F, Oliv, FVector(-1, 0, 0), FVector(10.0f, 3.6f, 4.6f));                  // Gehaeuse
    zylinderGlatt(P, K, F, Lauf, 10.0f, 34.0f, 1.55f, 1.35f, 12, 1.75f, 0);                // Doppellauf
    zylinderGlatt(P, K, F, Lauf, 10.0f, 34.0f, 1.55f, 1.35f, 12, -1.75f, 0);
-   kasten(P, K, F, Koerper, FVector(6.0f, 0, -2.6f), FVector(6.5f, 3.2f, 1.3f));          // Vorderschaft (Pumpe)
-   kasten(P, K, F, Koerper, FVector(-8.0f, 0, -5.8f), FVector(1.8f, 1.9f, 4.4f));         // Pistolengriff
+   LaLaBergKoerperTeile::kasten(P, K, F, Koerper, FVector(6.0f, 0, -2.6f), FVector(6.5f, 3.2f, 1.3f));          // Vorderschaft (Pumpe)
+   LaLaBergKoerperTeile::kasten(P, K, F, Koerper, FVector(-8.0f, 0, -5.8f), FVector(1.8f, 1.9f, 4.4f));         // Pistolengriff
    buegel(P, K, F, Oliv, -8.0f, -4.4f, -6.2f, -1.6f, -4.6f, 0.5f);                        // Abzugsbuegel
-   kasten(P, K, F, Griff, FVector(-19.0f, 0, 1.5f), FVector(7.5f, 3.0f, 3.6f));           // Schaft
+   LaLaBergKoerperTeile::kasten(P, K, F, Griff, FVector(-19.0f, 0, 1.5f), FVector(7.5f, 3.0f, 3.6f));           // Schaft
    haende(P, K, F, FVector(-8.0f, 0, -5.8f));
    break;
   case ELaLaBergWaffenArt::Raketenwerfer:
    zylinderGlatt(P, K, F, Rohr, -22.0f, 24.0f, 6.5f, 5.8f, 16, 0, 0, false, false);       // Rohr, ohne Deckel
    zylinderGlatt(P, K, F, Rohr, -30.0f, -22.0f, 7.6f, 6.5f, 16, 0, 0, false, true);       // Trichter hinten
    zylinderGlatt(P, K, F, Koerper, 24.0f, 26.5f, 6.7f, 6.7f, 16, 0, 0, true, false);      // Muendungsrand
-   kasten(P, K, F, Oliv, FVector(-4.0f, 0, 7.5f), FVector(4.5f, 2.2f, 3.4f));             // Visiereinheit
-   kasten(P, K, F, Messing, FVector(-4.0f, 0, 10.7f), FVector(0.4f, 0.3f, 0.9f));         // Visierstift
-   kasten(P, K, F, Griff, FVector(-9.0f, 0, -3.5f), FVector(2.0f, 2.0f, 5.0f));           // Abzugsgriff
+   LaLaBergKoerperTeile::kasten(P, K, F, Oliv, FVector(-4.0f, 0, 7.5f), FVector(4.5f, 2.2f, 3.4f));             // Visiereinheit
+   LaLaBergKoerperTeile::kasten(P, K, F, Messing, FVector(-4.0f, 0, 10.7f), FVector(0.4f, 0.3f, 0.9f));         // Visierstift
+   LaLaBergKoerperTeile::kasten(P, K, F, Griff, FVector(-9.0f, 0, -3.5f), FVector(2.0f, 2.0f, 5.0f));           // Abzugsgriff
    buegel(P, K, F, Oliv, -9.0f, -3.6f, -7.6f, -1.0f, -5.6f, 0.5f);                        // Abzugsbuegel
-   kasten(P, K, F, Koerper, FVector(-24.0f, 0, 0), FVector(3.4f, 3.4f, 3.4f));            // Schulterkappe
+   LaLaBergKoerperTeile::kasten(P, K, F, Koerper, FVector(-24.0f, 0, 0), FVector(3.4f, 3.4f, 3.4f));            // Schulterkappe
    haende(P, K, F, FVector(-9.0f, 0, -3.5f));
    break;
  }

@@ -1,5 +1,9 @@
 #include "LaLaBergWagenForm.h"
 #include "ProceduralMeshComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Components/SceneComponent.h"
+#include "Engine/StaticMesh.h"
+#include "GameFramework/Actor.h"
 #include "Materials/MaterialInterface.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
@@ -57,4 +61,50 @@ bool LaLaBergWagenForm::BaueNetz(UProceduralMeshComponent* Netz, const FLinearCo
  }
  UE_LOG(LogTemp, Display, TEXT("LALABERG_WAGENFORM teile=%d dreiecke=%d"), Nr, Dreiecke);
  return Nr > 0;
+}
+
+// Von aussen sichtbare Teile. "CarConcept_node_84/89/94/99" sind im Export
+// unbenannt geblieben, liegen aber genau an den vier Radkaesten - das sind
+// die Reifen, ohne die nur nackte Felgen schweben. "InteriorRearHatch" und
+// "InteriorRearPanels" liegen trotz des Namens exakt auf der sichtbaren
+// Heckscheibe/-klappe (siehe Tools/pruefe_carconcept.py) - ohne sie klaffte
+// dort ein Loch, weil die reine Glasscheibe (BodyRearwindow) allein die
+// Form nicht schliesst. Motor, Sitze, Pedale, Lenkrad bleiben aussen vor.
+const TCHAR* const LaLaBergWagenForm::CARCONCEPT_TEILE[] = {
+ TEXT("BodyDoorLColor1"), TEXT("BodyDoorLColor2"), TEXT("BodyDoorLHandle01"), TEXT("BodyDoorLHandle02"),
+ TEXT("BodyDoorLMirror"), TEXT("BodyDoorLMirrorColor1"), TEXT("BodyDoorLMirrorColor2"), TEXT("BodyDoorLWindow"),
+ TEXT("BodyDoorLWindowGasket"), TEXT("BodyDoorRColor1"), TEXT("BodyDoorRColor2"), TEXT("BodyDoorRHandle01"),
+ TEXT("BodyDoorRHandle02"), TEXT("BodyDoorRMirror"), TEXT("BodyDoorRMirrorColor1"), TEXT("BodyDoorRMirrorColor2"),
+ TEXT("BodyDoorRWindow"), TEXT("BodyDoorRWindowGasket"), TEXT("BodyHeadlights"), TEXT("BodyHood"),
+ TEXT("BodyHoodTopgrill"), TEXT("BodyPanelsColor2"), TEXT("BodyPillars"), TEXT("BodyRearPanelsColor1"),
+ TEXT("BodyRearwindow"), TEXT("BodyRoofPanel"), TEXT("BodyTaillights"), TEXT("BodyTaillightsPanels"),
+ TEXT("BodyTurnsignalsRear"), TEXT("BodyUnderside"), TEXT("BodyWindowsRearSides"), TEXT("BodyWindshield"),
+ TEXT("BodyWindshieldGasket"), TEXT("BodyWindshieldWipers"), TEXT("BodyWindshieldWipersBase"),
+ TEXT("License_Plate"), TEXT("InteriorRearHatch"), TEXT("InteriorRearPanels"),
+ TEXT("WheelFrontLRim"), TEXT("WheelFrontRRim"), TEXT("WheelRearLRim"), TEXT("WheelRearRRim"),
+ TEXT("CarConcept_node_84"), TEXT("CarConcept_node_89"), TEXT("CarConcept_node_94"), TEXT("CarConcept_node_99"),
+};
+const int32 LaLaBergWagenForm::CARCONCEPT_TEILE_ANZAHL = UE_ARRAY_COUNT(LaLaBergWagenForm::CARCONCEPT_TEILE);
+
+FString LaLaBergWagenForm::CarConceptPfad(const TCHAR* Teilname) {
+ return FString::Printf(TEXT("/Game/Art/Vehicles/CarConcept/StaticMeshes/%s.%s"), Teilname, Teilname);
+}
+
+bool LaLaBergWagenForm::BaueCarConceptTeile(USceneComponent* Traeger, TArray<TObjectPtr<UStaticMeshComponent>>& Teile) {
+ if (!Traeger) return false;
+ AActor* Besitzer = Traeger->GetOwner();
+ if (!Besitzer) return false;
+ for (const TCHAR* Name : CARCONCEPT_TEILE) {
+  UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, *CarConceptPfad(Name));
+  if (!Mesh) continue;
+  auto* Teil = NewObject<UStaticMeshComponent>(Besitzer, MakeUniqueObjectName(Besitzer, UStaticMeshComponent::StaticClass(), *FString(Name)));
+  Teil->SetStaticMesh(Mesh);
+  Teil->SetupAttachment(Traeger);
+  Teil->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+  Teil->SetCastShadow(true);
+  Teil->RegisterComponent();
+  Teile.Add(Teil);
+ }
+ UE_LOG(LogTemp, Display, TEXT("LALABERG_CARCONCEPT teile=%d"), Teile.Num());
+ return Teile.Num() > 0;
 }
