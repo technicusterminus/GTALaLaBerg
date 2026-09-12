@@ -111,7 +111,10 @@ namespace {
  // Das lizenzierte Ansichtsmodell je Waffenart (CC0, Quaternius - siehe
  // Content/SourceData/Waffen/LIZENZ.md). Skalierung und Versatz von Hand
  // abgeglichen: die Rohmodelle sind rund 2.5x groesser als die vorherigen
- // Kaesten und muessen zur Kamera hin ausgerichtet werden.
+ // Kaesten. Der Quaternius-glTF-Export zeigt mit seiner eigenen Vorderseite
+ // nach lokal -X; Wurzel (und die Kamera dahinter) erwarten +X als "nach
+ // vorn" (siehe Kasten/Zylinder-Bauweise weiter unten) - ohne die 180-Grad-
+ // Drehung um Z zeigte die Muendung zum Spieler statt von ihm weg.
  struct FModell {
   const TCHAR* Pfad;
   FVector Versatz;
@@ -121,13 +124,18 @@ namespace {
  const FModell& ModellInfo(ELaLaBergWaffenArt Art) {
   static const FModell M[] = {
    /* Pistole       */ { TEXT("/Game/Art/Waffen/Pistol/StaticMeshes/SM_Pistole.SM_Pistole"),
-                          FVector(27.0f, 0, -1.0f), FRotator(0, 0, 0), 0.40f },
+                          FVector(27.0f, 0, -1.0f), FRotator(0, 180, 0), 0.40f },
    /* Maschine      */ { TEXT("/Game/Art/Waffen/Smg/StaticMeshes/SM_Maschine.SM_Maschine"),
-                          FVector(40.0f, 0, -6.0f), FRotator(0, 0, 0), 0.40f },
+                          FVector(40.0f, 0, -6.0f), FRotator(0, 180, 0), 0.40f },
    /* Schrotflinte  */ { TEXT("/Game/Art/Waffen/Shotgun/StaticMeshes/SM_Schrotflinte.SM_Schrotflinte"),
-                          FVector(48.0f, 0, -4.0f), FRotator(0, 0, 0), 0.40f },
+                          FVector(48.0f, 0, -4.0f), FRotator(0, 180, 0), 0.40f },
+   // Deutlich weiter vorn als die anderen drei: die Rohmesh-Bounding-Box
+   // (siehe Tools/pruefe_waffenmasse.py) ist mit Y=46.9/Z=74.6 fast viermal
+   // so breit wie die Pistole - bei gleichem Versatz fuellte die Muendung,
+   // fast am Kameraclip, den ganzen Bildschirm mit einer einzelnen grauen
+   // Flaeche (im Test bestaetigt: LALABERG_WAFFENTEST-Screenshot).
    /* Raketenwerfer */ { TEXT("/Game/Art/Waffen/RocketLauncher/StaticMeshes/SM_Raketenwerfer.SM_Raketenwerfer"),
-                          FVector(30.0f, 0, -8.0f), FRotator(0, 0, 0), 0.40f },
+                          FVector(75.0f, 14.0f, -22.0f), FRotator(0, 180, 0), 0.40f },
   };
   return M[static_cast<uint8>(Art)];
  }

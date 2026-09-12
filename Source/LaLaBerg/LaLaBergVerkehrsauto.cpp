@@ -5,6 +5,8 @@
 #include "LaLaBergWagenForm.h"
 #include "LaLaBergAmpel.h"
 #include "Engine/World.h"
+#include "Kismet/GameplayStatics.h"
+#include "GameFramework/Pawn.h"
 
 TArray<ALaLaBergVerkehrsauto*> ALaLaBergVerkehrsauto::Alle;
 
@@ -38,6 +40,17 @@ namespace {
    Bremse = FMath::Min(Bremse, FMath::Clamp((Dist - 350.0f) / 900.0f, 0.0f, 1.0f));
   }
   return Bremse;
+ }
+ // Bremst vor dem Spieler genau wie vor einem anderen Verkehrswagen - egal
+ // ob zu Fuss oder im fahrbaren Wagen, die KI sah ihn zuvor gar nicht.
+ float BremseVorSpieler(const UWorld* Welt, const FVector& Ort, const FVector& Vorwaerts) {
+  const APawn* SpielerPawn = UGameplayStatics::GetPlayerPawn(Welt, 0);
+  if (!SpielerPawn) return 1.0f;
+  const FVector Diff = SpielerPawn->GetActorLocation() - Ort;
+  const float Dist = Diff.Size();
+  if (Dist > 900.0f || Dist < 1.0f) return 1.0f;
+  if (FVector::DotProduct(Diff / Dist, Vorwaerts) < 0.5f) return 1.0f;
+  return FMath::Clamp((Dist - 260.0f) / 640.0f, 0.05f, 1.0f);
  }
 }
 
@@ -91,7 +104,8 @@ void ALaLaBergVerkehrsauto::Tick(float Zeit) {
  const bool bGestoert = GetWorld()->GetTimeSeconds() < StoerungBis;
  FVector Ort = GetActorLocation();
  const FVector Vorwaerts = GetActorForwardVector();
- const float Bremse = FMath::Min(BremseVorAndauto(this, Ort, Vorwaerts), BremseVorAmpel(Ort, Vorwaerts));
+ const float Bremse = FMath::Min(FMath::Min(BremseVorAndauto(this, Ort, Vorwaerts), BremseVorAmpel(Ort, Vorwaerts)),
+                                  BremseVorSpieler(GetWorld(), Ort, Vorwaerts));
  const FVector Richtung = Weg.Bewege(Ort, Tempo * Zeit * (bGestoert ? 0.08f : 1.0f) * Bremse);
  SetActorLocation(Ort);
  if (!Richtung.IsNearlyZero()) SetActorRotation(FMath::RInterpTo(GetActorRotation(), Richtung.Rotation(), Zeit, 5.0f));

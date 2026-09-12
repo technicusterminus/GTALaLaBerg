@@ -4,6 +4,8 @@
 #include "ProceduralMeshComponent.h"
 #include "Materials/MaterialInterface.h"
 #include "Engine/World.h"
+#include "Kismet/GameplayStatics.h"
+#include "GameFramework/Pawn.h"
 
 namespace {
  void hinzu(TArray<FVector>& P, TArray<int32>& K, TArray<FLinearColor>& F, const FLinearColor& Farbe,
@@ -54,6 +56,17 @@ namespace {
    Bremse = FMath::Min(Bremse, FMath::Clamp((Dist - 70.0f) / 180.0f, 0.05f, 1.0f));
   }
   return Bremse;
+ }
+ // Bremst vor dem Spieler genau wie vor einem anderen Passanten - bislang
+ // liefen Figuren dem Spieler ungebremst hinterher bzw. durch ihn hindurch.
+ float BremseVorSpieler(const UWorld* Welt, const FVector& Ort, const FVector& Vorwaerts) {
+  const APawn* SpielerPawn = UGameplayStatics::GetPlayerPawn(Welt, 0);
+  if (!SpielerPawn) return 1.0f;
+  const FVector Diff = SpielerPawn->GetActorLocation() - Ort;
+  const float Dist = Diff.Size();
+  if (Dist > 250.0f || Dist < 1.0f) return 1.0f;
+  if (FVector::DotProduct(Diff / Dist, Vorwaerts) < 0.5f) return 1.0f;
+  return FMath::Clamp((Dist - 70.0f) / 180.0f, 0.05f, 1.0f);
  }
 }
 
@@ -171,7 +184,8 @@ void ALaLaBergPassantKI::Tick(float Zeit) {
  if (!Weg.Gueltig()) return;
  const bool bStolpert = GetWorld()->GetTimeSeconds() < StolpertBis;
  FVector Ort = GetActorLocation();
- const float Bremse = BremseVorPassant(this, Ort, GetActorForwardVector());
+ const FVector Vorwaerts = GetActorForwardVector();
+ const float Bremse = FMath::Min(BremseVorPassant(this, Ort, Vorwaerts), BremseVorSpieler(GetWorld(), Ort, Vorwaerts));
  const float Faktor = (bStolpert ? 0.15f : 1.0f) * Bremse;
  const FVector Richtung = Weg.Bewege(Ort, Tempo * Zeit * Faktor);
  SetActorLocation(Ort);

@@ -44,6 +44,7 @@ Tools/Export/prepare-verkehr.cjs                 → Content/SourceData/Verkehr/
 Tools/baue_farbklecks.py                         → M_Farbklecks (Decal-Material für Paintball-Treffer)
 Tools/baue_waffenmetall.py, Tools/erzeuge_waffentextur.py → M_Waffenmetall (Material der Waffen-Ansichtsmodelle)
 Tools/importiere_waffen.py                       → /Game/Art/Waffen (lizenzierte Waffenmodelle, CC0)
+Tools/pruefe_waffenmasse.py                      → Diagnose: Bounding Box je Waffen-Mesh ins Log (kein Content-Ergebnis)
 Tools/erzeuge_sounds.py, Tools/importiere_sounds.py → /Game/Audio (Schuss-, Einschlag-, Schritt- und Motorsound)
 ```
 
@@ -66,8 +67,9 @@ Das gepackte Spiel nimmt dieselben Schalter: `GTALaLaBerg.exe -windowed -ResX=16
 | `-LaLaBergFoto` | Vier Ansichten: Hauptplatz, Straße, Wagen, Luftbild über dem Hauptplatz |
 | `-LaLaBergHimmelEchtzeit` | Himmelslicht aus Echtzeit-Aufnahme statt fester Cubemap (siehe Grenzen) |
 | `-LaLaBergGpu` | Zusammen mit `-LaLaBergFahrtest`: GPU-Zeiten je Renderschritt ins Log |
-| `-LaLaBergWaffentest` | Vier Schüsse (je eine Waffenart) auf den fahrbaren Wagen, dann einer auf eine Hauswand: `LALABERG_WAFFENTEST PASS` ab einem gezählten Treffer, Bilder von Wagen und Wand |
+| `-LaLaBergWaffentest` | Rüstet nacheinander alle vier Waffenarten aus, je ein Bild des Ansichtsmodells direkt nach dem Ausrüsten (deckte die falsch gedrehte Werfer-Muendung auf, die im gemeinsamen Abschlussbild unterging), dann Schuss auf den fahrbaren Wagen und auf eine Hauswand: `LALABERG_WAFFENTEST PASS` ab einem gezählten Treffer |
 | `-LaLaBergVerkehrFoto` | Teleportiert zum ersten KI-Auto und zum ersten KI-Passanten, je ein Bild: `LALABERG_VERKEHRFOTO PASS autos=70 passanten=90` (Ampelzahl steht in `LALABERG_VERKEHR`) |
+| `-LaLaBergLechFoto` | Blick über den Lech aus der Luft, prüft `M_Lech` im Bild |
 
 ## Paket bauen
 
@@ -93,7 +95,7 @@ Die Kaskadenschatten rasterten die ganze Nanite-Stadt je Kaskade neu, viermal pr
 - **Kein Lumen:** Die Beleuchtung nutzt SSGI und SSR statt Lumen. Das Himmelslicht ist eine feste Cubemap, weil die Echtzeit-Aufnahme in dieser Welt kein Licht liefert; die Ursache ist offen. Ein Tag-Nacht-Wechsel braucht deshalb noch Arbeit.
 - **Kein importiertes Skelett-Mesh für Passanten:** Der Passanten-Rig (Hüfte/Knie/Schulter) ist von Hand aus SceneComponents gebaut, keine UAnimSequence, kein Blending, keine Fußauftritts-Erkennung – die Gelenkwinkel folgen einer festen Sinuskurve. Die Waffen-Ansichtsmodelle sind dagegen echte, lizenzierte Meshes (CC0, Quaternius, siehe `Content/SourceData/Waffen/LIZENZ.md`) mit Rückstoßanimation; der fahrbare Wagen bleibt ein prozeduraler Kasten ohne Animation. Kein Missionssystem.
 - **Ampeln ohne Kreuzungsgraph:** Jede der 44 Ampeln schaltet für sich, mit zufälligem Zeitversatz – keine Zuordnung, welche Ampeln zur selben Kreuzung gehören oder sich ergänzen sollten. KI-Autos bremsen vor der nächsten roten Ampel auf ihrer Strecke, unabhängig davon, ob sie „ihre“ ist. Echte Vorfahrtsregeln (wer zuerst darf) gibt es nicht.
-- **Keine Straßenführung, kein Ausweichen:** Der fahrbare Wagen hält keine Spur. KI-Autos und KI-Passanten bremsen vor einem gleichartigen Hindernis voraus, weichen aber nicht zur Seite aus und nehmen auf den Spieler keine Rücksicht.
+- **Keine Straßenführung, kein Ausweichen:** Der fahrbare Wagen hält keine Spur. KI-Autos und KI-Passanten bremsen vor einem gleichartigen Hindernis voraus und jetzt auch vor dem Spieler (zu Fuß oder im Wagen), weichen dabei aber nicht zur Seite aus – nur ein Anhalten, keine Ausweichbewegung.
 
 ## Datenquellen und Lizenzen
 

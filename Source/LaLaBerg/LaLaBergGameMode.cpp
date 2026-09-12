@@ -633,12 +633,26 @@ void ALaLaBergGameMode::BeginPlay() {
   const TArray<ELaLaBergWaffenArt> Arten={ELaLaBergWaffenArt::Pistole,ELaLaBergWaffenArt::Maschine,
    ELaLaBergWaffenArt::Schrotflinte,ELaLaBergWaffenArt::Raketenwerfer};
   for(int32 i=0;i<Arten.Num();i++) {
-   FTimerHandle Schuss;
-   GetWorldTimerManager().SetTimer(Schuss,[this,Art=Arten[i]]() {
+   FTimerHandle Ausruestung;
+   GetWorldTimerManager().SetTimer(Ausruestung,[this,Art=Arten[i]]() {
     auto* PC=GetWorld()->GetFirstPlayerController();
     auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr;
-    if(Figur&&Figur->HoleWaffe()) { Figur->HoleWaffe()->SetzeArt(Art); Figur->Feuern(); }
+    if(Figur&&Figur->HoleWaffe()) Figur->HoleWaffe()->SetzeArt(Art);
    },5.2f+i*1.0f,false);
+   // Eigenes Belegbild je Waffenart VOR dem Schuss: sonst zeigt nur die
+   // zuletzt ausgeruestete Waffe (der Werfer) ihr Ansichtsmodell, die
+   // anderen drei blieben unbelegt - genau die Luecke, die den falsch
+   // gedrehten Werfer zunaechst unbemerkt liess.
+   FTimerHandle Bild;
+   GetWorldTimerManager().SetTimer(Bild,[this]() {
+    if(auto* PC=GetWorld()->GetFirstPlayerController()) PC->ConsoleCommand(TEXT("HighResShot 800x450"));
+   },5.2f+i*1.0f+0.4f,false);
+   FTimerHandle Schuss;
+   GetWorldTimerManager().SetTimer(Schuss,[this]() {
+    auto* PC=GetWorld()->GetFirstPlayerController();
+    auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr;
+    if(Figur) Figur->Feuern();
+   },5.2f+i*1.0f+0.6f,false);
   }
   FTimerHandle Bild;
   GetWorldTimerManager().SetTimer(Bild,[this]() {
