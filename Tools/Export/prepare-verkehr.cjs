@@ -173,8 +173,35 @@ const ampeln = ampelnRoh.map((s, i) => ({
   gruppe: gruppe[i], phase: phase[i],
 }));
 
-const ergebnis = { schema: 1, autos, passanten, ampeln };
+// Geparkte Autos: dieselben amtlichen Stellplaetze, dieselbe Filterung wie
+// vormals in prepare-stadt.cjs (jeder zweite Platz, kein Wasser) - die dort
+// als Kasten-Geometrie ins Stadt-Mesh gebackenen Wagen sind jetzt entfernt
+// (siehe Commit-Nachricht: nicht einsteigbar, nicht das CarConcept-Modell).
+// Stattdessen hier eine Positionsliste fuer echte, stehende KI-Auto-Akteure
+// (ALaLaBergVerkehrsauto ohne Route - siehe LadeVerkehr).
+function hash(x, z) {
+  const s = Math.sin(x * 12.9898 + z * 78.233) * 43758.5453;
+  return s - Math.floor(s);
+}
+const LACKE = [0xB9BCC0, 0x8E9296, 0x2E3236, 0xE8E9EA, 0x6E7276, 0x1F3A5C,
+               0x7A2A24, 0x2C4A32, 0xC8C2B4, 0x4A5058];
+const stellplaetze = city.parking || [];
+const geparkt = [];
+for (let i = 0; i + 2 < stellplaetze.length; i += 3) {
+  if ((i / 3) % 2 !== 0) continue;
+  const px = stellplaetze[i], pz = stellplaetze[i + 1], winkel = stellplaetze[i + 2] || 0;
+  if (Terrain.isWater(px, pz)) continue;
+  const t = hash(px, pz);
+  const gierGrad = (winkel + (t - 0.5) * 0.06) * 180 / Math.PI;
+  const rgb = LACKE[Math.floor(t * 997) % LACKE.length];
+  geparkt.push({
+    x: ux(px), y: uz(pz), z: Math.round(boden(px, pz) * M), gier: Math.round(gierGrad),
+    lack: [((rgb >> 16) & 0xFF) / 255, ((rgb >> 8) & 0xFF) / 255, (rgb & 0xFF) / 255],
+  });
+}
+
+const ergebnis = { schema: 1, autos, passanten, ampeln, geparkt };
 const out = path.resolve(REPO, 'Content/SourceData/Verkehr/verkehr.json');
 fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, JSON.stringify(ergebnis));
-console.log(JSON.stringify({ autos: autos.length, passanten: passanten.length, ampeln: ampeln.length, bytes: fs.statSync(out).size }));
+console.log(JSON.stringify({ autos: autos.length, passanten: passanten.length, ampeln: ampeln.length, geparkt: geparkt.length, bytes: fs.statSync(out).size }));

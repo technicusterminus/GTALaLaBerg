@@ -37,6 +37,7 @@
 #include "LaLaBergWaffe.h"
 #include "LaLaBergVerkehrsauto.h"
 #include "LaLaBergAutoPool.h"
+#include "LaLaBergKastenPool.h"
 #include "LaLaBergPassantKI.h"
 #include "LaLaBergAmpel.h"
 #include "LaLaBergHUD.h"
@@ -863,7 +864,26 @@ void ALaLaBergGameMode::LadeVerkehr() {
    AmpelZahl++;
   }
  }
- UE_LOG(LogTemp,Display,TEXT("LALABERG_VERKEHR autos=%d passanten=%d ampeln=%d"),AutoZahl,PassantZahl,AmpelZahl);
+ // Geparkte Autos: dieselben amtlichen Stellplaetze, die frueher als Kasten-
+ // Geometrie ins Stadt-Mesh gebacken waren (siehe Tools/Export/prepare-
+ // stadt.cjs) - jetzt echte, stehende KI-Auto-Akteure ohne Route. Dieselbe
+ // Klasse wie die fahrenden KI-Autos: ohne SetzeRoute bleibt Weg ungueltig,
+ // Tick() bewegt nichts, zeigt aber trotzdem das Sichtweiten-LOD-Modell und
+ // laesst sich wie jedes andere KI-Auto uebernehmen (LaLaBergCharakter::
+ // Einsteigen). Vor der Schleife: der Kasten-Pool (siehe LaLaBergKastenPool),
+ // damit SetzeLack unten schon eine Instanz statt eines eigenen Netzes bekommt.
+ GetWorld()->SpawnActor<ALaLaBergKastenPool>();
+ for(const auto& Wert:Wurzel->GetArrayField(TEXT("geparkt"))) {
+  const auto Obj=Wert->AsObject();
+  const FVector Ort(Obj->GetNumberField(TEXT("x")),Obj->GetNumberField(TEXT("y")),Obj->GetNumberField(TEXT("z")));
+  const FRotator Blick(0,Obj->GetNumberField(TEXT("gier")),0);
+  if(auto* Auto=GetWorld()->SpawnActor<ALaLaBergVerkehrsauto>(Ort,Blick)) {
+   const auto& Rgb=Obj->GetArrayField(TEXT("lack"));
+   Auto->SetzeLack(FLinearColor(Rgb[0]->AsNumber(),Rgb[1]->AsNumber(),Rgb[2]->AsNumber()));
+   GeparktZahl++;
+  }
+ }
+ UE_LOG(LogTemp,Display,TEXT("LALABERG_VERKEHR autos=%d passanten=%d ampeln=%d geparkt=%d"),AutoZahl,PassantZahl,AmpelZahl,GeparktZahl);
 }
 
 bool ALaLaBergGameMode::LadeAusAssets(TSharedPtr<FJsonObject>& Metadaten) {

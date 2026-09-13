@@ -5,6 +5,7 @@
 #include "ProceduralMeshComponent.h"
 #include "LaLaBergWagenForm.h"
 #include "LaLaBergAutoPool.h"
+#include "LaLaBergKastenPool.h"
 #include "LaLaBergAmpel.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
@@ -95,10 +96,35 @@ ALaLaBergVerkehrsauto::ALaLaBergVerkehrsauto() {
  Netz->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }
 
+void ALaLaBergVerkehrsauto::SetzeLack(const FLinearColor& Farbe) {
+ Lack = Farbe;
+ // Nur fuer geparkte Autos gerufen (siehe LadeVerkehr) - deren Kasten kommt
+ // aus dem gemeinsamen Pool statt aus einem eigenen Netz (siehe
+ // ALaLaBergKastenPool). BeginPlay hat das Netz schon grau gebaut, bevor
+ // diese Faerbung eintrifft (SpawnActor ruft BeginPlay vor SetzeLack auf) -
+ // die leere ClearAllMeshSections raeumt die ueberfluessige Kopie weg.
+ if (ALaLaBergKastenPool::Instanz) {
+  KastenGriff = ALaLaBergKastenPool::Instanz->FuegeHinzu(Lack, GetActorTransform());
+  if (KastenGriff.Gueltig()) {
+   bKastenGepoolt = true;
+   if (bNetzGebaut) Netz->ClearAllMeshSections();
+   return;
+  }
+ }
+ if (bNetzGebaut) LaLaBergWagenForm::BaueNetz(Netz, Lack);
+}
+
 void ALaLaBergVerkehrsauto::SetzeRoute(const TArray<FVector>& Punkte, float TempoKmh) {
  Weg.Route = Punkte;
  Tempo = TempoKmh / 3.6f;
- if (Weg.Gueltig()) SetActorLocation(Weg.Start());
+ if (Weg.Gueltig()) {
+  SetActorLocation(Weg.Start());
+  // Nur fahrende Autos brauchen sich gegenseitig zu bremsen (siehe
+  // BremseVorAndauto) - die 1078 geparkten Autos ohne Route bleiben aus
+  // Alle heraus, sonst waechst diese Schleife von 70x70 auf 70x1148
+  // Abstandspruefungen pro Bild (19 statt 26 fps im Fahrtest gemessen).
+  Alle.Add(this);
+ }
 }
 
 void ALaLaBergVerkehrsauto::BeginPlay() {
@@ -111,47 +137,52 @@ void ALaLaBergVerkehrsauto::BeginPlay() {
  // (Glas/Chrom, viele Dreiecke - 2 fps im Test), nur wenige nahe Autos
  // gleichzeitig sind es nicht.
  LaLaBergWagenForm::BaueNetz(Netz, Lack);
+ bNetzGebaut = true;
  if (ALaLaBergAutoPool::Instanz && ALaLaBergAutoPool::Instanz->Gueltig()) {
   PoolIndizes = ALaLaBergAutoPool::Instanz->FuegeHinzu(FTransform(FVector(0, 0, -500000.0f)));
   bPoolGenutzt = true;
  }
- Alle.Add(this);
 }
 
 void ALaLaBergVerkehrsauto::EndPlay(const EEndPlayReason::Type Grund) {
  // Nicht entfernen, nur verstecken - siehe ALaLaBergAutoPool::Verstecke.
  if (bPoolGenutzt && ALaLaBergAutoPool::Instanz) ALaLaBergAutoPool::Instanz->Verstecke(PoolIndizes);
+ if (bKastenGepoolt && ALaLaBergKastenPool::Instanz) ALaLaBergKastenPool::Instanz->Verstecke(KastenGriff);
  Alle.RemoveSingleSwap(this);
  Super::EndPlay(Grund);
 }
 
 void ALaLaBergVerkehrsauto::Tick(float Zeit) {
  Super::Tick(Zeit);
- if (!Weg.Gueltig()) return;
- // Nach einem Treffer kurz fast stehen bleiben, dann wieder auf Tempo -
- // sonst waere ein Treffer nur eine Farbe, kein Ereignis.
- const bool bGestoert = GetWorld()->GetTimeSeconds() < StoerungBis;
- FVector Ort = GetActorLocation();
- const FVector Vorwaerts = GetActorForwardVector();
- const float BremseObjekt = FMath::Min(BremseVorAndauto(this, Ort, Vorwaerts), BremseVorSpieler(GetWorld(), Ort, Vorwaerts));
- const float Bremse = FMath::Min(BremseObjekt, BremseVorAmpel(Ort, Vorwaerts));
- const FVector Richtung = Weg.Bewege(Ort, Tempo * Zeit * (bGestoert ? 0.08f : 1.0f) * Bremse);
- SetActorLocation(Ort);
- if (!Richtung.IsNearlyZero()) SetActorRotation(FMath::RInterpTo(GetActorRotation(), Richtung.Rotation(), Zeit, 5.0f));
+ // Ohne gueltige Route (die 1078 geparkten Autos - siehe LadeVerkehr) faellt
+ // nur die Fahr-/Brems-/Ausweichlogik weg, nicht das Sichtweiten-LOD weiter
+ // unten: ein stehendes Auto soll trotzdem aus der Naehe echt aussehen.
+ if (Weg.Gueltig()) {
+  // Nach einem Treffer kurz fast stehen bleiben, dann wieder auf Tempo -
+  // sonst waere ein Treffer nur eine Farbe, kein Ereignis.
+  const bool bGestoert = GetWorld()->GetTimeSeconds() < StoerungBis;
+  FVector Ort = GetActorLocation();
+  const FVector Vorwaerts = GetActorForwardVector();
+  const float BremseObjekt = FMath::Min(BremseVorAndauto(this, Ort, Vorwaerts), BremseVorSpieler(GetWorld(), Ort, Vorwaerts));
+  const float Bremse = FMath::Min(BremseObjekt, BremseVorAmpel(Ort, Vorwaerts));
+  const FVector Richtung = Weg.Bewege(Ort, Tempo * Zeit * (bGestoert ? 0.08f : 1.0f) * Bremse);
+  SetActorLocation(Ort);
+  if (!Richtung.IsNearlyZero()) SetActorRotation(FMath::RInterpTo(GetActorRotation(), Richtung.Rotation(), Zeit, 5.0f));
 
- // Weicht einem Auto oder dem Spieler direkt voraus seitlich aus (nach
- // rechts), statt nur davor stehenzubleiben - nicht vor einer roten Ampel,
- // da soll die Fahrt tatsaechlich enden. Keine Fahrspur-Erkennung: ein
- // fester Versatz, sanft ein- und wieder ausgeblendet.
- const float SeitZiel = BremseObjekt < 0.9f ? MAX_SEITVERSATZ : 0.0f;
- Seitversatz = FMath::FInterpTo(Seitversatz, SeitZiel, Zeit, 0.7f);
- if (FMath::Abs(Seitversatz) > 0.5f) SetActorLocation(GetActorLocation() + GetActorRightVector() * Seitversatz);
+  // Weicht einem Auto oder dem Spieler direkt voraus seitlich aus (nach
+  // rechts), statt nur davor stehenzubleiben - nicht vor einer roten Ampel,
+  // da soll die Fahrt tatsaechlich enden. Keine Fahrspur-Erkennung: ein
+  // fester Versatz, sanft ein- und wieder ausgeblendet.
+  const float SeitZiel = BremseObjekt < 0.9f ? MAX_SEITVERSATZ : 0.0f;
+  Seitversatz = FMath::FInterpTo(Seitversatz, SeitZiel, Zeit, 0.7f);
+  if (FMath::Abs(Seitversatz) > 0.5f) SetActorLocation(GetActorLocation() + GetActorRightVector() * Seitversatz);
+ }
 
  // Sichtweiten-LOD: das Detailmodell (Pool-Instanz) nur nah am Spieler, sonst
  // der leichte Kasten - siehe Begruendung in BeginPlay. Der Wechsel selbst
  // (Sichtbarkeit umschalten) passiert nur bei einem tatsaechlichen Uebergang,
- // nicht jedes Bild - waere sonst derselbe unnoetige Zustandswechsel 70-mal
- // pro Sekunde.
+ // nicht jedes Bild - waere sonst derselbe unnoetige Zustandswechsel
+ // hunderte Male pro Sekunde.
  if (bPoolGenutzt) {
   const APawn* SpielerPawn = UGameplayStatics::GetPlayerPawn(GetWorld(), 0);
   const bool bSollDetail = SpielerPawn && FVector::DistSquared(SpielerPawn->GetActorLocation(), GetActorLocation()) < LOD_ABSTAND * LOD_ABSTAND;
@@ -159,6 +190,13 @@ void ALaLaBergVerkehrsauto::Tick(float Zeit) {
    bDetailliert = bSollDetail;
    Netz->SetVisibility(!bDetailliert);
    if (!bDetailliert && ALaLaBergAutoPool::Instanz) ALaLaBergAutoPool::Instanz->Verstecke(PoolIndizes);
+   // Derselbe Umschalter fuer den gepoolten Kasten (geparkte Autos, siehe
+   // SetzeLack) - der bewegt sich nie, GetActorTransform() bleibt also ueber
+   // die ganze Standzeit richtig.
+   if (bKastenGepoolt && ALaLaBergKastenPool::Instanz) {
+    if (bDetailliert) ALaLaBergKastenPool::Instanz->Verstecke(KastenGriff);
+    else ALaLaBergKastenPool::Instanz->Aktualisiere(KastenGriff, GetActorTransform());
+   }
   }
   if (bDetailliert && ALaLaBergAutoPool::Instanz)
    ALaLaBergAutoPool::Instanz->Aktualisiere(PoolIndizes, FTransform(GetActorRotation() + FRotator(0, -90, 0), GetActorLocation()));

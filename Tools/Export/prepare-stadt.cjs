@@ -996,16 +996,11 @@ function marienbrunnen(bx, bz) {
 }
 marienbrunnen(605.3, -105.2);
 
-// Geparkte Wagen auf den amtlichen Stellplaetzen. Nicht auf jedem - eine
-// vollbesetzte Stadt kostet zu viele Dreiecke und sieht auch nicht echter aus.
-const stellplaetze = city.parking || [];
-for (let i = 0; i + 2 < stellplaetze.length; i += 3) {
-  if ((i / 3) % 2 !== 0) continue;
-  const px = stellplaetze[i], pz = stellplaetze[i + 1], winkel = stellplaetze[i + 2] || 0;
-  if (Terrain.isWater(px, pz)) continue;
-  const t = streuung(px, pz);
-  fahrzeug(px, pz, winkel + (t - 0.5) * 0.06, LACKE[Math.floor(t * 997) % LACKE.length]);
-}
+// Geparkte Wagen stehen nicht mehr als Kasten-Geometrie hier im Stadt-Mesh -
+// dieselben amtlichen Stellplaetze liefert jetzt prepare-verkehr.cjs als
+// Positionsliste fuer echte, einsteigbare KI-Auto-Akteure (CarConcept-Modell
+// statt Kasten, siehe LaLaBergGameMode::LadeVerkehr). fahrzeug()/LACKE
+// bleiben stehen, falls der fahrbare Wagen sie einmal braucht.
 
 // Passanten entlang der Strassen in der Altstadt: am Gehsteigrand, in
 // Fahrtrichtung oder dagegen, in unregelmaessigen Abstaenden.

@@ -3,6 +3,7 @@
 #include "GameFramework/Actor.h"
 #include "LaLaBergFarbbar.h"
 #include "LaLaBergWegfolger.h"
+#include "LaLaBergKastenPool.h"
 #include "LaLaBergVerkehrsauto.generated.h"
 
 // Ein KI-Auto: faehrt seine Strasse ab und zurueck (siehe Tools/Export/
@@ -18,6 +19,11 @@ public:
  virtual void Tick(float Zeit) override;
  // Vor BeginPlay setzen: die Wegpunkte in Unreal-Zentimetern.
  void SetzeRoute(const TArray<FVector>& Punkte, float TempoKmh);
+ // Fuer geparkte Autos (siehe LadeVerkehr): faerbt den Kasten-Fallback, falls
+ // das CarConcept-Detailmodell (Sichtweiten-LOD) einmal nicht greift. Nach
+ // SpawnActor (nicht deferred) lief BeginPlay schon mit der Default-Farbe -
+ // baut das Netz bei Bedarf neu, statt grau zu bleiben.
+ void SetzeLack(const FLinearColor& Farbe);
  virtual void ErhalteFarbe(const FLinearColor& Farbe, const FVector& AusRichtung) override;
  // Eigene, kurze Liste statt TActorIterator: bei 70 Autos, die einander
  // jedes Bild abfragen, durchsuchte TActorIterator sonst die ganze Stadt -
@@ -49,4 +55,10 @@ private:
  // weicht sanft aus und wieder zurueck, statt starr auf der Route zu bremsen.
  float Seitversatz = 0.0f;
  FLinearColor Lack = FLinearColor(0.6f, 0.6f, 0.6f);
+ bool bNetzGebaut = false;
+ // Nur fuer geparkte Autos (siehe SetzeLack): der Kasten kommt dann aus
+ // ALaLaBergKastenPool statt aus einem eigenen Netz - siehe dort fuer den
+ // Grund (1078 einzelne Draw-Calls druckten die Bildrate auf 17 fps).
+ bool bKastenGepoolt = false;
+ ALaLaBergKastenPool::FGriff KastenGriff;
 };

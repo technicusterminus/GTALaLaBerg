@@ -22,7 +22,7 @@ namespace {
                                  FLinearColor(0.71f,0.65f,0.55f), FLinearColor(0.22f,0.23f,0.26f), FLinearColor(0.43f,0.30f,0.48f) };
  const FLinearColor HAUT(0.79f, 0.63f, 0.51f);
  // Gelenkwinkel in Grad: wie weit Huefte/Knie/Schulter im Schritt ausschlagen.
- constexpr float HUEFT_GRAD = 22.0f, KNIE_GRAD = 38.0f, SCHULTER_GRAD = 16.0f;
+ constexpr float PASSANT_HUEFT_GRAD = 22.0f, PASSANT_KNIE_GRAD = 38.0f, PASSANT_SCHULTER_GRAD = 16.0f;
 
  // Bremst KI-Passanten vor einem anderen KI-Passanten voraus, damit zwei
  // Figuren nicht sichtbar ineinander hineinlaufen - kein Ausweichen zur
@@ -266,12 +266,12 @@ void ALaLaBergPassantKI::Tick(float Zeit) {
  Gehphase += Zeit * Faktor * (Tempo / 45.0f);
  for (int32 s = 0; s < 2; s++) {
   const float Phase = Gehphase + (s == 0 ? 0.0f : PI);
-  const float HueftGrad = HUEFT_GRAD * FMath::Sin(Phase);
-  const float KnieGrad = KNIE_GRAD * FMath::Max(0.0f, FMath::Sin(Phase + HALF_PI * 0.5f));
+  const float HueftGrad = PASSANT_HUEFT_GRAD * FMath::Sin(Phase);
+  const float KnieGrad = PASSANT_KNIE_GRAD * FMath::Max(0.0f, FMath::Sin(Phase + HALF_PI * 0.5f));
   Huefte[s]->SetRelativeRotation(FRotator(HueftGrad, 0, 0));
   Knie[s]->SetRelativeRotation(FRotator(-KnieGrad, 0, 0));
   // Arme schwingen gegenlaeufig zum gleichseitigen Bein - wie beim Gehen ueblich.
-  Schulter[s]->SetRelativeRotation(FRotator(-SCHULTER_GRAD * FMath::Sin(Phase), 0, 0));
+  Schulter[s]->SetRelativeRotation(FRotator(-PASSANT_SCHULTER_GRAD * FMath::Sin(Phase), 0, 0));
  }
 }
 

@@ -35,7 +35,7 @@ private:
  // Wegpunkte fuer KI-Verkehr und Passanten laden und die Figuren dazu
  // erzeugen (Tools/Export/prepare-verkehr.cjs -> Content/SourceData/Verkehr).
  void LadeVerkehr();
- int32 AutoZahl=0, PassantZahl=0, AmpelZahl=0;
+ int32 AutoZahl=0, PassantZahl=0, AmpelZahl=0, GeparktZahl=0;
 public:
  virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
  // Von jeder Farbkugel beim Aufprall gerufen - fuer HUD und Waffentest.

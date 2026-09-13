@@ -8,6 +8,7 @@
 class UProceduralMeshComponent;
 class UStaticMeshComponent;
 class USceneComponent;
+class UStaticMesh;
 
 // Die Autoform aus wagen.json (siehe Tools/Export/wagen-form.cjs), geteilt
 // zwischen dem fahrbaren Wagen und den KI-Verkehrswagen - beide sollen
@@ -17,6 +18,14 @@ namespace LaLaBergWagenForm {
  // false, wenn die Vorlagedatei fehlt - dann bleibt das Netz leer und der
  // Aufrufer weicht auf eine einfache Form aus.
  bool BaueNetz(UProceduralMeshComponent* Netz, const FLinearColor& Lack);
+
+ // Dieselbe Form wie BaueNetz, aber als eigenstaendiges (transientes)
+ // UStaticMesh statt einer ProceduralMeshComponent-Sektion je Auto - fuer
+ // ALaLaBergKastenPool: ein Draw-Call je Lackfarbe statt einer je Auto (siehe
+ // dort fuer den Grund). Nur im Editor-Build verfuegbar wie der Sektor-Import
+ // (UStaticMesh::BuildFromMeshDescriptions) - liefert sonst nullptr, dann
+ // bleibt der Aufrufer bei BaueNetz.
+ UStaticMesh* BaueKastenMesh(const FLinearColor& Lack);
 
  // Haengt die sichtbaren Aussenteile des lizenzierten CarConcept-Fahrzeugs
  // (CC BY 4.0, siehe Content/SourceData/Vehicles/CarConcept-LICENSE.md) an
