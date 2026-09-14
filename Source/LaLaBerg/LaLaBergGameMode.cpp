@@ -82,6 +82,17 @@ void ALaLaBergGameMode::AktualisiereTageszeit(float DeltaSeconds) {
   D->SetLightColor(FMath::Lerp(FLinearColor(0.5f,0.6f,0.9f),Tagesfarbe,TagAnteil));
  }
  if(SkyLicht) SkyLicht->SetIntensity(FMath::Lerp(0.15f,1.6f,TagAnteil));
+ // Das enge Automatikfenster (siehe InitGame, 0.95-1.70) haelt tagsueber
+ // bewusst gegen jedes Pumpen beim Blick in einen Torbogen - unveraendert
+ // liesse es die Belichtung nachts aber vergeblich gegen ein taghelles Ziel
+ // hochregeln (bzw. am oberen Anschlag haengen bleiben), die Stadt bliebe
+ // nachts unnatuerlich hell. Das Fenster wandert deshalb mit TagAnteil nach
+ // unten, gleich breit wie tagsueber, nur um ein dunkleres Ziel herum.
+ if(Belichtung) {
+  FPostProcessSettings& PP=Belichtung->Settings;
+  PP.AutoExposureMinBrightness=FMath::Lerp(0.08f,0.95f,TagAnteil);
+  PP.AutoExposureMaxBrightness=FMath::Lerp(0.35f,1.70f,TagAnteil);
+ }
 }
 void ALaLaBergGameMode::InitGame(const FString& MapName,const FString& Options,FString& ErrorMessage) {
  Super::InitGame(MapName,Options,ErrorMessage);

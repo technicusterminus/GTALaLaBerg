@@ -222,8 +222,17 @@ void ALaLaBergPassantKI::BeginPlay() {
   SkelettKopf->SetLeaderPoseComponent(SkelettKoerper);
   SkelettFuesse->SetLeaderPoseComponent(SkelettKoerper);
   SkelettBeine->SetLeaderPoseComponent(SkelettKoerper);
+  // Dieselbe Statur-Streuung wie beim Kasten-Rig (Groesse, siehe Konstruktor)
+  // auch auf das Skelett angewandt - sonst waeren trotz unterschiedlicher
+  // Kleidung alle 90 KI-Passanten exakt gleich gross. Kopf/Fuesse/Beine
+  // sind eigene Geschwisterkomponenten an Huelle, keine Kinder von
+  // SkelettKoerper - die Skalierung muss deshalb auf allen vieren einzeln
+  // gesetzt werden, sonst wachsen nur Rumpf/Kopfpose (LeaderPose), nicht
+  // die Fuesse/Beine mit.
+  const float Statur = Groesse / 1.72f;
   for (USkeletalMeshComponent* Teil : { SkelettKoerper, SkelettKopf, SkelettFuesse, SkelettBeine }) {
    Teil->SetVisibility(true);
+   Teil->SetRelativeScale3D(FVector(Statur));
    FaerbeSkelett(Teil, Jacke);
   }
   Netz->SetVisibility(false);
