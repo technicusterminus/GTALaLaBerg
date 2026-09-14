@@ -184,6 +184,19 @@ namespace {
  USkeletalMesh* LadeNPCTeil(const TCHAR* Name) {
   return LoadObject<USkeletalMesh>(nullptr, *FString::Printf(TEXT("/Game/Art/People/Farmer/SK_Farmer_%s.SK_Farmer_%s"), Name, Name));
  }
+ // Zusaetzliche Figuren aus demselben Paket (siehe Tools/importiere_npc_
+ // einzeln.py, Content/SourceData/People/LIZENZ.md) - anders als Farmer
+ // (vier modulare Teile + externe Animations.fbx) ist jede davon EIN
+ // komplettes Skeletal Mesh mit 24 eigenen Animationen in einer Datei, kein
+ // Zusammenbau noetig. Fuer echte Gesichtsvielfalt statt immer derselben
+ // Farmer-Person - FigurTyp haelt fest, welche gewaehlt wurde (0=Farmer,
+ // 1..N=hier, siehe BeginPlay/Tick).
+ struct FEinzelFigur { const TCHAR* Name; };
+ const FEinzelFigur EINZEL_FIGUREN[] = { { TEXT("Casual") }, { TEXT("Worker") } };
+ const int32 EINZEL_FIGUREN_ANZAHL = UE_ARRAY_COUNT(EINZEL_FIGUREN);
+ FString EinzelAnimPfad(const TCHAR* Figur, const TCHAR* Anim) {
+  return FString::Printf(TEXT("/Game/Art/People/%s/SK_%sCharacterArmature_%s.SK_%sCharacterArmature_%s"), Figur, Figur, Anim, Figur, Anim);
+ }
  // Das Farmer-Paket bringt nur eine Kleidungsfarbe je Material-Slot mit
  // (Skin/LightBlue/Brown/Beige/Red/Brown2, keine vorbereiteten Varianten) -
  // ohne diese Faerbung saehen alle 90 KI-Passanten identisch aus. Jeder
@@ -197,7 +210,7 @@ namespace {
   const auto& Materials = Komp->GetSkeletalMeshAsset()->GetMaterials();
   for (int32 i = 0; i < Materials.Num(); i++) {
    const FString Name = Materials[i].MaterialSlotName.ToString();
-   if (Name == TEXT("Skin") || Name == TEXT("Eye") || Name == TEXT("Eyebrows")) continue;
+   if (Name == TEXT("Skin") || Name == TEXT("Eye") || Name == TEXT("Eyebrows") || Name == TEXT("Moustache")) continue;
    if (auto* MID = Komp->CreateDynamicMaterialInstance(i))
     MID->SetVectorParameterValue(TEXT("DiffuseColor"), Farbe);
   }
@@ -207,40 +220,69 @@ namespace {
 void ALaLaBergPassantKI::BeginPlay() {
  Super::BeginPlay();
 
- USkeletalMesh* MeshKoerper = LadeNPCTeil(TEXT("Body"));
- USkeletalMesh* MeshKopf = LadeNPCTeil(TEXT("Head"));
- USkeletalMesh* MeshFuesse = LadeNPCTeil(TEXT("Feet"));
- USkeletalMesh* MeshBeine = LadeNPCTeil(TEXT("Legs"));
- if (MeshKoerper && MeshKopf && MeshFuesse && MeshBeine) {
-  bSkelettGenutzt = true;
-  SkelettKoerper->SetSkeletalMesh(MeshKoerper);
-  SkelettKopf->SetSkeletalMesh(MeshKopf);
-  SkelettFuesse->SetSkeletalMesh(MeshFuesse);
-  SkelettBeine->SetSkeletalMesh(MeshBeine);
-  // Kopf/Fuesse/Beine folgen der Pose von SkelettKoerper, statt selbst eine
-  // AnimSequence abzuspielen - vier Teile, eine Animation.
-  SkelettKopf->SetLeaderPoseComponent(SkelettKoerper);
-  SkelettFuesse->SetLeaderPoseComponent(SkelettKoerper);
-  SkelettBeine->SetLeaderPoseComponent(SkelettKoerper);
-  // Dieselbe Statur-Streuung wie beim Kasten-Rig (Groesse, siehe Konstruktor)
-  // auch auf das Skelett angewandt - sonst waeren trotz unterschiedlicher
-  // Kleidung alle 90 KI-Passanten exakt gleich gross. Kopf/Fuesse/Beine
-  // sind eigene Geschwisterkomponenten an Huelle, keine Kinder von
-  // SkelettKoerper - die Skalierung muss deshalb auf allen vieren einzeln
-  // gesetzt werden, sonst wachsen nur Rumpf/Kopfpose (LeaderPose), nicht
-  // die Fuesse/Beine mit.
-  const float Statur = Groesse / 1.72f;
-  for (USkeletalMeshComponent* Teil : { SkelettKoerper, SkelettKopf, SkelettFuesse, SkelettBeine }) {
-   Teil->SetVisibility(true);
-   Teil->SetRelativeScale3D(FVector(Statur));
-   FaerbeSkelett(Teil, Jacke);
+ // Dieselbe Statur-Streuung wie beim Kasten-Rig (Groesse, siehe Konstruktor)
+ // auch auf jedes Skelett angewandt - sonst waeren trotz unterschiedlicher
+ // Kleidung/Figur alle 90 KI-Passanten exakt gleich gross.
+ const float Statur = Groesse / 1.72f;
+
+ // Zufaellig eine von mehreren Figuren aus demselben Paket: Farmer (0,
+ // modular, vier Teile + externe Animation) oder eine der einfacheren
+ // Einzel-Figuren (1..N, ein komplettes Mesh mit eigener Animation, siehe
+ // EINZEL_FIGUREN) - fuer echte Gesichtsvielfalt statt immer derselben
+ // Farmer-Person.
+ const int32 Wahl = FMath::RandRange(0, EINZEL_FIGUREN_ANZAHL);
+ if (Wahl == 0) {
+  USkeletalMesh* MeshKoerper = LadeNPCTeil(TEXT("Body"));
+  USkeletalMesh* MeshKopf = LadeNPCTeil(TEXT("Head"));
+  USkeletalMesh* MeshFuesse = LadeNPCTeil(TEXT("Feet"));
+  USkeletalMesh* MeshBeine = LadeNPCTeil(TEXT("Legs"));
+  if (MeshKoerper && MeshKopf && MeshFuesse && MeshBeine) {
+   bSkelettGenutzt = true;
+   FigurTyp = 0;
+   SkelettKoerper->SetSkeletalMesh(MeshKoerper);
+   SkelettKopf->SetSkeletalMesh(MeshKopf);
+   SkelettFuesse->SetSkeletalMesh(MeshFuesse);
+   SkelettBeine->SetSkeletalMesh(MeshBeine);
+   // Kopf/Fuesse/Beine folgen der Pose von SkelettKoerper, statt selbst eine
+   // AnimSequence abzuspielen - vier Teile, eine Animation. Die Skalierung
+   // dagegen muss auf allen vieren einzeln gesetzt werden: sie sind eigene
+   // Geschwisterkomponenten an Huelle, keine Kinder von SkelettKoerper -
+   // LeaderPoseComponent uebertraegt nur die Skelett-Pose, nicht die
+   // Komponenten-Transform.
+   SkelettKopf->SetLeaderPoseComponent(SkelettKoerper);
+   SkelettFuesse->SetLeaderPoseComponent(SkelettKoerper);
+   SkelettBeine->SetLeaderPoseComponent(SkelettKoerper);
+   for (USkeletalMeshComponent* Teil : { SkelettKoerper, SkelettKopf, SkelettFuesse, SkelettBeine }) {
+    Teil->SetVisibility(true);
+    Teil->SetRelativeScale3D(FVector(Statur));
+    FaerbeSkelett(Teil, Jacke);
+   }
+   if (auto* Anim = LoadObject<UAnimSequence>(nullptr, TEXT("/Game/Art/People/Animations/Anim_HumansCharacterArmature_Idle_Neutral.Anim_HumansCharacterArmature_Idle_Neutral")))
+    SkelettKoerper->PlayAnimation(Anim, true);
   }
+ } else {
+  // Einzel-Figur: ein komplettes Mesh mit eigener Animation (siehe
+  // Tools/importiere_npc_einzeln.py) - nur SkelettKoerper wird gebraucht,
+  // Kopf/Fuesse/Beine bleiben ungenutzt (unsichtbar per Default).
+  const TCHAR* Name = EINZEL_FIGUREN[Wahl - 1].Name;
+  if (USkeletalMesh* Mesh = LoadObject<USkeletalMesh>(nullptr,
+      *FString::Printf(TEXT("/Game/Art/People/%s/SK_%s.SK_%s"), Name, Name, Name))) {
+   bSkelettGenutzt = true;
+   FigurTyp = Wahl;
+   SkelettKoerper->SetSkeletalMesh(Mesh);
+   SkelettKoerper->SetVisibility(true);
+   SkelettKoerper->SetRelativeScale3D(FVector(Statur));
+   FaerbeSkelett(SkelettKoerper, Jacke);
+   if (auto* Anim = LoadObject<UAnimSequence>(nullptr, *EinzelAnimPfad(Name, TEXT("Idle_Neutral"))))
+    SkelettKoerper->PlayAnimation(Anim, true);
+  }
+ }
+
+ if (bSkelettGenutzt) {
   Netz->SetVisibility(false);
   for (int32 s = 0; s < 2; s++) {
    Oberschenkel[s]->SetVisibility(false); Unterschenkel[s]->SetVisibility(false); Oberarm[s]->SetVisibility(false);
   }
-  if (auto* Anim = LoadObject<UAnimSequence>(nullptr, TEXT("/Game/Art/People/Animations/Anim_HumansCharacterArmature_Idle_Neutral.Anim_HumansCharacterArmature_Idle_Neutral")))
-   SkelettKoerper->PlayAnimation(Anim, true);
  } else {
   BaueOberkoerper();
   const FLinearColor Hose = HOSEN[FMath::RandRange(0, UE_ARRAY_COUNT(HOSEN) - 1)];
@@ -284,10 +326,14 @@ void ALaLaBergPassantKI::Tick(float Zeit) {
   const bool bLaeuftJetzt = !Richtung.IsNearlyZero() && Tempo * Faktor > 5.0f;
   if (bLaeuftJetzt != bLaeuftGerade) {
    bLaeuftGerade = bLaeuftJetzt;
-   const TCHAR* Pfad = bLaeuftGerade
-    ? TEXT("/Game/Art/People/Animations/Anim_HumansCharacterArmature_Walk.Anim_HumansCharacterArmature_Walk")
-    : TEXT("/Game/Art/People/Animations/Anim_HumansCharacterArmature_Idle_Neutral.Anim_HumansCharacterArmature_Idle_Neutral");
-   if (auto* Anim = LoadObject<UAnimSequence>(nullptr, Pfad)) SkelettKoerper->PlayAnimation(Anim, true);
+   const TCHAR* AnimName = bLaeuftGerade ? TEXT("Walk") : TEXT("Idle_Neutral");
+   // FigurTyp 0 = Farmer (externe Animations.fbx, eigener Ordner "Animations"),
+   // sonst eine Einzel-Figur mit ihrer eigenen, mitgebrachten Animation
+   // (siehe BeginPlay/EinzelAnimPfad).
+   const FString Pfad = FigurTyp == 0
+    ? TEXT("/Game/Art/People/Animations/Anim_HumansCharacterArmature_") + FString(AnimName) + TEXT(".Anim_HumansCharacterArmature_") + FString(AnimName)
+    : EinzelAnimPfad(EINZEL_FIGUREN[FigurTyp - 1].Name, AnimName);
+   if (auto* Anim = LoadObject<UAnimSequence>(nullptr, *Pfad)) SkelettKoerper->PlayAnimation(Anim, true);
   }
   return;
  }

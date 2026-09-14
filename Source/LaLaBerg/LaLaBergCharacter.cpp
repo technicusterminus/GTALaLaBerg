@@ -40,10 +40,18 @@ namespace {
   const auto& Materials = Komp->GetSkeletalMeshAsset()->GetMaterials();
   for (int32 i = 0; i < Materials.Num(); i++) {
    const FString Name = Materials[i].MaterialSlotName.ToString();
-   if (Name == TEXT("Skin") || Name == TEXT("Eye") || Name == TEXT("Eyebrows")) continue;
+   if (Name == TEXT("Skin") || Name == TEXT("Eye") || Name == TEXT("Eyebrows") || Name == TEXT("Moustache")) continue;
    if (auto* MID = Komp->CreateDynamicMaterialInstance(i))
     MID->SetVectorParameterValue(TEXT("DiffuseColor"), Farbe);
   }
+ }
+ // Wie LaLaBergPassantKI::EINZEL_FIGUREN - dieselben zusaetzlichen Figuren
+ // aus demselben Paket, auch fuer die Spielfigur.
+ struct FEinzelFigur { const TCHAR* Name; };
+ const FEinzelFigur EINZEL_FIGUREN[] = { { TEXT("Casual") }, { TEXT("Worker") } };
+ const int32 EINZEL_FIGUREN_ANZAHL = UE_ARRAY_COUNT(EINZEL_FIGUREN);
+ FString EinzelAnimPfad(const TCHAR* Figur, const TCHAR* Anim) {
+  return FString::Printf(TEXT("/Game/Art/People/%s/SK_%sCharacterArmature_%s.SK_%sCharacterArmature_%s"), Figur, Figur, Anim, Figur, Anim);
  }
 }
 
@@ -202,32 +210,54 @@ void ALaLaBergCharacter::BeginPlay() {
  // Figur halb echt, halb Kasten zusammenzusetzen. Der Kasten-Rig bleibt in
  // beiden Faellen gebaut (siehe oben) - WaffenHalter haengt an Oberarm[0]
  // und braucht dessen Transform als Aufhaengepunkt weiter, auch unsichtbar.
+ // Zufaellig eine von mehreren Figuren, wie bei den KI-Passanten (siehe
+ // LaLaBergPassantKI::BeginPlay fuer die ausfuehrliche Begruendung): 0 =
+ // Farmer (modular, vier Teile + externe Animation), 1..N = einfachere
+ // Einzel-Figur (ein Mesh mit eigener Animation).
  auto LadeSpielerTeil = [](const TCHAR* Name) {
   return LoadObject<USkeletalMesh>(nullptr, *FString::Printf(TEXT("/Game/Art/People/Farmer/SK_Farmer_%s.SK_Farmer_%s"), Name, Name));
  };
- USkeletalMesh* MeshKoerper = LadeSpielerTeil(TEXT("Body"));
- USkeletalMesh* MeshKopf = LadeSpielerTeil(TEXT("Head"));
- USkeletalMesh* MeshFuesse = LadeSpielerTeil(TEXT("Feet"));
- USkeletalMesh* MeshBeine = LadeSpielerTeil(TEXT("Legs"));
- if (MeshKoerper && MeshKopf && MeshFuesse && MeshBeine) {
-  bSkelettGenutzt = true;
-  SkelettKoerper->SetSkeletalMesh(MeshKoerper);
-  SkelettKopf->SetSkeletalMesh(MeshKopf);
-  SkelettFuesse->SetSkeletalMesh(MeshFuesse);
-  SkelettBeine->SetSkeletalMesh(MeshBeine);
-  SkelettKopf->SetLeaderPoseComponent(SkelettKoerper);
-  SkelettFuesse->SetLeaderPoseComponent(SkelettKoerper);
-  SkelettBeine->SetLeaderPoseComponent(SkelettKoerper);
-  for (USkeletalMeshComponent* Teil : { SkelettKoerper, SkelettKopf, SkelettFuesse, SkelettBeine }) {
-   Teil->SetVisibility(true);
-   FaerbeSkelett(Teil, JACKE);
+ const int32 Wahl = FMath::RandRange(0, EINZEL_FIGUREN_ANZAHL);
+ if (Wahl == 0) {
+  USkeletalMesh* MeshKoerper = LadeSpielerTeil(TEXT("Body"));
+  USkeletalMesh* MeshKopf = LadeSpielerTeil(TEXT("Head"));
+  USkeletalMesh* MeshFuesse = LadeSpielerTeil(TEXT("Feet"));
+  USkeletalMesh* MeshBeine = LadeSpielerTeil(TEXT("Legs"));
+  if (MeshKoerper && MeshKopf && MeshFuesse && MeshBeine) {
+   bSkelettGenutzt = true;
+   FigurTyp = 0;
+   SkelettKoerper->SetSkeletalMesh(MeshKoerper);
+   SkelettKopf->SetSkeletalMesh(MeshKopf);
+   SkelettFuesse->SetSkeletalMesh(MeshFuesse);
+   SkelettBeine->SetSkeletalMesh(MeshBeine);
+   SkelettKopf->SetLeaderPoseComponent(SkelettKoerper);
+   SkelettFuesse->SetLeaderPoseComponent(SkelettKoerper);
+   SkelettBeine->SetLeaderPoseComponent(SkelettKoerper);
+   for (USkeletalMeshComponent* Teil : { SkelettKoerper, SkelettKopf, SkelettFuesse, SkelettBeine }) {
+    Teil->SetVisibility(true);
+    FaerbeSkelett(Teil, JACKE);
+   }
+   if (auto* Anim = LoadObject<UAnimSequence>(nullptr, TEXT("/Game/Art/People/Animations/Anim_HumansCharacterArmature_Idle_Neutral.Anim_HumansCharacterArmature_Idle_Neutral")))
+    SkelettKoerper->PlayAnimation(Anim, true);
   }
+ } else {
+  const TCHAR* Name = EINZEL_FIGUREN[Wahl - 1].Name;
+  if (USkeletalMesh* NeuesMesh = LoadObject<USkeletalMesh>(nullptr,
+      *FString::Printf(TEXT("/Game/Art/People/%s/SK_%s.SK_%s"), Name, Name, Name))) {
+   bSkelettGenutzt = true;
+   FigurTyp = Wahl;
+   SkelettKoerper->SetSkeletalMesh(NeuesMesh);
+   SkelettKoerper->SetVisibility(true);
+   FaerbeSkelett(SkelettKoerper, JACKE);
+   if (auto* Anim = LoadObject<UAnimSequence>(nullptr, *EinzelAnimPfad(Name, TEXT("Idle_Neutral"))))
+    SkelettKoerper->PlayAnimation(Anim, true);
+  }
+ }
+ if (bSkelettGenutzt) {
   Netz->SetVisibility(false);
   for (int32 s = 0; s < 2; s++) {
    Oberschenkel[s]->SetVisibility(false); Unterschenkel[s]->SetVisibility(false); Oberarm[s]->SetVisibility(false);
   }
-  if (auto* Anim = LoadObject<UAnimSequence>(nullptr, TEXT("/Game/Art/People/Animations/Anim_HumansCharacterArmature_Idle_Neutral.Anim_HumansCharacterArmature_Idle_Neutral")))
-   SkelettKoerper->PlayAnimation(Anim, true);
  }
 
  // Am rechten Arm statt an der Kamera: sonst haengt die Waffe in dritter
@@ -275,10 +305,11 @@ void ALaLaBergCharacter::Tick(float DeltaSeconds) {
   const bool bLaeuftJetzt = Faktor > 0.05f;
   if (bLaeuftJetzt != bLaeuftGerade) {
    bLaeuftGerade = bLaeuftJetzt;
-   const TCHAR* Pfad = bLaeuftGerade
-    ? TEXT("/Game/Art/People/Animations/Anim_HumansCharacterArmature_Walk.Anim_HumansCharacterArmature_Walk")
-    : TEXT("/Game/Art/People/Animations/Anim_HumansCharacterArmature_Idle_Neutral.Anim_HumansCharacterArmature_Idle_Neutral");
-   if (auto* Anim = LoadObject<UAnimSequence>(nullptr, Pfad)) SkelettKoerper->PlayAnimation(Anim, true);
+   const TCHAR* AnimName = bLaeuftGerade ? TEXT("Walk") : TEXT("Idle_Neutral");
+   const FString Pfad = FigurTyp == 0
+    ? TEXT("/Game/Art/People/Animations/Anim_HumansCharacterArmature_") + FString(AnimName) + TEXT(".Anim_HumansCharacterArmature_") + FString(AnimName)
+    : EinzelAnimPfad(EINZEL_FIGUREN[FigurTyp - 1].Name, AnimName);
+   if (auto* Anim = LoadObject<UAnimSequence>(nullptr, *Pfad)) SkelettKoerper->PlayAnimation(Anim, true);
   }
  }
 }

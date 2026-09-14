@@ -62,6 +62,9 @@ private:
  UPROPERTY() TObjectPtr<class USkeletalMeshComponent> SkelettBeine = nullptr;
  bool bSkelettGenutzt = false;
  bool bLaeuftGerade = false;
+ // Welche Figur gewaehlt wurde (siehe BeginPlay, wie LaLaBergPassantKI):
+ // 0 = Farmer (modular), 1..N = Index+1 in EINZEL_FIGUREN.
+ int32 FigurTyp = 0;
 
  void Waffe1(); void Waffe2(); void Waffe3(); void Waffe4();
  // Gedrueckt gehalten, feuert die Waffe weiter - ihre eigene Feuerrate

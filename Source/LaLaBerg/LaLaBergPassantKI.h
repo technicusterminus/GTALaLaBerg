@@ -58,12 +58,17 @@ private:
  UPROPERTY() TObjectPtr<class USkeletalMeshComponent> SkelettBeine = nullptr;
  bool bSkelettGenutzt = false;
  bool bLaeuftGerade = false;    // aktuell Walk- statt Idle-Animation
+ // Welche Figur gewaehlt wurde (siehe BeginPlay): 0 = Farmer (modular,
+ // externe Animation), 1..N = Index+1 in EINZEL_FIGUREN (eigenes Mesh samt
+ // Animation). Nur gueltig, wenn bSkelettGenutzt.
+ int32 FigurTyp = 0;
 
  FLaLaBergWegfolger Weg;
  float Tempo = 140.0f;             // cm/s, gewoehnliches Gehtempo
  float StolpertBis = -10.0f;       // ein Treffer bremst kurz
  float Seitversatz = 0.0f;         // seitliches Ausweichen, siehe Tick
  float Gehphase = 0.0f;
+ FVector LetzterAusweichOffset = FVector::ZeroVector;
  FLinearColor Jacke;
  float Groesse = 1.72f;
  float BeinL = 0.0f;                // Beinlaenge in cm, aus Groesse abgeleitet
