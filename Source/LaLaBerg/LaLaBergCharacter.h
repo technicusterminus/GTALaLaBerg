@@ -50,6 +50,19 @@ private:
  float BeinL = 0.0f, OberschenkelL = 0.0f, UnterschenkelL = 0.0f, OberarmL = 0.0f;
  float Gehphase = 0.0f;
 
+ // Bevorzugt: dasselbe echte, lizenzierte Skeletal Mesh wie bei den
+ // KI-Passanten (CC0, Quaternius - siehe LaLaBergPassantKI) statt des von
+ // Hand gebauten Kasten-Rigs oben. Der Kasten-Rig bleibt trotzdem bestehen
+ // (nur unsichtbar) - WaffenHalter haengt an Oberarm[0] und braucht dessen
+ // feste, nicht mitschwingende Position weiterhin als Aufhaengepunkt, ganz
+ // ohne einen Handknochen des Skeletts erraten zu muessen.
+ UPROPERTY() TObjectPtr<class USkeletalMeshComponent> SkelettKoerper = nullptr;
+ UPROPERTY() TObjectPtr<class USkeletalMeshComponent> SkelettKopf = nullptr;
+ UPROPERTY() TObjectPtr<class USkeletalMeshComponent> SkelettFuesse = nullptr;
+ UPROPERTY() TObjectPtr<class USkeletalMeshComponent> SkelettBeine = nullptr;
+ bool bSkelettGenutzt = false;
+ bool bLaeuftGerade = false;
+
  void Waffe1(); void Waffe2(); void Waffe3(); void Waffe4();
  // Gedrueckt gehalten, feuert die Waffe weiter - ihre eigene Feuerrate
  // begrenzt, wie schnell. So wird aus der MP eine Dauerfeuerwaffe, ohne

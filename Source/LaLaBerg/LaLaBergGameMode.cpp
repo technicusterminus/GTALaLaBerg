@@ -832,14 +832,31 @@ void ALaLaBergGameMode::LadeVerkehr() {
    Route.Add(FVector(Zahlen[i]->AsNumber(),Zahlen[i+1]->AsNumber(),Zahlen[i+2]->AsNumber()));
   return Route;
  };
+ // Echte Kreuzungen aus dem Strassengraphen (siehe Tools/Export/prepare-
+ // verkehr.cjs "kreuzungen") - vor den Autos einlesen, die brauchen die
+ // Liste schon fuer SetzeKreuzung unten. Keine Hoehe (siehe LiesRoute vs.
+ // hier x/y statt x/y/z) - BremseVorKreuzung vergleicht nur in der Ebene.
+ ALaLaBergVerkehrsauto::KreuzungOrte.Empty();
+ ALaLaBergVerkehrsauto::KreuzungKlassen.Empty();
+ for(const auto& Wert:Wurzel->GetArrayField(TEXT("kreuzungen"))) {
+  const auto Obj=Wert->AsObject();
+  ALaLaBergVerkehrsauto::KreuzungOrte.Add(FVector(Obj->GetNumberField(TEXT("x")),Obj->GetNumberField(TEXT("y")),0));
+  ALaLaBergVerkehrsauto::KreuzungKlassen.Add(Obj->GetIntegerField(TEXT("klasse")));
+ }
  // Vor den KI-Autos: die brauchen ALaLaBergAutoPool::Instanz schon in ihrem
  // eigenen BeginPlay (siehe dort).
  GetWorld()->SpawnActor<ALaLaBergAutoPool>();
  for(const auto& Wert:Wurzel->GetArrayField(TEXT("autos"))) {
-  const TArray<FVector> Route=LiesRoute(Wert->AsObject());
+  const auto AutoObj=Wert->AsObject();
+  const TArray<FVector> Route=LiesRoute(AutoObj);
   if(Route.Num()<2) continue;
   if(auto* Auto=GetWorld()->SpawnActor<ALaLaBergVerkehrsauto>(Route[0],FRotator::ZeroRotator)) {
    Auto->SetzeRoute(Route,FMath::FRandRange(28.0f,46.0f));
+   TArray<int32> Kreuzungen;
+   const TArray<TSharedPtr<FJsonValue>>* KreuzungenJson=nullptr;
+   if(AutoObj->TryGetArrayField(TEXT("kreuzungen"),KreuzungenJson))
+    for(const auto& K:*KreuzungenJson) Kreuzungen.Add(static_cast<int32>(K->AsNumber()));
+   Auto->SetzeKreuzung(AutoObj->HasField(TEXT("klasse"))?AutoObj->GetIntegerField(TEXT("klasse")):3,Kreuzungen);
    AutoZahl++;
   }
  }
@@ -883,7 +900,7 @@ void ALaLaBergGameMode::LadeVerkehr() {
    GeparktZahl++;
   }
  }
- UE_LOG(LogTemp,Display,TEXT("LALABERG_VERKEHR autos=%d passanten=%d ampeln=%d geparkt=%d"),AutoZahl,PassantZahl,AmpelZahl,GeparktZahl);
+ UE_LOG(LogTemp,Display,TEXT("LALABERG_VERKEHR autos=%d passanten=%d ampeln=%d geparkt=%d kreuzungen=%d"),AutoZahl,PassantZahl,AmpelZahl,GeparktZahl,ALaLaBergVerkehrsauto::KreuzungOrte.Num());
 }
 
 bool ALaLaBergGameMode::LadeAusAssets(TSharedPtr<FJsonObject>& Metadaten) {

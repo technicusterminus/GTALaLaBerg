@@ -6,12 +6,15 @@
 #include "LaLaBergWagenForm.h"
 #include "LaLaBergAutoPool.h"
 #include "LaLaBergKastenPool.h"
+#include "LaLaBergWagenTypen.h"
 #include "LaLaBergAmpel.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/Pawn.h"
 
 TArray<ALaLaBergVerkehrsauto*> ALaLaBergVerkehrsauto::Alle;
+TArray<FVector> ALaLaBergVerkehrsauto::KreuzungOrte;
+TArray<int32> ALaLaBergVerkehrsauto::KreuzungKlassen;
 
 namespace {
  // Keine echte Verkehrssimulation - nur: bremsen, wenn ein anderer
@@ -26,6 +29,36 @@ namespace {
    if (Dist > 900.0f || Dist < 1.0f) continue;
    if (FVector::DotProduct(Diff / Dist, Vorwaerts) < 0.5f) continue;   // nicht voraus
    Bremse = FMath::Min(Bremse, FMath::Clamp((Dist - 260.0f) / 640.0f, 0.05f, 1.0f));
+  }
+  return Bremse;
+ }
+ // Echtes Vorfahrtsrecht an den Kreuzungen der eigenen Route (siehe
+ // Tools/Export/prepare-verkehr.cjs "kreuzungen", aus dem echten OSM-
+ // Strassengraphen, nicht nur Ampel-Abstandsgruppierung wie unten): ein Auto
+ // bremst, wenn ein anderes an derselben Kreuzung von der wichtigeren
+ // Strasse (niedrigere Klasse) naht, oder bei gleicher Klasse von rechts -
+ // "rechts vor links". Keine echte Ankunftsreihenfolge, kein Anhalten und
+ // Warten bis frei - nur ein Vorrang-Bremsen wie bei den anderen BremseVor*-
+ // Funktionen, aber erstmals auf echter Kreuzungstopologie statt Distanz.
+ float BremseVorKreuzung(const AActor* Selbst, const FVector& Ort, const FVector& Vorwaerts, int32 EigeneKlasse, const TArray<int32>& MeineKreuzungen) {
+  float Bremse = 1.0f;
+  for (int32 KIdx : MeineKreuzungen) {
+   if (!ALaLaBergVerkehrsauto::KreuzungOrte.IsValidIndex(KIdx)) continue;
+   // Kreuzungen tragen keine Hoehe (siehe prepare-verkehr.cjs) - Abstand
+   // deshalb nur in der Grundflaeche, sonst verfaelschten Hoehenunterschiede
+   // (Bruecken, Gefaelle) die Entfernung zur Kreuzung selbst.
+   const FVector& KreuzOrt = ALaLaBergVerkehrsauto::KreuzungOrte[KIdx];
+   const float EigenerAbstand = FVector::Dist2D(Ort, KreuzOrt);
+   if (EigenerAbstand > 1400.0f) continue;   // Kreuzung noch nicht relevant
+   for (ALaLaBergVerkehrsauto* Andere : ALaLaBergVerkehrsauto::Alle) {
+    if (!Andere || Andere == Selbst || !Andere->HoleKreuzungen().Contains(KIdx)) continue;
+    const FVector AndererOrt = Andere->GetActorLocation();
+    if (FVector::Dist2D(AndererOrt, KreuzOrt) > 1400.0f) continue;
+    const bool bAndererWichtiger = Andere->HoleKlasse() < EigeneKlasse;
+    const bool bVonRechts = FVector::DotProduct(Selbst->GetActorRightVector(), (AndererOrt - Ort).GetSafeNormal()) > 0.3f;
+    if (bAndererWichtiger || (Andere->HoleKlasse() == EigeneKlasse && bVonRechts))
+     Bremse = FMath::Min(Bremse, FMath::Clamp((EigenerAbstand - 300.0f) / 1100.0f, 0.05f, 1.0f));
+   }
   }
   return Bremse;
  }
@@ -66,6 +99,11 @@ namespace {
  // druecken die Bildrate auf 2 fps (Glas/Chrom-Material, viele Dreiecke je
  // Wagen) - mit diesem Radius sind es realistisch nur eine Handvoll.
  constexpr float LOD_ABSTAND = 8000.0f;
+ // City-Sample-Fahrzeuge (siehe LaLaBergWagenTypen) sind fuer die Engine
+ // selbst gebaut, anders als das aus einem externen glTF-Sample importierte
+ // CarConcept (-90 Grad, siehe unten) - bislang keine Drehkorrektur noetig,
+ // per Testbild geprueft (siehe Begruendung bei ALaLaBergWagen::BaueKarosserie).
+ constexpr float TYP_DREHKORREKTUR = 0.0f;
 }
 
 ALaLaBergVerkehrsauto::ALaLaBergVerkehrsauto() {
@@ -138,7 +176,27 @@ void ALaLaBergVerkehrsauto::BeginPlay() {
  // gleichzeitig sind es nicht.
  LaLaBergWagenForm::BaueNetz(Netz, Lack);
  bNetzGebaut = true;
- if (ALaLaBergAutoPool::Instanz && ALaLaBergAutoPool::Instanz->Gueltig()) {
+ if (!ALaLaBergAutoPool::Instanz || !ALaLaBergAutoPool::Instanz->Gueltig()) return;
+
+ // Zufaellig entweder das bisherige CarConcept (-1) oder einer der
+ // realistischen City-Sample-Typen (siehe LaLaBergWagenTypen) - fuer
+ // Fahrzeugvielfalt statt eines einzigen Modells fuer jedes KI-Auto.
+ FahrzeugTyp = FMath::RandRange(-1, LaLaBergWagenTypen::TYPEN_ANZAHL - 1);
+ if (FahrzeugTyp >= 0 && ALaLaBergAutoPool::Instanz->TypGueltig(FahrzeugTyp)) {
+  const FTransform Versteckt(FVector(0, 0, -500000.0f));
+  TypPoolIndizes = ALaLaBergAutoPool::Instanz->FuegeTypHinzu(FahrzeugTyp, Versteckt);
+  // An der wirklichen Stelle sichtbar von Anfang an - dieselbe Rolle wie der
+  // Kasten aus wagen.json beim CarConcept-Pfad (siehe unten), nur mit dem
+  // eigenen, bereits zusammengefassten Fern-Mesh des Typs statt der
+  // prozeduralen Form. Fehlt eins (z.B. vehicle07_Car), bleibt der leichte
+  // Kasten unnoetig - das Detailmodell zeigt sich dann immer (siehe Tick).
+  TypFernIndex = ALaLaBergAutoPool::Instanz->FuegeTypFernHinzu(FahrzeugTyp, GetActorTransform());
+  bTypFernBenutzt = TypFernIndex >= 0;
+  bPoolGenutzt = true;
+  Netz->ClearAllMeshSections();
+  Netz->SetVisibility(false);
+ } else {
+  FahrzeugTyp = -1;
   PoolIndizes = ALaLaBergAutoPool::Instanz->FuegeHinzu(FTransform(FVector(0, 0, -500000.0f)));
   bPoolGenutzt = true;
  }
@@ -146,7 +204,14 @@ void ALaLaBergVerkehrsauto::BeginPlay() {
 
 void ALaLaBergVerkehrsauto::EndPlay(const EEndPlayReason::Type Grund) {
  // Nicht entfernen, nur verstecken - siehe ALaLaBergAutoPool::Verstecke.
- if (bPoolGenutzt && ALaLaBergAutoPool::Instanz) ALaLaBergAutoPool::Instanz->Verstecke(PoolIndizes);
+ if (bPoolGenutzt && ALaLaBergAutoPool::Instanz) {
+  if (FahrzeugTyp == -1) {
+   ALaLaBergAutoPool::Instanz->Verstecke(PoolIndizes);
+  } else {
+   ALaLaBergAutoPool::Instanz->VersteckeTyp(FahrzeugTyp, TypPoolIndizes);
+   if (bTypFernBenutzt) ALaLaBergAutoPool::Instanz->VersteckeTypFern(FahrzeugTyp, TypFernIndex);
+  }
+ }
  if (bKastenGepoolt && ALaLaBergKastenPool::Instanz) ALaLaBergKastenPool::Instanz->Verstecke(KastenGriff);
  Alle.RemoveSingleSwap(this);
  Super::EndPlay(Grund);
@@ -164,7 +229,8 @@ void ALaLaBergVerkehrsauto::Tick(float Zeit) {
   FVector Ort = GetActorLocation();
   const FVector Vorwaerts = GetActorForwardVector();
   const float BremseObjekt = FMath::Min(BremseVorAndauto(this, Ort, Vorwaerts), BremseVorSpieler(GetWorld(), Ort, Vorwaerts));
-  const float Bremse = FMath::Min(BremseObjekt, BremseVorAmpel(Ort, Vorwaerts));
+  const float BremseKreuzung = BremseVorKreuzung(this, Ort, Vorwaerts, EigeneKlasse, MeineKreuzungen);
+  const float Bremse = FMath::Min(FMath::Min(BremseObjekt, BremseVorAmpel(Ort, Vorwaerts)), BremseKreuzung);
   const FVector Richtung = Weg.Bewege(Ort, Tempo * Zeit * (bGestoert ? 0.08f : 1.0f) * Bremse);
   SetActorLocation(Ort);
   if (!Richtung.IsNearlyZero()) SetActorRotation(FMath::RInterpTo(GetActorRotation(), Richtung.Rotation(), Zeit, 5.0f));
@@ -183,23 +249,43 @@ void ALaLaBergVerkehrsauto::Tick(float Zeit) {
  // (Sichtbarkeit umschalten) passiert nur bei einem tatsaechlichen Uebergang,
  // nicht jedes Bild - waere sonst derselbe unnoetige Zustandswechsel
  // hunderte Male pro Sekunde.
- if (bPoolGenutzt) {
+ if (bPoolGenutzt && ALaLaBergAutoPool::Instanz) {
   const APawn* SpielerPawn = UGameplayStatics::GetPlayerPawn(GetWorld(), 0);
-  const bool bSollDetail = SpielerPawn && FVector::DistSquared(SpielerPawn->GetActorLocation(), GetActorLocation()) < LOD_ABSTAND * LOD_ABSTAND;
+  const bool bInNaehe = SpielerPawn && FVector::DistSquared(SpielerPawn->GetActorLocation(), GetActorLocation()) < LOD_ABSTAND * LOD_ABSTAND;
+  // Ohne eigenes Fern-Mesh (FahrzeugTyp >= 0, aber bTypFernBenutzt falsch -
+  // siehe BeginPlay) gibt es keinen Fernzustand, in den umgeschaltet werden
+  // koennte: das Detailmodell bleibt dann immer an.
+  const bool bHatFern = FahrzeugTyp == -1 || bTypFernBenutzt;
+  const bool bSollDetail = !bHatFern || bInNaehe;
   if (bSollDetail != bDetailliert) {
    bDetailliert = bSollDetail;
-   Netz->SetVisibility(!bDetailliert);
-   if (!bDetailliert && ALaLaBergAutoPool::Instanz) ALaLaBergAutoPool::Instanz->Verstecke(PoolIndizes);
-   // Derselbe Umschalter fuer den gepoolten Kasten (geparkte Autos, siehe
-   // SetzeLack) - der bewegt sich nie, GetActorTransform() bleibt also ueber
-   // die ganze Standzeit richtig.
-   if (bKastenGepoolt && ALaLaBergKastenPool::Instanz) {
-    if (bDetailliert) ALaLaBergKastenPool::Instanz->Verstecke(KastenGriff);
-    else ALaLaBergKastenPool::Instanz->Aktualisiere(KastenGriff, GetActorTransform());
+   if (FahrzeugTyp == -1) {
+    Netz->SetVisibility(!bDetailliert);
+    if (!bDetailliert) ALaLaBergAutoPool::Instanz->Verstecke(PoolIndizes);
+    // Derselbe Umschalter fuer den gepoolten Kasten (geparkte Autos, siehe
+    // SetzeLack) - der bewegt sich nie, GetActorTransform() bleibt also ueber
+    // die ganze Standzeit richtig.
+    if (bKastenGepoolt && ALaLaBergKastenPool::Instanz) {
+     if (bDetailliert) ALaLaBergKastenPool::Instanz->Verstecke(KastenGriff);
+     else ALaLaBergKastenPool::Instanz->Aktualisiere(KastenGriff, GetActorTransform());
+    }
+   } else if (bTypFernBenutzt) {
+    if (!bDetailliert) ALaLaBergAutoPool::Instanz->VersteckeTyp(FahrzeugTyp, TypPoolIndizes);
+    if (bDetailliert) ALaLaBergAutoPool::Instanz->VersteckeTypFern(FahrzeugTyp, TypFernIndex);
+    else ALaLaBergAutoPool::Instanz->AktualisiereTypFern(FahrzeugTyp, TypFernIndex, GetActorTransform());
    }
   }
-  if (bDetailliert && ALaLaBergAutoPool::Instanz)
-   ALaLaBergAutoPool::Instanz->Aktualisiere(PoolIndizes, FTransform(GetActorRotation() + FRotator(0, -90, 0), GetActorLocation()));
+  if (FahrzeugTyp == -1) {
+   if (bDetailliert) ALaLaBergAutoPool::Instanz->Aktualisiere(PoolIndizes, FTransform(GetActorRotation() + FRotator(0, -90, 0), GetActorLocation()));
+  } else {
+   if (bDetailliert)
+    ALaLaBergAutoPool::Instanz->AktualisiereTyp(FahrzeugTyp, TypPoolIndizes, FTransform(GetActorRotation() + FRotator(0, TYP_DREHKORREKTUR, 0), GetActorLocation()));
+   // Faehrt der Wagen (Weg.Gueltig()) und ist gerade weit weg, muss das
+   // Fern-Mesh trotzdem folgen - anders als Netz oben ist es keine
+   // angehaengte Komponente, die sich automatisch mitbewegt. Ein geparktes
+   // Auto steht ohnehin fest (siehe BeginPlay), braucht das nicht.
+   else if (bTypFernBenutzt && Weg.Gueltig()) ALaLaBergAutoPool::Instanz->AktualisiereTypFern(FahrzeugTyp, TypFernIndex, GetActorTransform());
+  }
  }
 }
 

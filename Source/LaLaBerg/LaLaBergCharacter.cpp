@@ -18,6 +18,9 @@
 #include "EngineUtils.h"
 #include "GameFramework/PlayerController.h"
 #include "Sound/SoundBase.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
+#include "Animation/AnimSequence.h"
 
 namespace {
  // Kein "using namespace"/"using" hier: anonyme Namespaces sind pro
@@ -105,6 +108,23 @@ ALaLaBergCharacter::ALaLaBergCharacter() {
  Ausleger->bEnableCameraLag = true;
  Ausleger->CameraLagSpeed = 12.0f;
 
+ // Skeletal-Mesh-Alternative zum Kasten-Rig oben (siehe BeginPlay) - vier
+ // Teile desselben modularen Pakets wie LaLaBergPassantKI, am selben
+ // Bodenversatz wie Netz.
+ auto BaueSkelettTeil = [this, BodenZ](const TCHAR* Name) {
+  auto* Teil = CreateDefaultSubobject<USkeletalMeshComponent>(Name);
+  Teil->SetupAttachment(GetCapsuleComponent());
+  Teil->SetRelativeLocation(FVector(0, 0, BodenZ));
+  Teil->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+  Teil->SetVisibility(false);
+  Teil->bOwnerNoSee = false;
+  return Teil;
+ };
+ SkelettKoerper = BaueSkelettTeil(TEXT("SkelettKoerper"));
+ SkelettKopf = BaueSkelettTeil(TEXT("SkelettKopf"));
+ SkelettFuesse = BaueSkelettTeil(TEXT("SkelettFuesse"));
+ SkelettBeine = BaueSkelettTeil(TEXT("SkelettBeine"));
+
  Kamera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
  Kamera->SetupAttachment(Ausleger);
  Kamera->bUsePawnControlRotation = false;
@@ -163,6 +183,36 @@ void ALaLaBergCharacter::BeginPlay() {
   BaueGlied(Oberarm[s], JACKE, 6.0f, OberarmL);
  }
 
+ // Bevorzugt das lizenzierte Skeletal Mesh (siehe Header) - alle vier Teile
+ // muessen laden, sonst bleibt es konsistent beim Kasten-Rig statt eine
+ // Figur halb echt, halb Kasten zusammenzusetzen. Der Kasten-Rig bleibt in
+ // beiden Faellen gebaut (siehe oben) - WaffenHalter haengt an Oberarm[0]
+ // und braucht dessen Transform als Aufhaengepunkt weiter, auch unsichtbar.
+ auto LadeSpielerTeil = [](const TCHAR* Name) {
+  return LoadObject<USkeletalMesh>(nullptr, *FString::Printf(TEXT("/Game/Art/People/Farmer/SK_Farmer_%s.SK_Farmer_%s"), Name, Name));
+ };
+ USkeletalMesh* MeshKoerper = LadeSpielerTeil(TEXT("Body"));
+ USkeletalMesh* MeshKopf = LadeSpielerTeil(TEXT("Head"));
+ USkeletalMesh* MeshFuesse = LadeSpielerTeil(TEXT("Feet"));
+ USkeletalMesh* MeshBeine = LadeSpielerTeil(TEXT("Legs"));
+ if (MeshKoerper && MeshKopf && MeshFuesse && MeshBeine) {
+  bSkelettGenutzt = true;
+  SkelettKoerper->SetSkeletalMesh(MeshKoerper);
+  SkelettKopf->SetSkeletalMesh(MeshKopf);
+  SkelettFuesse->SetSkeletalMesh(MeshFuesse);
+  SkelettBeine->SetSkeletalMesh(MeshBeine);
+  SkelettKopf->SetLeaderPoseComponent(SkelettKoerper);
+  SkelettFuesse->SetLeaderPoseComponent(SkelettKoerper);
+  SkelettBeine->SetLeaderPoseComponent(SkelettKoerper);
+  for (USkeletalMeshComponent* Teil : { SkelettKoerper, SkelettKopf, SkelettFuesse, SkelettBeine }) Teil->SetVisibility(true);
+  Netz->SetVisibility(false);
+  for (int32 s = 0; s < 2; s++) {
+   Oberschenkel[s]->SetVisibility(false); Unterschenkel[s]->SetVisibility(false); Oberarm[s]->SetVisibility(false);
+  }
+  if (auto* Anim = LoadObject<UAnimSequence>(nullptr, TEXT("/Game/Art/People/Animations/Anim_HumansCharacterArmature_Idle_Neutral.Anim_HumansCharacterArmature_Idle_Neutral")))
+   SkelettKoerper->PlayAnimation(Anim, true);
+ }
+
  // Am rechten Arm statt an der Kamera: sonst haengt die Waffe in dritter
  // Person freischwebend im Raum, ganz ohne erkennbaren Traeger. Die Position
  // folgt dem Arm (relativ zum Griffpunkt), die Drehung bleibt bewusst an
@@ -200,6 +250,19 @@ void ALaLaBergCharacter::Tick(float DeltaSeconds) {
   Huefte[s]->SetRelativeRotation(FRotator(HueftGrad, 0, 0));
   Knie[s]->SetRelativeRotation(FRotator(-KnieGrad, 0, 0));
   if (s == 1) Schulter[s]->SetRelativeRotation(FRotator(-SCHULTER_GRAD * FMath::Sin(Phase) * Faktor, 0, 0));
+ }
+
+ if (bSkelettGenutzt) {
+  // Wie bei LaLaBergPassantKI::Tick: nur beim Wechsel zwischen Stehen und
+  // Gehen die AnimSequence tauschen, nicht jedes Bild neu abspielen.
+  const bool bLaeuftJetzt = Faktor > 0.05f;
+  if (bLaeuftJetzt != bLaeuftGerade) {
+   bLaeuftGerade = bLaeuftJetzt;
+   const TCHAR* Pfad = bLaeuftGerade
+    ? TEXT("/Game/Art/People/Animations/Anim_HumansCharacterArmature_Walk.Anim_HumansCharacterArmature_Walk")
+    : TEXT("/Game/Art/People/Animations/Anim_HumansCharacterArmature_Idle_Neutral.Anim_HumansCharacterArmature_Idle_Neutral");
+   if (auto* Anim = LoadObject<UAnimSequence>(nullptr, Pfad)) SkelettKoerper->PlayAnimation(Anim, true);
+  }
  }
 }
 

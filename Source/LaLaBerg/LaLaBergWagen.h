@@ -60,6 +60,11 @@ private:
  UPROPERTY() TObjectPtr<class USceneComponent> Karosseriepunkt = nullptr;
  UPROPERTY() TObjectPtr<class UProceduralMeshComponent> Netz = nullptr;
  UPROPERTY() TArray<TObjectPtr<class UStaticMeshComponent>> CarConceptTeile;
+ // Fahrzeugvielfalt (siehe LaLaBergWagenTypen, LaLaBergVerkehrsauto): -2 =
+ // noch nicht gewuerfelt, -1 = CarConcept, 0..TYPEN_ANZAHL-1 = CitySample-Typ.
+ // Einmal in BaueKarosserie gewaehlt und behalten - SetzeLack faerbt das
+ // gewaehlte Modell nur um, wuerfelt nicht neu.
+ int32 FahrzeugTyp = -2;
  UPROPERTY() TObjectPtr<class USpringArmComponent> Ausleger = nullptr;
  UPROPERTY() TObjectPtr<class UCameraComponent> Kamera = nullptr;
  UPROPERTY() TObjectPtr<class UAudioComponent> Motorklang = nullptr;

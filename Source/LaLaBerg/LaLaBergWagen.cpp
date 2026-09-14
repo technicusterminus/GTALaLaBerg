@@ -15,6 +15,7 @@
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
 #include "LaLaBergWagenForm.h"
+#include "LaLaBergWagenTypen.h"
 #include "Components/AudioComponent.h"
 #include "Sound/SoundBase.h"
 #include "Kismet/GameplayStatics.h"
@@ -175,13 +176,25 @@ void ALaLaBergWagen::ErhalteFarbe(const FLinearColor& Farbe, const FVector& AusR
 }
 
 void ALaLaBergWagen::BaueKarosserie() {
+ if (!CarConceptTeile.IsEmpty()) return;  // schon gebaut - faerbt sich nicht per SetzeLack um
+ // Fahrzeugvielfalt wie bei den KI-Autos (siehe LaLaBergVerkehrsauto): einmal
+ // zufaellig entweder CarConcept (-1) oder einer der realistischen City-
+ // Sample-Typen. Einzelne, unpoolte Komponenten statt ALaLaBergAutoPool - nur
+ // ein Wagen, kein Instanzieren noetig.
+ if (FahrzeugTyp == -2) FahrzeugTyp = FMath::RandRange(-1, LaLaBergWagenTypen::TYPEN_ANZAHL - 1);
+ if (FahrzeugTyp >= 0 && LaLaBergWagenTypen::BaueTeile(Karosseriepunkt, LaLaBergWagenTypen::TYPEN[FahrzeugTyp], CarConceptTeile)) {
+  Karosseriepunkt->SetRelativeRotation(FRotator::ZeroRotator);
+  Netz->SetVisibility(false);
+  Netz->ClearAllMeshSections();
+  return;
+ }
  // Bevorzugt das lizenzierte CarConcept-Fahrzeug (CC BY 4.0, siehe
  // Content/SourceData/Vehicles/CarConcept-LICENSE.md) - deutlich mehr
  // Detail als die prozedurale Form. Das Rohmodell hat seine Laengsachse
  // (436 cm Ausdehnung) lokal auf Y statt auf X, deshalb die 90-Grad-
  // Drehung; ohne Zugriff auf einen Modell-Editor war das nur per
  // Testbild zu pruefen, nicht am Namen der Achsen abzulesen.
- if (!CarConceptTeile.IsEmpty()) return;  // schon gebaut - CarConcept faerbt sich nicht per SetzeLack um
+ FahrzeugTyp = -1;
  if (LaLaBergWagenForm::BaueCarConceptTeile(Karosseriepunkt, CarConceptTeile)) {
   Karosseriepunkt->SetRelativeRotation(FRotator(0, -90, 0));
   Netz->SetVisibility(false);

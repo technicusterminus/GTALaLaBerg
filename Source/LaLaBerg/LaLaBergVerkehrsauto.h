@@ -31,6 +31,19 @@ public:
  // Bildrate (26 auf 16 fps beim Hinzukommen der Ampeln).
  static TArray<ALaLaBergVerkehrsauto*> Alle;
 
+ // Echte Kreuzungen aus dem Strassengraphen (siehe Tools/Export/prepare-
+ // verkehr.cjs "kreuzungen") - einmalig von LaLaBergGameMode befuellt, bevor
+ // die Autos selbst entstehen. Position in Unreal-Zentimetern, Klasse wie
+ // roads[].c (0 = wichtigste Strasse). Fuer echtes Vorfahrtsrecht statt nur
+ // Abstand zu jedem anderen Auto (siehe BremseVorKreuzung in der .cpp).
+ static TArray<FVector> KreuzungOrte;
+ static TArray<int32> KreuzungKlassen;
+ // Vor BeginPlay setzen (siehe SetzeRoute): die eigene Strassenklasse und
+ // welche der obigen Kreuzungen auf der eigenen Route liegen.
+ void SetzeKreuzung(int32 Klasse, const TArray<int32>& Indizes) { EigeneKlasse = Klasse; MeineKreuzungen = Indizes; }
+ int32 HoleKlasse() const { return EigeneKlasse; }
+ const TArray<int32>& HoleKreuzungen() const { return MeineKreuzungen; }
+
 protected:
  virtual void BeginPlay() override;
  virtual void EndPlay(const EEndPlayReason::Type Grund) override;
@@ -61,4 +74,22 @@ private:
  // Grund (1078 einzelne Draw-Calls druckten die Bildrate auf 17 fps).
  bool bKastenGepoolt = false;
  ALaLaBergKastenPool::FGriff KastenGriff;
+
+ // Fahrzeugvielfalt (siehe LaLaBergWagenTypen): -1 = CarConcept (Felder oben,
+ // unveraendert), 0..TYPEN_ANZAHL-1 = LaLaBergWagenTypen::TYPEN[FahrzeugTyp].
+ // Zufaellig in BeginPlay gewaehlt - siehe dort, warum nicht per Setter wie
+ // SetzeLack (SpawnActor ruft BeginPlay schon vor jedem Setter auf).
+ int32 FahrzeugTyp = -1;
+ TArray<int32> TypPoolIndizes;
+ // Fern-Mesh-Instanz fuer FahrzeugTyp (LaLaBergWagenTypen::LadeLod) - -1,
+ // wenn der Typ keins mitbringt (z.B. vehicle07_Car); bTypFernBenutzt haelt
+ // fest, ob das der Fall war, ohne bei jeder Pruefung neu nachzusehen.
+ int32 TypFernIndex = -1;
+ bool bTypFernBenutzt = false;
+
+ // Eigene Strassenklasse (roads[].c, 0 = wichtigste) und die Indizes der
+ // Kreuzungen (in KreuzungOrte/-Klassen) auf der eigenen Route - siehe
+ // SetzeKreuzung. 3 = mittlere Klasse als Rueckfall, falls nie gesetzt.
+ int32 EigeneKlasse = 3;
+ TArray<int32> MeineKreuzungen;
 };

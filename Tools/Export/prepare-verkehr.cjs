@@ -71,12 +71,50 @@ function laenge(p) {
 const KANDIDATEN = city.roads.filter(r => r.p && r.p.length >= 6 && laenge(r.p) > 45 && !Terrain.isWater(r.p[0], r.p[1]));
 KANDIDATEN.sort((a, b) => laenge(b.p) - laenge(a.p));
 const AUTO_ROUTEN = 70;
+// Echte Kreuzungstopologie aus dem Strassengraphen (city.graph) statt reiner
+// Abstandsgruppierung wie bei den Ampeln unten: ein Knoten mit mindestens
+// drei angeschlossenen Strassen ist eine wirkliche Kreuzung. Jede Kreuzung
+// traegt die niedrigste (= wichtigste) angeschlossene Strassenklasse
+// (roads[].c, 0 = Hauptstrasse) - LaLaBergVerkehrsauto::BremseVorKreuzung
+// nutzt das fuer echtes Vorfahrtsrecht: ein Auto von der unwichtigeren
+// Strasse wartet, wenn ein anderes von der wichtigeren naht.
+const graph = city.graph || { p: [], e: [] };
+const kreuzungsKlasse = new Map();
+{
+  const grad = new Map();
+  for (const [a, b, klasse] of graph.e) {
+    grad.set(a, (grad.get(a) || 0) + 1);
+    grad.set(b, (grad.get(b) || 0) + 1);
+    for (const n of [a, b]) {
+      const bisher = kreuzungsKlasse.get(n);
+      if (bisher === undefined || klasse < bisher) kreuzungsKlasse.set(n, klasse);
+    }
+  }
+  for (const [n, g] of grad) if (g < 3) kreuzungsKlasse.delete(n);
+}
+const kreuzungsPunkte = [...kreuzungsKlasse.keys()].map(n => ({
+  x: graph.p[2 * n], z: graph.p[2 * n + 1], klasse: kreuzungsKlasse.get(n),
+}));
+// Wegpunkttoleranz: die Fahrbahnbreite selbst, nicht der 45-m-Ampelradius -
+// eine Kreuzung soll nur zaehlen, wenn die Route wirklich dort vorbeikommt.
+const NAHE_KREUZUNG = 8;
+function findeKreuzungen(p) {
+  const treffer = [];
+  for (let i = 0; i < kreuzungsPunkte.length; i++) {
+    const k = kreuzungsPunkte[i];
+    for (let j = 0; j + 1 < p.length; j += 2) {
+      if (Math.hypot(p[j] - k.x, p[j + 1] - k.z) <= NAHE_KREUZUNG) { treffer.push(i); break; }
+    }
+  }
+  return treffer;
+}
+
 const autos = [];
 for (const r of KANDIDATEN.slice(0, AUTO_ROUTEN)) {
   const punkte = resample(r.p, 9);
   if (punkte.length < 3) continue;
   const weg = punkte.map(([x, z]) => [ux(x), uz(z), Math.round(boden(x, z) * M)]);
-  autos.push({ w: Math.max(3.0, r.w || 3.0), p: weg.flat() });
+  autos.push({ w: Math.max(3.0, r.w || 3.0), klasse: r.c ?? 3, kreuzungen: findeKreuzungen(r.p), p: weg.flat() });
 }
 
 // Passanten: beidseitig entlang derselben Strassen, aber nur in der Alt-
@@ -108,6 +146,26 @@ for (const r of KANDIDATEN) {
 // Ampeln: die amtlichen Standorte echter Lichtsignalanlagen (OSM
 // highway=traffic_signals). Richtung aus der Strassenachse am naechsten
 // Punkt - eine Ampel steht quer zur Fahrbahn, nicht zufaellig gedreht.
+// Kleine erste Passantengruppe auf den geraden Hauptstrassenabschnitten
+// am Klinikum. Altstadt-Routen bleiben unveraendert erhalten.
+const klinikumStrassen = city.roads.filter(r => /hartmann/i.test(r.n || '')
+  && r.w >= 5.5 && r.p.length === 4 && r.p[1] >= 0 && r.p[1] < 200);
+let klinikumRouten = 0;
+for (const r of klinikumStrassen.slice(0, 2)) {
+  const punkte = resample(r.p, 3);
+  const dx = r.p[2] - r.p[0], dz = r.p[3] - r.p[1];
+  const len = Math.hypot(dx, dz);
+  if (len < 1) continue;
+  for (const seite of [-1, 1]) {
+    const versatz = seite * (r.w / 2 + 1.0);
+    const rand = punkte.map(([x,z]) => [x + dz / len * versatz, z - dx / len * versatz]);
+    if (rand.some(([x,z]) => Terrain.isWater(x,z))) continue;
+    passanten.push({gebiet: 'Klinikum-Hartmann', p: rand.flatMap(([x,z]) =>
+      [ux(x), uz(z), Math.round(boden(x,z) * M)])});
+    klinikumRouten++;
+  }
+}
+console.log(JSON.stringify({ klinikumRouten }));
 function naechsteStrassenrichtung(x, z) {
   let beste = Infinity, richtung = [1, 0];
   for (const r of city.roads) {
@@ -200,8 +258,9 @@ for (let i = 0; i + 2 < stellplaetze.length; i += 3) {
   });
 }
 
-const ergebnis = { schema: 1, autos, passanten, ampeln, geparkt };
+const kreuzungen = kreuzungsPunkte.map(k => ({ x: ux(k.x), y: uz(k.z), klasse: k.klasse }));
+const ergebnis = { schema: 1, autos, passanten, ampeln, geparkt, kreuzungen };
 const out = path.resolve(REPO, 'Content/SourceData/Verkehr/verkehr.json');
 fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, JSON.stringify(ergebnis));
-console.log(JSON.stringify({ autos: autos.length, passanten: passanten.length, ampeln: ampeln.length, geparkt: geparkt.length, bytes: fs.statSync(out).size }));
+console.log(JSON.stringify({ autos: autos.length, passanten: passanten.length, ampeln: ampeln.length, geparkt: geparkt.length, kreuzungen: kreuzungen.length, bytes: fs.statSync(out).size }));

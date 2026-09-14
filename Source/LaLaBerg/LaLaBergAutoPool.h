@@ -36,6 +36,25 @@ public:
  // lassen.
  void Verstecke(const TArray<int32>& Indizes);
 
+ // Dieselbe Idee fuer die realistischen City-Sample-Fahrzeugtypen (siehe
+ // LaLaBergWagenTypen) zusaetzlich zum CarConcept-Modell oben - TypIndex
+ // 0..LaLaBergWagenTypen::TYPEN_ANZAHL-1. Ein eigener Teile-Pool-Satz je Typ,
+ // damit sich z.B. alle Instanzen desselben Sedan-Typs einen Draw-Call teilen.
+ bool TypGueltig(int32 TypIndex) const;
+ TArray<int32> FuegeTypHinzu(int32 TypIndex, const FTransform& Lage);
+ void AktualisiereTyp(int32 TypIndex, const TArray<int32>& Indizes, const FTransform& Lage);
+ void VersteckeTyp(int32 TypIndex, const TArray<int32>& Indizes);
+
+ // Fern-Mesh je Typ (LaLaBergWagenTypen::LadeLod - ein bereits fertiges,
+ // einzelnes Mesh statt Einzelteilen): ein Draw-Call je Typ statt je Auto,
+ // keine Farbvielfalt noetig (anders als ALaLaBergKastenPool fuer CarConcept,
+ // wo die prozedurale Form erst gefaerbt werden muss). -1, wenn der Typ kein
+ // Fern-Mesh mitbringt (z.B. vehicle07_Car) - der Aufrufer bleibt dann auf
+ // dem Detail-Pool oben.
+ int32 FuegeTypFernHinzu(int32 TypIndex, const FTransform& Lage);
+ void AktualisiereTypFern(int32 TypIndex, int32 Index, const FTransform& Lage);
+ void VersteckeTypFern(int32 TypIndex, int32 Index);
+
 protected:
  virtual void BeginPlay() override;
  virtual void EndPlay(const EEndPlayReason::Type Grund) override;
@@ -43,4 +62,11 @@ protected:
 private:
  UPROPERTY() TObjectPtr<class USceneComponent> Wurzel = nullptr;
  UPROPERTY() TArray<TObjectPtr<class UHierarchicalInstancedStaticMeshComponent>> Pools;
+ // Alle Teile aller City-Sample-Typen hintereinander in einem flachen Array -
+ // TypPoolsStart[TypIndex] ist der erste, TypPoolsStart[TypIndex+1]-1 der
+ // letzte Index darin (kein nested TArray<TArray<...>> als UPROPERTY noetig).
+ UPROPERTY() TArray<TObjectPtr<class UHierarchicalInstancedStaticMeshComponent>> TypPoolsFlach;
+ TArray<int32> TypPoolsStart;
+ // Ein HISM je Typ (Index = TypIndex), nullptr wo LadeLod nichts fand.
+ UPROPERTY() TArray<TObjectPtr<class UHierarchicalInstancedStaticMeshComponent>> TypFernPools;
 };

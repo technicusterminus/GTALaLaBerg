@@ -9,3 +9,9 @@ Saved/
 Tools/Export/node_modules/
 __pycache__/
 Build/Windows/FileOpenOrder/
+
+# Fab-Content (Epic Games, "City Sample Vehicles") - eigene Lizenz (Nutzung
+# innerhalb von UE-Projekten, keine freie Weitergabe der Rohdateien), anders
+# als die CC-lizenzierten Assets sonst in diesem Repo. Lokal ueber den
+# Fab-Reiter im Editor holen (siehe README "Datenquellen und Lizenzen").
+Content/CitySampleVehicles/
