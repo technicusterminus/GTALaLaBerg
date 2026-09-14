@@ -188,22 +188,50 @@ const ampelnRoh = (city.signals || []).map(s => {
   return { x: s.x, z: s.z, gier: gierGrad };
 });
 
-// Kreuzungsgruppen: Ampeln innerhalb von 45 m gehoeren zur selben Kreuzung
-// (einfaches Union-Find ueber die Paarabstaende, keine echte OSM-Kreuzungs-
-// relation - die liegt in den Quelldaten nicht vor). Innerhalb einer Gruppe
-// schalten zwei Phasen abwechselnd auf Gruen: Ampeln, deren Fahrbahnachse
-// (aus "gier") ungefaehr gleich oder um 180 Grad gedreht verlaeuft, gehoeren
-// zur selben Phase - ungefaehr senkrechte Achsen zur anderen. Damit haben
-// sich kreuzende Strassen nie gleichzeitig Gruen, ohne dass eine echte
-// Kreuzungstopologie ausgewertet werden muesste.
-const KREUZUNGS_RADIUS = 45;
+// Kreuzungsgruppen: bevorzugt die echten Kreuzungsknoten aus dem Strassen-
+// graphen (kreuzungsPunkte, siehe oben - dieselben, die auch KI-Autos fuer
+// Vorfahrt nutzen) statt reiner Abstandsgruppierung. Eine Ampel direkt an
+// ihrer echten Kreuzung erkannt (naechster Knoten mit >=3 Strassen
+// innerhalb 60 m) teilt deren Gruppen-ID mit jeder anderen Ampel am selben
+// Knoten. Ampeln ohne nahen echten Knoten (z.B. ein Fussgaengerueberweg
+// mitten auf einer Strecke, keine echte Kreuzung) fallen auf die alte
+// Abstandsgruppierung (45 m, Union-Find) unter sich zurueck, gemischt wird
+// nie: eine Ampel mit echter Kreuzung gruppiert sich nur mit einer anderen
+// an derselben echten Kreuzung, nicht ueber den Abstand. Innerhalb einer
+// Gruppe schalten weiterhin zwei Phasen abwechselnd auf Gruen: Ampeln,
+// deren Fahrbahnachse (aus "gier") ungefaehr gleich oder um 180 Grad
+// gedreht verlaeuft, gehoeren zur selben Phase - ungefaehr senkrechte
+// Achsen zur anderen.
+function naechsteKreuzung(x, z) {
+  let beste = Infinity, index = -1;
+  for (let i = 0; i < kreuzungsPunkte.length; i++) {
+    const k = kreuzungsPunkte[i];
+    const d = Math.hypot(x - k.x, z - k.z);
+    if (d < beste) { beste = d; index = i; }
+  }
+  return beste <= 60 ? index : -1;
+}
+// Ankerpunkt je Ampel: der eigene, echte Kreuzungsknoten, falls einer nahe
+// genug liegt - sonst die Ampel-Position selbst. Ein grosser Kreuzungsbereich
+// kann in den Quelldaten aus mehreren nahe beieinanderliegenden Knoten
+// bestehen (z.B. getrennte Fahrbahnrichtungen) - deshalb gruppieren nicht
+// per exakter Knoten-Uebereinstimmung, sondern per Abstand zwischen den
+// Ankerpunkten, mit engerem Radius fuer zwei echte Knoten (praeziser als
+// rohe Ampel-Positionen) und dem alten, weiteren Radius als Ruckfall.
+const anker = ampelnRoh.map(a => {
+  const idx = naechsteKreuzung(a.x, a.z);
+  return idx >= 0 ? { x: kreuzungsPunkte[idx].x, z: kreuzungsPunkte[idx].z, echt: true }
+                   : { x: a.x, z: a.z, echt: false };
+});
+const KREUZUNGS_RADIUS = 45, ECHTE_KREUZUNG_RADIUS = 30;
 const eltern = ampelnRoh.map((_, i) => i);
 function find(i) { while (eltern[i] !== i) { eltern[i] = eltern[eltern[i]]; i = eltern[i]; } return i; }
 function vereinige(a, b) { const ra = find(a), rb = find(b); if (ra !== rb) eltern[ra] = rb; }
 for (let i = 0; i < ampelnRoh.length; i++) {
   for (let j = i + 1; j < ampelnRoh.length; j++) {
-    const d = Math.hypot(ampelnRoh[i].x - ampelnRoh[j].x, ampelnRoh[i].z - ampelnRoh[j].z);
-    if (d <= KREUZUNGS_RADIUS) vereinige(i, j);
+    const radius = (anker[i].echt && anker[j].echt) ? ECHTE_KREUZUNG_RADIUS : KREUZUNGS_RADIUS;
+    const d = Math.hypot(anker[i].x - anker[j].x, anker[i].z - anker[j].z);
+    if (d <= radius) vereinige(i, j);
   }
 }
 // Gruppen-IDs zu 0..n-1 verdichten, damit sie sich als seed fuer den
