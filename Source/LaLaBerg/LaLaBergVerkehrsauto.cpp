@@ -98,12 +98,22 @@ namespace {
   if (FVector::DotProduct(Diff / Dist, Vorwaerts) < 0.5f) return 1.0f;
   return FMath::Clamp((Dist - 260.0f) / 640.0f, 0.05f, 1.0f);
  }
- // Groesster seitlicher Versatz, den ein Wagen einem Hindernis ausweicht -
- // nach rechts, wie im echten Verkehr ueblich. Keine Fahrspur-Erkennung: der
- // Versatz ist ein fester Wert, kein Blick darauf, ob rechts ueberhaupt noch
- // Fahrbahn ist. Nur vor Autos/Spieler, nicht vor einer roten Ampel - dort
- // soll stehenbleiben, nicht vorbeischleichen, das richtige Verhalten sein.
+ // Groesster zusaetzlicher seitlicher Versatz, den ein Wagen einem Hindernis
+ // ausweicht - nach rechts, wie im echten Verkehr ueblich. Keine echte
+ // Fahrspur-Breite: der Versatz ist ein fester Wert, kein Blick darauf, ob
+ // rechts ueberhaupt noch Fahrbahn ist. Nur vor Autos/Spieler, nicht vor
+ // einer roten Ampel - dort soll stehenbleiben, nicht vorbeischleichen, das
+ // richtige Verhalten sein.
  constexpr float MAX_SEITVERSATZ = 220.0f;
+ // Dauerhafter Versatz rechts der Fahrbahnmitte (siehe SeitZiel in Tick) -
+ // dieselbe Route wird in beide Richtungen abgefahren (FLaLaBergWegfolger
+ // kehrt am Ende einfach um), ohne diesen Versatz faehrt Gegenverkehr exakt
+ // auf derselben Linie aufeinander zu. GetActorRightVector() zeigt schon in
+ // die richtige Richtung, weil die Rotation der aktuellen Fahrtrichtung
+ // folgt - ein rueckwaerts abgefahrenes Routenstueck verschiebt den Wagen
+ // deshalb von selbst auf die andere Fahrbahnseite, ganz ohne eigene
+ // Umschaltung beim Umkehren.
+ constexpr float SPUR_VERSATZ = 150.0f;
  // Sichtweiten-LOD (siehe Tick): jenseits davon der leichte Kasten statt
  // des CarConcept-Detailmodells. 70 Autos gleichzeitig im Detailmodell
  // druecken die Bildrate auf 2 fps (Glas/Chrom-Material, viele Dreiecke je
@@ -245,11 +255,12 @@ void ALaLaBergVerkehrsauto::Tick(float Zeit) {
   SetActorLocation(Ort);
   if (!Richtung.IsNearlyZero()) SetActorRotation(FMath::RInterpTo(GetActorRotation(), Richtung.Rotation(), Zeit, 5.0f));
 
-  // Weicht einem Auto oder dem Spieler direkt voraus seitlich aus (nach
-  // rechts), statt nur davor stehenzubleiben - nicht vor einer roten Ampel,
-  // da soll die Fahrt tatsaechlich enden. Keine Fahrspur-Erkennung: ein
-  // fester Versatz, sanft ein- und wieder ausgeblendet.
-  const float SeitZiel = BremseObjekt < 0.9f ? MAX_SEITVERSATZ : 0.0f;
+  // Weicht einem Auto oder dem Spieler direkt voraus zusaetzlich seitlich
+  // aus (nach rechts), statt nur davor stehenzubleiben - nicht vor einer
+  // roten Ampel, da soll die Fahrt tatsaechlich enden. SPUR_VERSATZ selbst
+  // gilt immer (siehe oben) - eine einfache, aber echte Fahrspurtrennung
+  // ohne Fahrspurbreite aus den Quelldaten.
+  const float SeitZiel = SPUR_VERSATZ + (BremseObjekt < 0.9f ? MAX_SEITVERSATZ : 0.0f);
   Seitversatz = FMath::FInterpTo(Seitversatz, SeitZiel, Zeit, 0.7f);
   if (FMath::Abs(Seitversatz) > 0.5f) SetActorLocation(GetActorLocation() + GetActorRightVector() * Seitversatz);
  }
