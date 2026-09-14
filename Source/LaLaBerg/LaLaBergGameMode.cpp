@@ -81,7 +81,17 @@ void ALaLaBergGameMode::AktualisiereTageszeit(float DeltaSeconds) {
   const FLinearColor Tagesfarbe=FMath::Lerp(FLinearColor(1.0f,0.55f,0.32f),FLinearColor(1.0f,0.97f,0.92f),Hoehenanteil);
   D->SetLightColor(FMath::Lerp(FLinearColor(0.5f,0.6f,0.9f),Tagesfarbe,TagAnteil));
  }
- if(SkyLicht) SkyLicht->SetIntensity(FMath::Lerp(0.15f,1.6f,TagAnteil));
+ // Die feste Tageslicht-Cubemap selbst kennt keine Tageszeit (siehe InitGame -
+ // die Echtzeitaufnahme blieb bislang schwarz, Ursache offen). SetLightColor
+ // faerbt ihre Ausgabe aber trotzdem ein, ohne das Cubemap-Bild selbst zu
+ // aendern - dieselbe Tag-Nacht-Faerbung wie bei der Sonne oben, damit das
+ // Umgebungslicht wenigstens die Farbtemperatur mitmacht, nicht nur die Staerke.
+ if(SkyLicht) {
+  SkyLicht->SetIntensity(FMath::Lerp(0.15f,1.6f,TagAnteil));
+  const float Hoehenanteil=FMath::Clamp((ElevationGrad+10.0f)/70.0f,0.0f,1.0f);
+  const FLinearColor Tagesfarbe=FMath::Lerp(FLinearColor(1.0f,0.55f,0.32f),FLinearColor(1.0f,0.97f,0.92f),Hoehenanteil);
+  SkyLicht->SetLightColor(FMath::Lerp(FLinearColor(0.5f,0.6f,0.9f),Tagesfarbe,TagAnteil));
+ }
  // Das enge Automatikfenster (siehe InitGame, 0.95-1.70) haelt tagsueber
  // bewusst gegen jedes Pumpen beim Blick in einen Torbogen - unveraendert
  // liesse es die Belichtung nachts aber vergeblich gegen ein taghelles Ziel
@@ -445,6 +455,9 @@ AActor* ALaLaBergGameMode::ChoosePlayerStart_Implementation(AController* Player)
 
 void ALaLaBergGameMode::BeginPlay() {
  Super::BeginPlay();
+ // -LaLaBergNacht springt sofort auf Mitternacht - zum Pruefen der
+ // Nachtfaerbung, ohne die vollen 600s eines Tageszyklus abzuwarten.
+ if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergNacht"))) Tageszeit=0.0f;
  if(auto* PC=GetWorld()->GetFirstPlayerController()) {
   PC->SetInputMode(FInputModeGameOnly()); PC->bShowMouseCursor=false;
  }
