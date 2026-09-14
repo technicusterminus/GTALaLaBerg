@@ -4,6 +4,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "ProceduralMeshComponent.h"
 #include "Materials/MaterialInterface.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Engine/SkeletalMesh.h"
 #include "Animation/AnimSequence.h"
 #include "Engine/World.h"
@@ -172,7 +173,7 @@ void ALaLaBergPassantKI::BaueOberkoerper() {
 
 void ALaLaBergPassantKI::SetzeRoute(const TArray<FVector>& Punkte, float TempoKmh) {
  Weg.Route = Punkte;
- Tempo = TempoKmh / 3.6f;
+ Tempo = FMath::Max(0.0f, TempoKmh) / 3.6f * 100.0f;
  if (Weg.Gueltig()) SetActorLocation(Weg.Start());
 }
 
@@ -182,6 +183,24 @@ void ALaLaBergPassantKI::SetzeRoute(const TArray<FVector>& Punkte, float TempoKm
 namespace {
  USkeletalMesh* LadeNPCTeil(const TCHAR* Name) {
   return LoadObject<USkeletalMesh>(nullptr, *FString::Printf(TEXT("/Game/Art/People/Farmer/SK_Farmer_%s.SK_Farmer_%s"), Name, Name));
+ }
+ // Das Farmer-Paket bringt nur eine Kleidungsfarbe je Material-Slot mit
+ // (Skin/LightBlue/Brown/Beige/Red/Brown2, keine vorbereiteten Varianten) -
+ // ohne diese Faerbung saehen alle 90 KI-Passanten identisch aus. Jeder
+ // Slot ausser Haut/Augen/Augenbrauen bekommt dieselbe Farbe wie der von
+ // Hand gebaute Kasten-Rig (Jacke, siehe Konstruktor) - eine dynamische
+ // Materialinstanz je Slot mit dem DiffuseColor-Parameter des von
+ // Interchange automatisch erzeugten Phong-Materials (siehe Beige.uasset:
+ // ein echtes MaterialInstanceConstant, kein fest gebackenes Bild).
+ void FaerbeSkelett(USkeletalMeshComponent* Komp, const FLinearColor& Farbe) {
+  if (!Komp || !Komp->GetSkeletalMeshAsset()) return;
+  const auto& Materials = Komp->GetSkeletalMeshAsset()->GetMaterials();
+  for (int32 i = 0; i < Materials.Num(); i++) {
+   const FString Name = Materials[i].MaterialSlotName.ToString();
+   if (Name == TEXT("Skin") || Name == TEXT("Eye") || Name == TEXT("Eyebrows")) continue;
+   if (auto* MID = Komp->CreateDynamicMaterialInstance(i))
+    MID->SetVectorParameterValue(TEXT("DiffuseColor"), Farbe);
+  }
  }
 }
 
@@ -203,7 +222,10 @@ void ALaLaBergPassantKI::BeginPlay() {
   SkelettKopf->SetLeaderPoseComponent(SkelettKoerper);
   SkelettFuesse->SetLeaderPoseComponent(SkelettKoerper);
   SkelettBeine->SetLeaderPoseComponent(SkelettKoerper);
-  for (USkeletalMeshComponent* Teil : { SkelettKoerper, SkelettKopf, SkelettFuesse, SkelettBeine }) Teil->SetVisibility(true);
+  for (USkeletalMeshComponent* Teil : { SkelettKoerper, SkelettKopf, SkelettFuesse, SkelettBeine }) {
+   Teil->SetVisibility(true);
+   FaerbeSkelett(Teil, Jacke);
+  }
   Netz->SetVisibility(false);
   for (int32 s = 0; s < 2; s++) {
    Oberschenkel[s]->SetVisibility(false); Unterschenkel[s]->SetVisibility(false); Oberarm[s]->SetVisibility(false);
@@ -231,7 +253,7 @@ void ALaLaBergPassantKI::Tick(float Zeit) {
  Super::Tick(Zeit);
  if (!Weg.Gueltig()) return;
  const bool bStolpert = GetWorld()->GetTimeSeconds() < StolpertBis;
- FVector Ort = GetActorLocation();
+ FVector Ort = GetActorLocation() - LetzterAusweichOffset;
  const FVector Vorwaerts = GetActorForwardVector();
  const float Bremse = FMath::Min(BremseVorPassant(this, Ort, Vorwaerts), BremseVorSpieler(GetWorld(), Ort, Vorwaerts));
  const float Faktor = (bStolpert ? 0.15f : 1.0f) * Bremse;
@@ -243,13 +265,14 @@ void ALaLaBergPassantKI::Tick(float Zeit) {
  // nur davor stehenzubleiben - sanft ein- und wieder ausgeblendet.
  const float SeitZiel = Bremse < 0.9f ? MAX_SEITVERSATZ : 0.0f;
  Seitversatz = FMath::FInterpTo(Seitversatz, SeitZiel, Zeit, 0.7f);
- if (FMath::Abs(Seitversatz) > 0.5f) SetActorLocation(GetActorLocation() + GetActorRightVector() * Seitversatz);
+ LetzterAusweichOffset = GetActorRightVector() * Seitversatz;
+ SetActorLocation(Ort + LetzterAusweichOffset);
 
  if (bSkelettGenutzt) {
   // Echte Animation statt Gelenkwinkel von Hand: nur beim Wechsel zwischen
   // Stehen und Gehen die AnimSequence tauschen, nicht jedes Bild neu
   // abspielen (das rissee sie sonst staendig auf Bild 0 zurueck).
-  const bool bLaeuftJetzt = Faktor > 0.05f;
+  const bool bLaeuftJetzt = !Richtung.IsNearlyZero() && Tempo * Faktor > 5.0f;
   if (bLaeuftJetzt != bLaeuftGerade) {
    bLaeuftGerade = bLaeuftJetzt;
    const TCHAR* Pfad = bLaeuftGerade

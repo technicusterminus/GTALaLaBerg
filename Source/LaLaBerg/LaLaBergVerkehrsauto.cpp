@@ -35,11 +35,16 @@ namespace {
  // Echtes Vorfahrtsrecht an den Kreuzungen der eigenen Route (siehe
  // Tools/Export/prepare-verkehr.cjs "kreuzungen", aus dem echten OSM-
  // Strassengraphen, nicht nur Ampel-Abstandsgruppierung wie unten): ein Auto
- // bremst, wenn ein anderes an derselben Kreuzung von der wichtigeren
- // Strasse (niedrigere Klasse) naht, oder bei gleicher Klasse von rechts -
- // "rechts vor links". Keine echte Ankunftsreihenfolge, kein Anhalten und
- // Warten bis frei - nur ein Vorrang-Bremsen wie bei den anderen BremseVor*-
- // Funktionen, aber erstmals auf echter Kreuzungstopologie statt Distanz.
+ // bremst bis zum Stillstand (Untergrenze 0, nicht wie BremseVorAndauto -
+ // echtes Anhalten statt nur Kriechen), wenn ein anderes an derselben
+ // Kreuzung von der wichtigeren Strasse (niedrigere Klasse) naht. Bei
+ // gleicher Klasse zaehlt der Abstand zur Kreuzung als Naeherung fuer die
+ // Ankunftsreihenfolge (wer naeher dran ist, war zuerst da) - nur bei
+ // echtem Gleichstand (< 3 m Unterschied) entscheidet ersatzweise Rechts-
+ // vor-Links. Weiterhin kein echtes Anhalten-und-Warten-bis-frei als
+ // Zustand (kein Queue-System je Kreuzung) - nur ein kontinuierliches
+ // Vorrang-Bremsen wie bei den anderen BremseVor*-Funktionen, aber jetzt
+ // auf echter Kreuzungstopologie statt Distanzgruppierung.
  float BremseVorKreuzung(const AActor* Selbst, const FVector& Ort, const FVector& Vorwaerts, int32 EigeneKlasse, const TArray<int32>& MeineKreuzungen) {
   float Bremse = 1.0f;
   for (int32 KIdx : MeineKreuzungen) {
@@ -53,11 +58,16 @@ namespace {
    for (ALaLaBergVerkehrsauto* Andere : ALaLaBergVerkehrsauto::Alle) {
     if (!Andere || Andere == Selbst || !Andere->HoleKreuzungen().Contains(KIdx)) continue;
     const FVector AndererOrt = Andere->GetActorLocation();
-    if (FVector::Dist2D(AndererOrt, KreuzOrt) > 1400.0f) continue;
-    const bool bAndererWichtiger = Andere->HoleKlasse() < EigeneKlasse;
-    const bool bVonRechts = FVector::DotProduct(Selbst->GetActorRightVector(), (AndererOrt - Ort).GetSafeNormal()) > 0.3f;
-    if (bAndererWichtiger || (Andere->HoleKlasse() == EigeneKlasse && bVonRechts))
-     Bremse = FMath::Min(Bremse, FMath::Clamp((EigenerAbstand - 300.0f) / 1100.0f, 0.05f, 1.0f));
+    const float AndererAbstand = FVector::Dist2D(AndererOrt, KreuzOrt);
+    if (AndererAbstand > 1400.0f) continue;
+    bool bMussWarten = Andere->HoleKlasse() < EigeneKlasse;
+    if (!bMussWarten && Andere->HoleKlasse() == EigeneKlasse) {
+     if (AndererAbstand < EigenerAbstand - 300.0f) bMussWarten = true;
+     else if (FMath::Abs(AndererAbstand - EigenerAbstand) <= 300.0f)
+      bMussWarten = FVector::DotProduct(Selbst->GetActorRightVector(), (AndererOrt - Ort).GetSafeNormal()) > 0.3f;
+    }
+    if (bMussWarten)
+     Bremse = FMath::Min(Bremse, FMath::Clamp((EigenerAbstand - 300.0f) / 1100.0f, 0.0f, 1.0f));
    }
   }
   return Bremse;

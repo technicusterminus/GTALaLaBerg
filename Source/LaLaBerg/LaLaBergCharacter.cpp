@@ -21,6 +21,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/SkeletalMesh.h"
 #include "Animation/AnimSequence.h"
+#include "Materials/MaterialInstanceDynamic.h"
 
 namespace {
  // Kein "using namespace"/"using" hier: anonyme Namespaces sind pro
@@ -31,6 +32,19 @@ namespace {
  // voll qualifiziert aufgerufen.
  const FLinearColor JACKE(0.20f, 0.22f, 0.25f), HOSE(0.15f, 0.16f, 0.18f), HAUT(0.79f, 0.63f, 0.51f);
  constexpr float HUEFT_GRAD = 22.0f, KNIE_GRAD = 38.0f, SCHULTER_GRAD = 16.0f;
+ // Wie LaLaBergPassantKI::FaerbeSkelett - das Farmer-Paket bringt nur eine
+ // Kleidungsfarbe je Material-Slot mit, ohne dies saehe die Spielfigur wie
+ // jeder KI-Passant aus.
+ void FaerbeSkelett(USkeletalMeshComponent* Komp, const FLinearColor& Farbe) {
+  if (!Komp || !Komp->GetSkeletalMeshAsset()) return;
+  const auto& Materials = Komp->GetSkeletalMeshAsset()->GetMaterials();
+  for (int32 i = 0; i < Materials.Num(); i++) {
+   const FString Name = Materials[i].MaterialSlotName.ToString();
+   if (Name == TEXT("Skin") || Name == TEXT("Eye") || Name == TEXT("Eyebrows")) continue;
+   if (auto* MID = Komp->CreateDynamicMaterialInstance(i))
+    MID->SetVectorParameterValue(TEXT("DiffuseColor"), Farbe);
+  }
+ }
 }
 
 // Dritte Person statt Ego-Perspektive: ohne einen sichtbaren Koerper haengt
@@ -204,7 +218,10 @@ void ALaLaBergCharacter::BeginPlay() {
   SkelettKopf->SetLeaderPoseComponent(SkelettKoerper);
   SkelettFuesse->SetLeaderPoseComponent(SkelettKoerper);
   SkelettBeine->SetLeaderPoseComponent(SkelettKoerper);
-  for (USkeletalMeshComponent* Teil : { SkelettKoerper, SkelettKopf, SkelettFuesse, SkelettBeine }) Teil->SetVisibility(true);
+  for (USkeletalMeshComponent* Teil : { SkelettKoerper, SkelettKopf, SkelettFuesse, SkelettBeine }) {
+   Teil->SetVisibility(true);
+   FaerbeSkelett(Teil, JACKE);
+  }
   Netz->SetVisibility(false);
   for (int32 s = 0; s < 2; s++) {
    Oberschenkel[s]->SetVisibility(false); Unterschenkel[s]->SetVisibility(false); Oberarm[s]->SetVisibility(false);

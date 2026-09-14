@@ -11,6 +11,7 @@ public:
  ALaLaBergGameMode();
  virtual void InitGame(const FString& MapName,const FString& Options,FString& ErrorMessage) override;
  virtual void BeginPlay() override;
+ virtual void Tick(float DeltaSeconds) override;
 private:
  bool bSceneReady=false;
  int32 BuildingCount=0;
@@ -27,9 +28,20 @@ private:
  float FahrtSchlechteste=1000.0f;
  static void Beleg(const FString& Zeile);
  // Sonne und Belichtung bleiben greifbar: der Fotomodus stellt sie um, und
- // spaeter haengt daran der Tageszeitwechsel.
+ // der Tageszeitwechsel haengt daran (siehe AktualisiereTageszeit).
  UPROPERTY() TObjectPtr<class ULightComponent> SonnenLicht=nullptr;
+ UPROPERTY() TObjectPtr<class USkyLightComponent> SkyLicht=nullptr;
  UPROPERTY() TObjectPtr<class APostProcessVolume> Belichtung=nullptr;
+ // Tageszeit in Stunden (0-24, 12=Mittag) - eine volle Umdrehung alle
+ // TAGESLAENGE_SEKUNDEN echte Sekunden. Dreht SonnenLicht und passt Staerke/
+ // Farbe an (Sonnenauf-/-untergang waermer, Nacht schwaecher und blaeulich).
+ // Die feste Ausgangsdrehung aus InitGame (FRotator(-50,152,0)) bleibt der
+ // Bezug fuer Mittag - der Azimut (152) aendert sich nicht, nur die Elevation,
+ // eine bewusste Vereinfachung statt eines echten Sonnenstands.
+ float Tageszeit=12.0f;
+ static constexpr float TAGESLAENGE_SEKUNDEN=600.0f;
+ static constexpr float SONNEN_AZIMUT=152.0f;
+ void AktualisiereTageszeit(float DeltaSeconds);
  UPROPERTY() TObjectPtr<class APlayerStart> Startpunkt=nullptr;
  int32 FarbtrefferZahl=0;
  // Wegpunkte fuer KI-Verkehr und Passanten laden und die Figuren dazu

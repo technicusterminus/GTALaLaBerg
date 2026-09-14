@@ -50,6 +50,38 @@
 ALaLaBergGameMode::ALaLaBergGameMode() {
  DefaultPawnClass=ALaLaBergCharacter::StaticClass();
  HUDClass=ALaLaBergHUD::StaticClass();
+ PrimaryActorTick.bCanEverTick=true;
+}
+void ALaLaBergGameMode::Tick(float DeltaSeconds) {
+ Super::Tick(DeltaSeconds);
+ AktualisiereTageszeit(DeltaSeconds);
+}
+// Dreht die Sonne ueber den Tag statt sie fest zu lassen (siehe InitGame,
+// SonnenLage) - Elevation nach einer einfachen Kosinuskurve um den Mittag,
+// derselbe Azimut wie im Ausgangswert (SONNEN_AZIMUT). Staerke und Farbe
+// folgen der Elevation: voll und neutral tagsueber, waermer nahe dem
+// Horizont, schwach und leicht blaeulich nachts - nie ganz aus, sonst
+// wirkte eine Gasse nachts als reines Schwarz ohne jede Kontur.
+void ALaLaBergGameMode::AktualisiereTageszeit(float DeltaSeconds) {
+ if(!SonnenLicht) return;
+ Tageszeit=FMath::Fmod(Tageszeit+DeltaSeconds*(24.0f/TAGESLAENGE_SEKUNDEN),24.0f);
+ const float Stundenwinkel=2.0f*PI*(Tageszeit-12.0f)/24.0f;
+ const float ElevationGrad=70.0f*FMath::Cos(Stundenwinkel)-10.0f;
+ SonnenLicht->GetOwner()->SetActorRotation(FRotator(-ElevationGrad,SONNEN_AZIMUT,0));
+ // Ueber der Horizontlinie (0 Grad) voll, darunter rasch schwaecher - kein
+ // hartes Abschneiden, sonst springt die Stadt sichtbar von hell auf dunkel.
+ const float TagAnteil=FMath::Clamp((ElevationGrad+8.0f)/16.0f,0.0f,1.0f);
+ // Farbtemperatur nach Sonnenhoehe (warmes Orange knapp ueber dem Horizont,
+ // neutrales Weiss hoch am Himmel), zusaetzlich zur Nacht hin ins Blaue
+ // gedreht - ueber TagAnteil ineinander geblendet statt zweier getrennter
+ // Faelle, damit der Wechsel sichtbar weich bleibt.
+ if(auto* D=Cast<UDirectionalLightComponent>(SonnenLicht)) {
+  D->SetIntensity(FMath::Lerp(0.05f,10.0f,TagAnteil));
+  const float Hoehenanteil=FMath::Clamp((ElevationGrad+10.0f)/70.0f,0.0f,1.0f);
+  const FLinearColor Tagesfarbe=FMath::Lerp(FLinearColor(1.0f,0.55f,0.32f),FLinearColor(1.0f,0.97f,0.92f),Hoehenanteil);
+  D->SetLightColor(FMath::Lerp(FLinearColor(0.5f,0.6f,0.9f),Tagesfarbe,TagAnteil));
+ }
+ if(SkyLicht) SkyLicht->SetIntensity(FMath::Lerp(0.15f,1.6f,TagAnteil));
 }
 void ALaLaBergGameMode::InitGame(const FString& MapName,const FString& Options,FString& ErrorMessage) {
  Super::InitGame(MapName,Options,ErrorMessage);
@@ -248,6 +280,7 @@ void ALaLaBergGameMode::InitGame(const FString& MapName,const FString& Options,F
   SkyComp->bLowerHemisphereIsBlack=false;                    // Bodenlicht statt schwarzer Unterseite
  }
  Sky->FinishSpawning(FTransform(FVector(0,0,20000)));
+ SkyLicht=SkyComp;
 
  auto* Nebel=GetWorld()->SpawnActor<AExponentialHeightFog>();
  if(auto* NebelComp=Nebel->GetComponent()) {
