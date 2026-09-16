@@ -626,7 +626,7 @@ Die Verkehrslogik priorisiert skalierbares, glaubwürdiges Verhalten gegenüber 
 
 - Der Spurversatz der KI-Autos richtet sich jetzt nach der echten Fahrbahnbreite aus den Straßendaten (`verkehr.json`, Feld `w`) statt nach einem für jede Straße gleichen Festwert - auf schmalen Straßen bleibt entsprechend weniger Platz zum Ausweichen, ohne über den Fahrbahnrand hinauszufahren. Kein Spurwechselmodell und keine mehrspurige Fahrspurwahl innerhalb einer Fahrtrichtung.
 - Kein Queue-System pro Kreuzung.
-- Keine präzise Fahrspurgeometrie für komplexe Kreuzungen.
+- Der Anhalteabstand an einer Kreuzung richtet sich jetzt nach deren geschätzter tatsächlicher Breite (aus der Straßenklasse der wichtigsten angeschlossenen Straße, kalibriert an echten Breitendaten) statt nach einem für jede Kreuzung gleichen Festwert - an einer breiten oder mehrarmigen Kreuzung steht ein wartendes Auto entsprechend weiter vom Mittelpunkt entfernt. Keine präzise Fahrspurgeometrie für Abbiegevorgänge selbst - ein Auto folgt weiterhin der Straßenmitte durch die Kreuzung statt einer echten Abbiegekurve.
 - Die Ampel-Phasenlogik teilt eine Kreuzung jetzt in so viele nicht überlappende Zeitfenster wie sie tatsächlich unterschiedliche Fahrbahnachsen hat (statt fest zwei Phasen für vier Arme) - eine breite Kreuzung mit mehr als vier Armen bekommt entsprechend mehr Phasen, statt eine ihrer Achsen fälschlich mit einer anderen zu teilen.
 - Einzelfälle können trotz Graph-Gruppierung in getrennten Ampelgruppen landen.
 - Der fahrbare Wagen besitzt aktuell keine Spurhalteassistenz oder Fahrspurbindung.
