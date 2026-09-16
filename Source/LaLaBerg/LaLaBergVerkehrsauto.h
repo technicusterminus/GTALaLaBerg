@@ -38,6 +38,13 @@ public:
  // Abstand zu jedem anderen Auto (siehe BremseVorKreuzung in der .cpp).
  static TArray<FVector> KreuzungOrte;
  static TArray<int32> KreuzungKlassen;
+ // Zentimeter, parallel zu KreuzungOrte/-Klassen (Tools/Export/prepare-
+ // verkehr.cjs "breite", aus der durchschnittlichen Fahrbahnbreite je
+ // Strassenklasse geschaetzt) - fuer einen von der tatsaechlichen
+ // Kreuzungsgroesse statt einem festen Wert abhaengigen Anhalteabstand
+ // (siehe BremseVorKreuzung in der .cpp): eine breite oder mehrarmige
+ // Kreuzung braucht mehr Abstand als eine schmale Nebenstrasse.
+ static TArray<float> KreuzungBreiten;
  // Vor BeginPlay setzen (siehe SetzeRoute): die eigene Strassenklasse und
  // welche der obigen Kreuzungen auf der eigenen Route liegen.
  void SetzeKreuzung(int32 Klasse, const TArray<int32>& Indizes) { EigeneKlasse = Klasse; MeineKreuzungen = Indizes; }

@@ -899,10 +899,14 @@ void ALaLaBergGameMode::LadeVerkehr() {
  // hier x/y statt x/y/z) - BremseVorKreuzung vergleicht nur in der Ebene.
  ALaLaBergVerkehrsauto::KreuzungOrte.Empty();
  ALaLaBergVerkehrsauto::KreuzungKlassen.Empty();
+ ALaLaBergVerkehrsauto::KreuzungBreiten.Empty();
  for(const auto& Wert:Wurzel->GetArrayField(TEXT("kreuzungen"))) {
   const auto Obj=Wert->AsObject();
   ALaLaBergVerkehrsauto::KreuzungOrte.Add(FVector(Obj->GetNumberField(TEXT("x")),Obj->GetNumberField(TEXT("y")),0));
   ALaLaBergVerkehrsauto::KreuzungKlassen.Add(Obj->GetIntegerField(TEXT("klasse")));
+  // "breite" fehlt nur bei sehr alten verkehr.json-Staenden - 3.8 m
+  // (Klasse 3, mittlere Breite) als Rueckfall wie zuvor der feste Puffer.
+  ALaLaBergVerkehrsauto::KreuzungBreiten.Add(Obj->HasField(TEXT("breite"))?Obj->GetNumberField(TEXT("breite")):3.8f);
  }
  // Vor den KI-Autos: die brauchen ALaLaBergAutoPool::Instanz schon in ihrem
  // eigenen BeginPlay (siehe dort).

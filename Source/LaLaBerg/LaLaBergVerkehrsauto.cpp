@@ -15,6 +15,7 @@
 TArray<ALaLaBergVerkehrsauto*> ALaLaBergVerkehrsauto::Alle;
 TArray<FVector> ALaLaBergVerkehrsauto::KreuzungOrte;
 TArray<int32> ALaLaBergVerkehrsauto::KreuzungKlassen;
+TArray<float> ALaLaBergVerkehrsauto::KreuzungBreiten;
 
 namespace {
  // Keine echte Verkehrssimulation - nur: bremsen, wenn ein anderer
@@ -54,12 +55,22 @@ namespace {
    // (Bruecken, Gefaelle) die Entfernung zur Kreuzung selbst.
    const FVector& KreuzOrt = ALaLaBergVerkehrsauto::KreuzungOrte[KIdx];
    const float EigenerAbstand = FVector::Dist2D(Ort, KreuzOrt);
-   if (EigenerAbstand > 1400.0f) continue;   // Kreuzung noch nicht relevant
+   // Anhalteabstand von der tatsaechlichen Kreuzungsbreite abhaengig statt
+   // eines fuer jede Kreuzung gleichen Werts (siehe KreuzungBreiten): eine
+   // breite oder mehrarmige Kreuzung braucht mehr Platz zum Anhalten, sonst
+   // stand ein wartendes Auto sichtbar mitten in der querenden Fahrbahn.
+   // Halbe Kreuzungsbreite (bis zum eigenen Fahrbahnrand) plus die halbe
+   // Wagenlaenge (rund 210 cm, siehe Karosse-Querschnitte in
+   // LaLaBergWagenForm) als Sicherheitsabstand zur Vorderstossstange.
+   const float Puffer = ALaLaBergVerkehrsauto::KreuzungBreiten.IsValidIndex(KIdx)
+    ? ALaLaBergVerkehrsauto::KreuzungBreiten[KIdx] * 50.0f + 210.0f : 300.0f;
+   const float Relevanz = Puffer + 1100.0f;
+   if (EigenerAbstand > Relevanz) continue;   // Kreuzung noch nicht relevant
    for (ALaLaBergVerkehrsauto* Andere : ALaLaBergVerkehrsauto::Alle) {
     if (!Andere || Andere == Selbst || !Andere->HoleKreuzungen().Contains(KIdx)) continue;
     const FVector AndererOrt = Andere->GetActorLocation();
     const float AndererAbstand = FVector::Dist2D(AndererOrt, KreuzOrt);
-    if (AndererAbstand > 1400.0f) continue;
+    if (AndererAbstand > Relevanz) continue;
     bool bMussWarten = Andere->HoleKlasse() < EigeneKlasse;
     if (!bMussWarten && Andere->HoleKlasse() == EigeneKlasse) {
      if (AndererAbstand < EigenerAbstand - 300.0f) bMussWarten = true;
@@ -67,7 +78,7 @@ namespace {
       bMussWarten = FVector::DotProduct(Selbst->GetActorRightVector(), (AndererOrt - Ort).GetSafeNormal()) > 0.3f;
     }
     if (bMussWarten)
-     Bremse = FMath::Min(Bremse, FMath::Clamp((EigenerAbstand - 300.0f) / 1100.0f, 0.0f, 1.0f));
+     Bremse = FMath::Min(Bremse, FMath::Clamp((EigenerAbstand - Puffer) / 1100.0f, 0.0f, 1.0f));
    }
   }
   return Bremse;

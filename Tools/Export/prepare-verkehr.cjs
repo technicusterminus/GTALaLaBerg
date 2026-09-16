@@ -92,8 +92,19 @@ const kreuzungsKlasse = new Map();
   }
   for (const [n, g] of grad) if (g < 3) kreuzungsKlasse.delete(n);
 }
+// Durchschnittliche Fahrbahnbreite je Strassenklasse (Meter, empirisch aus
+// city.roads[].w berechnet) - der Strassengraph traegt selbst keine Breite
+// je Kante, nur die Klasse. Die wichtigste angeschlossene Klasse
+// (kreuzungsKlasse oben, niedrigste Zahl = breiteste Strasse) liefert damit
+// eine Naeherung dafuer, wie breit die Kreuzung selbst ungefaehr ist - vor
+// allem an einer breiten oder mehrarmigen Kreuzung sichtbar falsch, wenn
+// LaLaBergVerkehrsauto::BremseVorKreuzung stattdessen fuer jede Kreuzung
+// denselben festen Anhalteabstand (3 m) verwendet, egal ob eine schmale
+// Nebenstrasse oder eine breite Hauptkreuzung mit fuenf Armen gemeint ist.
+const BREITE_JE_KLASSE = { 0: 7.5, 1: 6.0, 2: 5.8, 3: 3.8, 4: 6.5, 5: 2.0 };
 const kreuzungsPunkte = [...kreuzungsKlasse.keys()].map(n => ({
   x: graph.p[2 * n], z: graph.p[2 * n + 1], klasse: kreuzungsKlasse.get(n),
+  breite: BREITE_JE_KLASSE[kreuzungsKlasse.get(n)] ?? 3.8,
 }));
 // Wegpunkttoleranz: die Fahrbahnbreite selbst, nicht der 45-m-Ampelradius -
 // eine Kreuzung soll nur zaehlen, wenn die Route wirklich dort vorbeikommt.
@@ -304,7 +315,7 @@ for (let i = 0; i + 2 < stellplaetze.length; i += 3) {
   });
 }
 
-const kreuzungen = kreuzungsPunkte.map(k => ({ x: ux(k.x), y: uz(k.z), klasse: k.klasse }));
+const kreuzungen = kreuzungsPunkte.map(k => ({ x: ux(k.x), y: uz(k.z), klasse: k.klasse, breite: Math.round(k.breite * 10) / 10 }));
 const ergebnis = { schema: 1, autos, passanten, ampeln, geparkt, kreuzungen };
 const out = path.resolve(REPO, 'Content/SourceData/Verkehr/verkehr.json');
 fs.mkdirSync(path.dirname(out), { recursive: true });
