@@ -624,8 +624,7 @@ Der Fahrzeug-Detailgrad ist bewusst auf Echtzeit-Performance optimiert.
 
 Die Verkehrslogik priorisiert skalierbares, glaubwürdiges Verhalten gegenüber vollständiger Verkehrssimulation.
 
-- Keine echte Fahrspurbreite aus den Quelldaten.
-- Kein Spurwechselmodell.
+- Der Spurversatz der KI-Autos richtet sich jetzt nach der echten Fahrbahnbreite aus den Straßendaten (`verkehr.json`, Feld `w`) statt nach einem für jede Straße gleichen Festwert - auf schmalen Straßen bleibt entsprechend weniger Platz zum Ausweichen, ohne über den Fahrbahnrand hinauszufahren. Kein Spurwechselmodell und keine mehrspurige Fahrspurwahl innerhalb einer Fahrtrichtung.
 - Kein Queue-System pro Kreuzung.
 - Keine präzise Fahrspurgeometrie für komplexe Kreuzungen.
 - Breite Kreuzungen mit mehr als vier Armen können geometrisch ungenau aussehen.
