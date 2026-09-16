@@ -242,21 +242,39 @@ const gruppe = ampelnRoh.map((_, i) => {
   if (!gruppenIndex.has(wurzel)) gruppenIndex.set(wurzel, gruppenIndex.size);
   return gruppenIndex.get(wurzel);
 });
-// Phase je Ampel: 0 fuer die Achse mit dem ersten "gier"-Winkel in einer
-// Gruppe (auf 180 Grad reduziert), 1 fuer alles, was um rund 90 Grad
-// dagegen verdreht ist.
-const gruppenAchse = new Map();
+// Phase je Ampel: eine eigene, sich nie ueberschneidende Phase je
+// tatsaechlich unterschiedlicher Fahrbahnachse innerhalb der Gruppe, statt
+// nur zwei fester Buckets ("ungefaehr Referenzachse" vs. "alles andere").
+// Bei einer gewoehnlichen Kreuzung mit vier Armen (zwei Achsen) ist das
+// weiterhin dasselbe Ergebnis wie vorher; bei mehr als vier Armen (mehr als
+// zwei tatsaechlich verschiedene Achsen) reichten zwei Buckets nicht mehr,
+// um jede Achse sicher von jeder anderen zu trennen - eine dritte Achse
+// landete zwangslaeufig im selben Bucket wie eine der beiden ersten, obwohl
+// sie mit keiner davon dieselbe Fahrtrichtung teilt. Jede neue Achse
+// bekommt hier stattdessen ihre eigene Phase, bis sie nah genug (<= 40 Grad,
+// modulo 180 wegen Hin-/Rueckrichtung derselben Strasse) an einer bereits
+// vorhandenen liegt. LaLaBergAmpel.cpp teilt den Zyklus in ebenso viele
+// gleich lange, nicht ueberlappende Zeitfenster wie es Phasen gibt.
+const ACHSEN_TOLERANZ = 40;
+const gruppenAchsen = new Map(); // Gruppe -> [{achse, phase}]
 const phase = ampelnRoh.map((a, i) => {
   const g = gruppe[i];
   const achse = ((a.gier % 180) + 180) % 180;
-  if (!gruppenAchse.has(g)) { gruppenAchse.set(g, achse); return 0; }
-  const bezug = gruppenAchse.get(g);
-  let diff = Math.abs(achse - bezug); if (diff > 90) diff = 180 - diff;
-  return diff > 45 ? 1 : 0;
+  if (!gruppenAchsen.has(g)) gruppenAchsen.set(g, []);
+  const liste = gruppenAchsen.get(g);
+  for (const eintrag of liste) {
+    let diff = Math.abs(achse - eintrag.achse); if (diff > 90) diff = 180 - diff;
+    if (diff <= ACHSEN_TOLERANZ) return eintrag.phase;
+  }
+  const neuePhase = liste.length;
+  liste.push({ achse, phase: neuePhase });
+  return neuePhase;
 });
+const anzahlPhasenJeGruppe = new Map();
+for (const [g, liste] of gruppenAchsen) anzahlPhasenJeGruppe.set(g, liste.length);
 const ampeln = ampelnRoh.map((s, i) => ({
   x: ux(s.x), y: uz(s.z), z: Math.round(boden(s.x, s.z) * M), gier: Math.round(s.gier),
-  gruppe: gruppe[i], phase: phase[i],
+  gruppe: gruppe[i], phase: phase[i], phasen: anzahlPhasenJeGruppe.get(gruppe[i]),
 }));
 
 // Geparkte Autos: dieselben amtlichen Stellplaetze, dieselbe Filterung wie

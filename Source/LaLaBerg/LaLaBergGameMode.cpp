@@ -840,12 +840,16 @@ void ALaLaBergGameMode::BeginPlay() {
   static int32 GesamtVerstoesse=0;
   FTimerHandle Takt;
   GetWorldTimerManager().SetTimer(Takt,[this,Pruefe]() { GesamtVerstoesse+=Pruefe(); },0.5f,true,2.0f);
+  // Mindestens einen vollen Zyklus lang pruefen - bei Kreuzungen mit mehr
+  // als zwei Phasen (mehr als vier Armen) dauert der laenger als die alten,
+  // fest angenommenen 18s (Zweiphasen-Zyklus plus Vorlauf).
+  const float TestDauer=FMath::Max(18.0f,2.0f+ALaLaBergAmpel::PhasenfensterS()*GroessteAnzahlPhasen+2.0f);
   FTimerHandle Ende;
   GetWorldTimerManager().SetTimer(Ende,[this]() {
    Beleg(FString::Printf(TEXT("LALABERG_AMPELTEST %s verstoesse=%d ampeln=%d"),
     GesamtVerstoesse==0?TEXT("PASS"):TEXT("FAIL"),GesamtVerstoesse,AmpelZahl));
    FPlatformMisc::RequestExitWithStatus(false,0);
-  },18.0f,false);
+  },TestDauer,false);
  }
  if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergSmoke"))) {
   FTimerHandle Handle;
@@ -936,9 +940,13 @@ void ALaLaBergGameMode::LadeVerkehr() {
   // BeginPlay stehen - SpawnActor riefe BeginPlay schon auf, bevor SetzeGruppe
   // je zum Zug kaeme (siehe LaLaBergFarbkugel fuer dasselbe Vorgehen).
   if(auto* Ampel=GetWorld()->SpawnActorDeferred<ALaLaBergAmpel>(ALaLaBergAmpel::StaticClass(),Lage)) {
-   Ampel->SetzeGruppe(Obj->GetIntegerField(TEXT("gruppe")),Obj->GetIntegerField(TEXT("phase")));
+   // "phasen" fehlt nur bei sehr alten verkehr.json-Staenden vor der
+   // Mehrphasen-Umstellung - 2 als Rueckfall wie zuvor der feste Wert.
+   Ampel->SetzeGruppe(Obj->GetIntegerField(TEXT("gruppe")),Obj->GetIntegerField(TEXT("phase")),
+    Obj->HasField(TEXT("phasen"))?Obj->GetIntegerField(TEXT("phasen")):2);
    Ampel->FinishSpawning(Lage);
    AmpelZahl++;
+   GroessteAnzahlPhasen=FMath::Max(GroessteAnzahlPhasen,Ampel->HoleAnzahlPhasen());
   }
  }
  // Geparkte Autos: dieselben amtlichen Stellplaetze, die frueher als Kasten-

@@ -48,6 +48,11 @@ private:
  // erzeugen (Tools/Export/prepare-verkehr.cjs -> Content/SourceData/Verkehr).
  void LadeVerkehr();
  int32 AutoZahl=0, PassantZahl=0, AmpelZahl=0, GeparktZahl=0;
+ // Fuer -LaLaBergAmpelTest: die laengste tatsaechlich vorkommende
+ // Phasenzahl bestimmt, wie lang ein voller Kreuzungszyklus maximal dauert
+ // (siehe dort) - bei mehr als zwei Phasen (mehr als vier Kreuzungsarme)
+ // laenger als der alte, fest angenommene Zweiphasen-Zyklus.
+ int32 GroessteAnzahlPhasen=2;
 public:
  virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
  // Von jeder Farbkugel beim Aufprall gerufen - fuer HUD und Waffentest.
