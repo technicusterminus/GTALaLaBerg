@@ -914,6 +914,9 @@ void ALaLaBergGameMode::LadeVerkehr() {
    if(AutoObj->TryGetArrayField(TEXT("kreuzungen"),KreuzungenJson))
     for(const auto& K:*KreuzungenJson) Kreuzungen.Add(static_cast<int32>(K->AsNumber()));
    Auto->SetzeKreuzung(AutoObj->HasField(TEXT("klasse"))?AutoObj->GetIntegerField(TEXT("klasse")):3,Kreuzungen);
+   // Echte Fahrbahnbreite (Meter, siehe Tools/Export/prepare-verkehr.cjs
+   // "w") statt eines fuer jede Strasse gleichen Spur-Versatzes.
+   if(AutoObj->HasField(TEXT("w"))) Auto->SetzeStrassenbreite(AutoObj->GetNumberField(TEXT("w")));
    AutoZahl++;
   }
  }

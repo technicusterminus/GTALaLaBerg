@@ -105,15 +105,11 @@ namespace {
  // einer roten Ampel - dort soll stehenbleiben, nicht vorbeischleichen, das
  // richtige Verhalten sein.
  constexpr float MAX_SEITVERSATZ = 220.0f;
- // Dauerhafter Versatz rechts der Fahrbahnmitte (siehe SeitZiel in Tick) -
- // dieselbe Route wird in beide Richtungen abgefahren (FLaLaBergWegfolger
- // kehrt am Ende einfach um), ohne diesen Versatz faehrt Gegenverkehr exakt
- // auf derselben Linie aufeinander zu. GetActorRightVector() zeigt schon in
- // die richtige Richtung, weil die Rotation der aktuellen Fahrtrichtung
- // folgt - ein rueckwaerts abgefahrenes Routenstueck verschiebt den Wagen
- // deshalb von selbst auf die andere Fahrbahnseite, ganz ohne eigene
- // Umschaltung beim Umkehren.
- constexpr float SPUR_VERSATZ = 150.0f;
+ // Halbe Fahrzeugbreite (siehe Rumpf->InitBoxExtent unten) - Sicherheitsrand,
+ // damit der Gesamtversatz (Spur + Ausweichen) das Auto nie ueber den
+ // eigentlichen Fahrbahnrand hinausschiebt, auch nicht auf einer schmalen
+ // Strasse mit wenig Platz zum Ausweichen.
+ constexpr float HALBE_WAGENBREITE = 88.0f;
  // Sichtweiten-LOD (siehe Tick): jenseits davon der leichte Kasten statt
  // des CarConcept-Detailmodells. 70 Autos gleichzeitig im Detailmodell
  // druecken die Bildrate auf 2 fps (Glas/Chrom-Material, viele Dreiecke je
@@ -257,10 +253,17 @@ void ALaLaBergVerkehrsauto::Tick(float Zeit) {
 
   // Weicht einem Auto oder dem Spieler direkt voraus zusaetzlich seitlich
   // aus (nach rechts), statt nur davor stehenzubleiben - nicht vor einer
-  // roten Ampel, da soll die Fahrt tatsaechlich enden. SPUR_VERSATZ selbst
-  // gilt immer (siehe oben) - eine einfache, aber echte Fahrspurtrennung
-  // ohne Fahrspurbreite aus den Quelldaten.
-  const float SeitZiel = SPUR_VERSATZ + (BremseObjekt < 0.9f ? MAX_SEITVERSATZ : 0.0f);
+  // roten Ampel, da soll die Fahrt tatsaechlich enden. Der dauerhafte
+  // Spur-Versatz selbst gilt immer (siehe unten) - echte Fahrspurtrennung
+  // anhand der Fahrbahnbreite aus den Quelldaten (StrassenBreite, siehe
+  // SetzeStrassenbreite) statt eines fuer jede Strasse gleichen Werts: bei
+  // zwei Spuren liegt die Mitte der eigenen Spur ein Viertel der Breite
+  // neben der Fahrbahnmitte. Der Gesamtversatz (Spur + Ausweichen) bleibt
+  // innerhalb des Fahrbahnrands - auf einer schmalen Strasse bleibt dafuer
+  // weniger Platz zum Ausweichen, statt ueber den Rand hinauszufahren.
+  const float SpurVersatz = StrassenBreite * 0.25f;
+  const float Rand = FMath::Max(0.0f, StrassenBreite * 0.5f - HALBE_WAGENBREITE);
+  const float SeitZiel = FMath::Min(SpurVersatz + (BremseObjekt < 0.9f ? MAX_SEITVERSATZ : 0.0f), Rand);
   Seitversatz = FMath::FInterpTo(Seitversatz, SeitZiel, Zeit, 0.7f);
   if (FMath::Abs(Seitversatz) > 0.5f) SetActorLocation(GetActorLocation() + GetActorRightVector() * Seitversatz);
  }

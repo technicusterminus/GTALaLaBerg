@@ -43,6 +43,11 @@ public:
  void SetzeKreuzung(int32 Klasse, const TArray<int32>& Indizes) { EigeneKlasse = Klasse; MeineKreuzungen = Indizes; }
  int32 HoleKlasse() const { return EigeneKlasse; }
  const TArray<int32>& HoleKreuzungen() const { return MeineKreuzungen; }
+ // Echte Fahrbahnbreite der eigenen Route (Tools/Export/prepare-verkehr.cjs
+ // "w", Meter aus den Strassendaten) statt eines fuer alle Autos gleichen
+ // Werts - vor BeginPlay setzen wie SetzeKreuzung. BreiteM bleibt unter 3 m
+ // nie unterschritten (siehe Export), deshalb kein Rueckfall auf 0 noetig.
+ void SetzeStrassenbreite(float BreiteM) { StrassenBreite = BreiteM * 100.0f; }
 
 protected:
  virtual void BeginPlay() override;
@@ -92,4 +97,7 @@ private:
  // SetzeKreuzung. 3 = mittlere Klasse als Rueckfall, falls nie gesetzt.
  int32 EigeneKlasse = 3;
  TArray<int32> MeineKreuzungen;
+ // Zentimeter, siehe SetzeStrassenbreite. 300 cm (3 m) als Rueckfall, falls
+ // nie gesetzt - dieselbe Mindestbreite wie im Export.
+ float StrassenBreite = 300.0f;
 };
