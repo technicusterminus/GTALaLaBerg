@@ -1,121 +1,802 @@
-# GTALaLaBerg – Unreal 5.8
+# GTALaLaBerg – Unreal Engine 5.8
 
-Landsberg am Lech im Maßstab 1:1 als begehbare und befahrbare Stadt. Dies ist das native Unreal-Projekt. Der Projektname und der vollständige Projektpfad enthalten **keine Leerzeichen** – das bleibt so.
+> **Landsberg am Lech als begehbare und befahrbare Open World im Maßstab 1:1.**
+> Native Unreal-Engine-5.8-Umsetzung mit amtlichen LoD2-Gebäudedaten, Laserscan-Gelände, OpenStreetMap-Straßennetz, Nanite-Sektorstreaming, KI-Verkehr, interaktiven Fahrzeugen, Paintball-Waffen und Tageszeiten.
 
-- Projektdatei: `GTALaLaBerg.uproject`
-- Editor-Buildtarget: `GTALaLaBergEditor`, Spiel-Buildtarget: `GTALaLaBerg`
-- Der interne C++-Modulname ist `LaLaBerg`; das ist kein zweites Projekt.
+***
 
-Codex und Claude arbeiten beide in diesem Projekt. Zwischen den beiden Assistenten gibt es keine automatische Nachrichtenverbindung. Wer eine Datei des anderen ändert, liest vorher den aktuellen Stand und nennt die Änderung im Bericht.
+## Projektüberblick
 
-**Import und Spiellauf nie gleichzeitig.** Ein laufendes Spiel (`-game`) hält die Stadt-Assets geöffnet. Ein gleichzeitiger `-run=LaLaBergImport` kann sie dann nicht ersetzen und meldet `LALABERG_STATIC_SAVE_FAILED`; am 11.09.2026 traf das drei Meshes in S_N2_N3. Vor einem Spiellauf deshalb prüfen, dass kein `UnrealEditor-Cmd.exe` läuft, und vor einem Import, dass kein `UnrealEditor.exe -game` läuft.
+**GTALaLaBerg** ist kein klassisches GTA-Remake, sondern ein technisch orientiertes Unreal-Engine-Projekt: Landsberg am Lech wird aus öffentlichen Geodaten, Gebäudemodellen, Straßeninformationen und Höhendaten als begeh- und befahrbare Stadt rekonstruiert.
 
-## Was drin ist
+Der Schwerpunkt liegt auf einer skalierbaren Pipeline für große Stadtmodelle in Unreal Engine:
 
-- **Die ganze Stadt:** 7207 Gebäude aus amtlichen LoD2-Daten, Laser-Gelände, Straßen, Plätze, Lech mit Wehr und 13 320 Bäume. Das Ganze sind 2060 statische Nanite-Meshes in 101 Sektoren zu je 500 m, geladen in etwa 6 s.
-- **Altstadt nach Fotovorlage:** Putzfarben und Dachdeckung der Innenstadt, Sockel, Gesimse, Ladenzonen, Gauben, Türen, Brandmauern und in 11,5-m-Häuser geteilte Zeilen. Dazu Rathaus, Marienbrunnen und Hauptplatz sowie der Klinikum-Campus.
-- **Leben:** 371 Passanten als gebaute Stadtgeometrie, dazu 1078 geparkte Autos, 70 fahrende KI-Autos, 90 KI-Passanten und 44 Ampeln an amtlichen Standorten (OSM `highway=traffic_signals`) als eigenständige Akteure (`Tools/Export/prepare-verkehr.cjs`). Die geparkten Autos stehen ohne Route an ihrem amtlichen Stellplatz (dieselben Daten, die früher als Kasten-Geometrie ins Stadt-Mesh gebacken waren), lassen sich aber wie jedes fahrende KI-Auto übernehmen. Die fahrenden KI-Autos fahren ihre Straße ab und zurück, bremsen und weichen seitlich aus vor einem Auto oder dem Spieler voraus und vor Rot; die KI-Passanten gehen ihren Gehweg ab und zurück und bremsen/weichen vor einem anderen Passanten oder dem Spieler - mit einem echten, lizenzierten Skeletal Mesh samt Idle-/Walk-Animation (CC0, Quaternius), fehlen die Assets in einem Checkout, fällt jede Figur auf das von Hand gebaute Gelenk-Rig aus Hüfte, Knie und Schulter zurück (siehe „Bekannte Grenzen“).
-- **Fahrzeugvielfalt:** Der fahrbare Wagen und alle KI-Autos (fahrend wie geparkt) wählen zufällig eines von 14 lizenzierten Modellen - das CarConcept-Modell (CC BY 4.0) oder einen von 13 realistischen Fahrzeugtypen aus Epics kostenlosem „City Sample Vehicles“-Paket (Fab, siehe „Datenquellen und Lizenzen“): Vans, mehrere PKW-Formen, Busse, Lkw. Jedes Modell zeigt Türen, Fenster, Scheinwerfer, Rückleuchten, Felgen statt einer Kasten-Silhouette. Nur nah am Spieler (< 80 m): weiter entfernte KI-Autos zeigen ein leichtes Fern-Mesh, sonst brach die Bildrate mit vielen Detail-Autos gleichzeitig ein (`ALaLaBergAutoPool`, eine Instanced-Static-Mesh-Instanz je Wagen und Teil statt einer eigenen Komponente, je Fahrzeugtyp ein eigener Pool-Satz - siehe `LaLaBergWagenTypen`). Derselbe Trick für den CarConcept-Kasten: bei 1078 geparkten Autos kostete je ein eigenes Netz ebenso viele Draw-Calls und drückte die Bildrate von 26 auf 17 fps - `ALaLaBergKastenPool` hält stattdessen eine Instanced-Static-Mesh-Instanz je Lackfarbe (siehe „Bekannte Grenzen“).
-- **Jedes Auto ist nehmbar:** Steht kein fahrbarer Wagen in der Nähe, wird das nächste KI-Auto (fahrend oder geparkt) an Ort und Stelle zu einem fahrbaren Wagen (das KI-Auto verschwindet dafür) - wie in einem echten GTA lässt sich jedes Auto auf der Straße oder am Stellplatz stehlen, nicht nur das eine dafür vorgesehene.
-- **Fahrbarer Wagen:** Federung über vier Strahlen, Antrieb bis etwa 120 km/h, Bremse und Parkbremse. Er steht beim Start auf der nächsten freien Straße am Klinikum. Ein Umbau auf echte Chaos-Vehicle-Physik (`UChaosWheeledVehicleMovementComponent`, Motor-/Getriebe-Kennfeld, Vorderradlenkung, Hinterradantrieb statt vier Federstrahlen) wurde begonnen, aber nicht übernommen: nach Beheben mehrerer echter Engine-Probleme (`CanCreateVehicle()` verlangt in UE 5.8 fälschlich einen Bone-Namen je Rad auch ohne Skelettnetz; Radgeometrie musste zur Rumpf-Kollisionsbox statt zu den alten Federstrahl-Maßen passen) zeigten alle Rad-Messwerte (Bodenkontakt, Federkompression, Federkraft ~125.000N, Reifenreibung 0,70, Antriebsmoment ~986 Nm, auch beim Zehnfachen unverändert) korrekte Werte, doch die Karosserie beschleunigte nie - ein bislang ungeklärter, tiefer liegender Bug oder eine fehlende Verbindung im „Experimental"-ChaosVehiclesPlugin speziell für Aufbauten ohne Skelettnetz. Details und ein vorbereiteter Community-Anfrage-Text in `Docs/ChaosVehicle-ForumAnfrage.md`.
-- **Spielfigur in dritter Person:** Kamera an einem Federarm hinter/über der Figur statt in der Ego-Perspektive. Bevorzugt dasselbe echte, lizenzierte Skeletal Mesh wie die KI-Passanten (CC0, Quaternius) - fehlen die Assets in einem Checkout, fällt die Figur auf den handgebauten Gelenk-Rig zurück (Hüfte/Knie/Schulter, Gang ans Tempo gekoppelt). Die Waffe hängt am rechten Arm statt frei an der Kamera zu schweben, in beiden Fällen an derselben Stelle - der (dann unsichtbare) Kasten-Rig bleibt als Aufhängepunkt bestehen, auch wenn das Skelett sichtbar ist.
-- **Waffen – ein abgerundetes Spektrum, alle mit Paintball statt Geschossen:** Pistole, MP (Dauerfeuer), Schrotflinte (7 Kugeln im Streukegel) und ein Werfer (langsam, große Wucht, großer Klecks). Ein Treffer hinterlässt einen Farbklecks (Decal) an der Trefferstelle, der mit der getroffenen Fläche mitfährt/-geht; die Fläche selbst behält ihre Farbe. Trifft er den fahrbaren Wagen, einen KI-Wagen oder einen KI-Passanten, bremst der kurz bzw. stolpert, ohne sich umzufärben.
-- **Einblendungen:** Tacho, „E – Einsteigen“ neben einem Wagen, Fadenkreuz mit Waffenname und Schusszahl, eine Tastenleiste und die Ortsanzeige. Die zeigt links unten den Platz, das Wahrzeichen oder die Straße, darunter Ortsteil und Stadt (263 Straßen, 12 Plätze, 40 Wahrzeichen).
-- **Menü:** Startbild, Pause, Einstellungen für Auflösung, Fenstermodus, Grafikstufe 0–3 und Lautstärke.
+- automatisierter Import und Sektorbildung
+- Nanite-Static-Meshes für die gesamte Stadt
+- amtliche LoD2-Gebäudegeometrie
+- KI-Verkehr und Fußgänger
+- interaktive, übernehmbare Fahrzeuge
+- Open-World-Streaming in Stadtsektoren
+- ortsbezogene HUD-Anzeigen
+- automatisierte Smoke-, Fahr-, Bild- und Verkehrstests
+- Cook-/Package-fähiger Shipping-Build
+
+Das Projekt ist als **natives C++-Unreal-Projekt** aufgebaut. Die Projektdatei heißt `GTALaLaBerg.uproject`; das interne C++-Modul heißt bewusst `LaLaBerg`.
+
+| Bezeichnung | Wert |
+|---|---|
+| Unreal-Projekt | `GTALaLaBerg.uproject` |
+| C++-Modul | `LaLaBerg` |
+| Editor-Target | `GTALaLaBergEditor` |
+| Game-Target | `GTALaLaBerg` |
+| Engine | Unreal Engine 5.8 |
+| Zielplattform | Windows 64-bit |
+| Lizenz für Code/Tools | MIT |
+| Stadt- und Geodaten | ODbL / CC BY 4.0, siehe Lizenzabschnitt |
+
+***
+
+## Features
+
+### Stadtmodell
+
+Die Stadt wird als sektorisiertes Nanite-Stadtmodell geladen und besteht aus Gebäuden, Straßen, Freiflächen, Gewässern, Vegetation und Landmarken.
+
+| Inhalt | Umfang |
+|---|---:|
+| Gebäude | 7.207 |
+| Bäume | 13.320 |
+| Statische Nanite-Meshes | 2.060 |
+| Stadtsektoren | 101 |
+| Sektorgröße | 500 × 500 m |
+| Ladezeit | ca. 6 Sekunden |
+| Straßen | 263 |
+| Plätze | 12 |
+| Wahrzeichen | 40 |
+
+Enthalten sind unter anderem:
+
+- amtliche LoD2-Gebäudegeometrie mit Gebäudehöhen und Dachformen
+- laserbasiertes Gelände
+- Straßen, Plätze und Freiflächen aus OpenStreetMap-Daten
+- Lech, Wehr und Uferbereiche
+- Stadtvegetation mit mehr als 13.000 Bäumen
+- Altstadtaufwertung mit Putzfarben, Dachdeckung, Gesimsen, Sockeln, Brandmauern, Ladenzonen, Fenstern, Türen und Gauben
+- Hauptplatz, Rathaus, Marienbrunnen, Schmalzturm und Klinikum-Campus
+- in etwa 11,5-m-Abschnitte aufgeteilte Häuserzeilen für eine glaubwürdigere Fassadenstruktur
+
+### Verkehrs- und Stadtleben
+
+| Element | Anzahl |
+|---|---:|
+| Statische Passanten als Stadtgeometrie | 371 |
+| Geparkte Fahrzeuge | 1.078 |
+| Fahrende KI-Autos | 70 |
+| KI-Passanten | 90 |
+| Ampeln | 44 |
+
+Die Verkehrslogik basiert auf vorbereiteten Wegen, OpenStreetMap-Straßendaten und Kreuzungsinformationen:
+
+- KI-Autos fahren Strecken ab und kehren am Routenende um.
+- Fahrzeuge fahren grundsätzlich rechts versetzt zur Straßenachse.
+- Gegenverkehr entsteht automatisch durch den fahrtrichtungsabhängigen Spurversatz.
+- Fahrzeuge bremsen vor Autos, Spielern, roten Ampeln und bevorrechtigtem Verkehr.
+- Bei Hindernissen weichen Fahrzeuge seitlich aus, sofern es sich nicht um eine Ampel oder Vorrangregelung handelt.
+- KI-Passanten laufen Gehwegsegmente ab und reagieren auf andere Passanten und den Spieler.
+- Ampeln sind aus OSM-Punkten mit `highway=traffic_signals` erzeugt.
+- Kreuzungsgruppen werden bevorzugt über reale Graphknoten des Straßennetzes gebildet.
+- Die Ampelsteuerung verhindert gleichzeitig grüne, geometrisch konfliktierende Fahrtrichtungen.
+
+### Fahrzeuge
+
+Jeder Wagen in der Stadt ist grundsätzlich übernehmbar.
+
+- Der Spielstart platziert ein fahrbares Fahrzeug auf einer freien Straße am Klinikum.
+- Falls kein fahrbarer Wagen in Reichweite steht, kann das nächstgelegene KI-Auto übernommen werden.
+- Das betroffene KI-Fahrzeug verschwindet dabei und wird an derselben Position zum Spielerfahrzeug.
+- Das gilt für fahrende und geparkte KI-Fahrzeuge.
+- Geparkte Fahrzeuge stehen an ihren aus den Quelldaten übernommenen Standorten und benötigen keine Route.
+
+Es stehen bis zu **14 Fahrzeugtypen** zur Verfügung:
+
+| Quelle | Fahrzeuge |
+|---|---:|
+| CarConcept, CC BY 4.0 | 1 |
+| Epic City Sample Vehicles via Fab | 13 |
+| Gesamt | 14 |
+
+Die Fahrzeugdarstellung nutzt einen bewusst aggressiven Sichtweiten-Kompromiss:
+
+- Detaillierte Fahrzeuge werden nur innerhalb von 80 m um den Spieler angezeigt.
+- Entfernte Fahrzeuge verwenden ein vereinfachtes Fernmodell.
+- Detailfahrzeuge werden über `ALaLaBergAutoPool` als Instanced Static Meshes gepoolt.
+- Geparkte Kasten-Fallbacks werden über `ALaLaBergKastenPool` pro Lackfarbe instanziiert.
+
+Diese Pooling-Strategie reduziert Draw Calls massiv. Ohne Pooling sank die Bildrate bei 1.078 geparkten Fahrzeugen im Fahrtest von 26 auf 17 fps; alle Detailfahrzeuge gleichzeitig führten zu rund 2 fps.
+
+Der fahrbare Wagen selbst fährt aktuell über eine vereinfachte Federung aus vier Strahlen statt echter Chaos-Vehicle-Physik - siehe „Bekannte Grenzen" für den Stand eines begonnenen, aber nicht übernommenen Umbaus.
+
+### Spielfigur
+
+Die Spielfigur wird aus einer Third-Person-Kamera gesteuert.
+
+- Kamera über Federarm hinter und über der Figur
+- Bevorzugt echte CC0-Skeletal-Meshes von Quaternius
+- Drei mögliche Figurenvarianten: `Farmer`, `Casual` und `Worker`
+- Zufällige Farbvarianten für Kleidung und Körpergröße
+- KI-Passanten verwenden dieselben Varianten
+- Fallback auf ein selbstgebautes, animiertes Gelenk-Rig, falls die Skeletal Assets nicht verfügbar sind
+- Die Waffe ist physisch am rechten Arm positioniert und schwebt nicht frei an der Kamera
+
+### Paintball-Waffen
+
+Das Projekt verwendet absichtlich keine tödlichen Projektile, sondern Paintball-Mechaniken.
+
+| Taste | Waffe | Verhalten |
+|---|---|---|
+| `1` | Pistole | Einzelschuss |
+| `2` | MP | Dauerfeuer |
+| `3` | Schrotflinte | Sieben Projektile im Streukegel |
+| `4` | Werfer | Langsames Projektil, hohe Wucht, großer Farbklecks |
+
+Treffer erzeugen einen Decal-Farbklecks auf der getroffenen Fläche.
+
+- Der Farbklecks bewegt sich mit getroffenen Flächen, Fahrzeugen oder Figuren mit.
+- Hauswände und statische Objekte behalten die aufgebrachte Farbe.
+- Treffer auf Fahrzeuge bremsen diese kurz ab.
+- Treffer auf KI-Passanten lösen ein kurzes Stolpern aus.
+- Die Waffenmodelle stammen aus einem CC0-lizenzierten Quaternius-Paket.
+
+### HUD und Menüs
+
+Das HUD enthält:
+
+- Tacho im Fahrzeug
+- kontextuelle Einsteigeaufforderung `E – Einsteigen`
+- Fadenkreuz
+- aktiver Waffenname
+- Schussanzahl
+- Steuerungshinweise
+- Ortsanzeige mit Straße, Platz oder Wahrzeichen
+- Ortsteil und Stadt
+
+Das Menü umfasst:
+
+- Startbildschirm
+- Pause-Menü
+- Auflösungswahl
+- Fenstermodus
+- Grafikstufe 0–3
+- Lautstärkeregelung
+
+***
 
 ## Steuerung
 
-| Zu Fuß | Im Wagen |
+| Zu Fuß | Im Fahrzeug |
 |---|---|
-| WASD gehen, Maus umsehen | W/S Gas und rückwärts, A/D lenken |
-| Leertaste springen | Leertaste (halten) bremsen |
-| Maus links (halten) feuern | – |
-| 1–4 Waffe wählen (Pistole/MP/Schrotflinte/Werfer) | – |
-| E einsteigen (bis 8 m Abstand) | E oder R aussteigen |
-| Esc Menü | Esc Menü |
+| `WASD` – bewegen | `W` / `S` – Gas / Rückwärts |
+| Maus – umsehen | `A` / `D` – lenken |
+| `Leertaste` – springen | `Leertaste` halten – bremsen |
+| Linke Maustaste halten – feuern | – |
+| `1`–`4` – Waffe wechseln | – |
+| `E` – einsteigen, bis 8 m Abstand | `E` oder `R` – aussteigen |
+| `Esc` – Menü | `Esc` – Menü |
 
-## Datenkette
+***
 
-```
-Tools/Export/prepare-stadt.cjs                   → Content/SourceData/stadt.json
-Tools/SectorPipeline/sectorize-city.cjs          → Content/SourceData/Sectors/*.json + manifest.json
-UnrealEditor-Cmd … -run=LaLaBergImport -Sector=alle → /Game/City/Sectors/<id>/SM_<id>_<Klasse>
-Tools/baue_texturen.py, Tools/baue_materialien.py → /Game/Art (Texturen, Materialien)
-Tools/Export/prepare-orte.cjs                    → Content/SourceData/Orte/orte.json (Straßen-, Platz- und Ortsnamen)
-Tools/Export/prepare-wagen.cjs                   → Content/SourceData/Fahrzeug/wagen.json (Form des fahrbaren Wagens)
-Tools/Export/prepare-verkehr.cjs                 → Content/SourceData/Verkehr/verkehr.json (Wegpunkte für KI-Autos/-Passanten, Ampelstandorte)
-Tools/baue_farbklecks.py                         → M_Farbklecks (Decal-Material für Paintball-Treffer)
-Tools/baue_waffenmetall.py, Tools/erzeuge_waffentextur.py → M_Waffenmetall (Material der Waffen-Ansichtsmodelle)
-Tools/importiere_waffen.py                       → /Game/Art/Waffen (lizenzierte Waffenmodelle, CC0)
-Tools/pruefe_waffenmasse.py                      → Diagnose: Bounding Box je Waffen-Mesh ins Log (kein Content-Ergebnis)
-Tools/pruefe_carconcept.py                       → Diagnose: Bounding Box je CarConcept-Teilnetz ins Log (kein Content-Ergebnis)
-Tools/importiere_npc.py                          → /Game/Art/People (NPC-Figur "Farmer": Skeletal Mesh + Animationen)
-Tools/pruefe_npc_assets.py, pruefe_npc_skelette.py, pruefe_npc_anim.py → Diagnose: NPC-Assets/Skelett-Zuordnung/Animationslaenge ins Log
-Tools/erzeuge_sounds.py, Tools/importiere_sounds.py → /Game/Audio (Schuss-, Einschlag-, Schritt- und Motorsound)
-```
+## Architektur
 
-Die Autoform steht an genau einer Stelle, in `Tools/Export/wagen-form.cjs`. Alle KI-Autos (fahrend wie geparkt, über `wagen.json` zur Laufzeit) und der fahrbare Wagen entstehen daraus. Wer die Form ändert, lässt `prepare-wagen.cjs` neu laufen.
-
-Die Exporter brauchen die Rohdaten des Spielprojekts „GTA LaLaBerg“ (`data/citydata.js` usw.), die nicht in diesem Repo liegen. `LALABERG_QUELLE` zeigt auf dessen Wurzel, ohne Angabe wird der Nachbarordner angenommen. Einmalig `npm install` in `Tools/Export`.
-
-Das Spiel lädt die Stadt aus den Assets. Liegen noch keine vor, baut es sie zur Laufzeit aus `stadt.json` – das ist langsamer, dient aber als Rückfall.
-
-## Prüfläufe
-
-Alle Prüfläufe starten mit `UnrealEditor.exe GTALaLaBerg.uproject -game -windowed -ResX=1600 -ResY=900 <Schalter> -log` und beenden sich selbst. Sie schreiben `LALABERG_…`-Zeilen in `Saved/Logs/GTALaLaBerg.log`, Bilder landen unter `Saved/Screenshots/WindowsEditor`.
-
-Das gepackte Spiel nimmt dieselben Schalter: `GTALaLaBerg.exe -windowed -ResX=1600 -ResY=900 -LaLaBergFahrtest`. Shipping schreibt kein Log. Der Fahrtest hält Ergebnis, Bildrate und Programmlaufzeit deshalb zusätzlich in `Saved/Logs/LaLaBerg-Test.txt` fest; im Paket liegt die Datei unter `%LOCALAPPDATA%\GTALaLaBerg\Saved`.
-
-| Schalter | Prüft |
-|---|---|
-| `-LaLaBergSmoke` | Die Stadt steht, die Figur steht auf Boden: `LALABERG_SMOKE PASS` |
-| `-LaLaBergFahrtest` | Figur tritt an den Wagen (Bild mit Einblendung), steigt über die E-Taste ein und fährt vier Sekunden Vollgas (Bild mit Tacho): `LALABERG_FAHRTEST PASS` ab 8 m Weg auf allen Rädern |
-| `-LaLaBergFoto` | Vier Ansichten: Hauptplatz, Straße, Wagen, Luftbild über dem Hauptplatz |
-| `-LaLaBergHimmelEchtzeit` | Himmelslicht aus Echtzeit-Aufnahme statt fester Cubemap (siehe Grenzen) |
-| `-LaLaBergNacht` | Setzt die Tageszeit sofort auf Mitternacht, zusammen mit `-LaLaBergFoto` zum Prüfen der Nachtfärbung ohne die vollen 600s eines Tageszyklus abzuwarten |
-| `-LaLaBergGpu` | Zusammen mit `-LaLaBergFahrtest`: GPU-Zeiten je Renderschritt ins Log |
-| `-LaLaBergWaffentest` | Rüstet nacheinander alle vier Waffenarten aus, je ein Bild des Ansichtsmodells direkt nach dem Ausrüsten (deckte die falsch gedrehte Werfer-Muendung auf, die im gemeinsamen Abschlussbild unterging), dann Schuss auf den fahrbaren Wagen und auf eine Hauswand: `LALABERG_WAFFENTEST PASS` ab einem gezählten Treffer |
-| `-LaLaBergVerkehrFoto` | Teleportiert zum ersten KI-Auto und zum ersten KI-Passanten, je ein Bild: `LALABERG_VERKEHRFOTO PASS autos=70 passanten=90` (Ampelzahl steht in `LALABERG_VERKEHR`) |
-| `-LaLaBergLechFoto` | Blick über den Lech aus der Luft, prüft `M_Lech` im Bild |
-| `-LaLaBergKoerperFoto` | Waagerechte Kamera auf freiem Feld statt des schräg auf den Wagen gerichteten Waffentests - prüft Körper/Arm/Waffe der Spielfigur ohne den verzerrenden Blickwinkel |
-| `-LaLaBergAmpelTest` | Prüft über einen vollen Ampelzyklus, ob zwei Ampeln derselben Kreuzungsgruppe je gleichzeitig Grün zeigen: `LALABERG_AMPELTEST PASS verstoesse=0 ampeln=44` |
-
-## Paket bauen
-
-```
-RunUAT.bat BuildCookRun -project=<Pfad>\GTALaLaBerg.uproject -noP4 -platform=Win64 -clientconfig=Shipping -build -cook -stage -pak -iostore -archive -archivedirectory=<Zielordner> -prereqs
+```text
+GTALaLaBerg/
+├── Config/
+│   ├── DefaultEngine.ini
+│   └── DefaultGame.ini
+├── Content/
+│   ├── Art/
+│   │   ├── People/
+│   │   ├── Vehicles/
+│   │   └── Waffen/
+│   ├── City/
+│   │   └── Sectors/
+│   └── SourceData/
+│       ├── Fahrzeug/
+│       ├── Orte/
+│       ├── Sectors/
+│       └── Verkehr/
+├── Docs/
+│   └── ChaosVehicle-ForumAnfrage.md
+├── Source/
+│   └── LaLaBerg/
+├── Tools/
+│   ├── Export/
+│   └── SectorPipeline/
+├── GTALaLaBerg.uproject
+└── README.md
 ```
 
-Das Ziel sollte außerhalb eines Cloud-Ordners liegen – das Paket ist mehrere hundert MB groß. Die Stadt und die Materialien werden nur über ihren Pfad geladen; `Config/DefaultGame.ini` zwingt sie deshalb in den Cook. Das Sektoren-Manifest wird als Datei mitgepackt.
+### Kernprinzipien
 
-## Leistung
+- **Native C++-Logik:** Gameplay, Streaming, Verkehr, UI, Fahrzeugübernahme, Waffen und Tageszeit sind im Modul `LaLaBerg` implementiert (`Source/LaLaBerg/`, keine Private/Public-Unterteilung).
+- **Asset-basierte Stadt:** Die Stadt wird regulär aus Unreal-Assets geladen; `stadt.json` dient als langsamer Laufzeit-Fallback.
+- **Sektorisierung:** Stadtgeometrie ist in 500-m-Sektoren aufgeteilt.
+- **Nanite:** Stadtgeometrie wird als Nanite-Static-Mesh geladen.
+- **Automatisierte Pipeline:** Die Geodatenaufbereitung wird mit Node.js- und Python-Tools reproduzierbar ausgeführt.
+- **Cook-Sicherheit:** Stadt- und Kunst-Assets werden über `DefaultGame.ini` explizit in den Cook aufgenommen (`DirectoriesToAlwaysCook`); die JSON-Quelldaten (Sektoren, Orte, Fahrzeug, Verkehr) werden zusätzlich unverändert mitgepackt (`DirectoriesToAlwaysStageAsUFS`), damit der Laufzeit-Fallback auch im Shipping-Build funktioniert.
+- **Diagnostik:** Funktions- und Bildtests laufen automatisiert über Kommandozeilenparameter.
 
-Gemessen am 11.09.2026 im Fahrtest mit `-LaLaBergGpu` (`ProfileGPU` mitten in der Fahrt), 1600×900, auf der AMD Radeon PRO Graphics des Entwicklungsrechners:
+***
 
-| | GPU je Bild | davon Schatten |
+## Datenpipeline
+
+```text
+Tools/Export/prepare-stadt.cjs
+    → Content/SourceData/stadt.json
+
+Tools/SectorPipeline/sectorize-city.cjs
+    → Content/SourceData/Sectors/*.json
+    → Content/SourceData/Sectors/manifest.json
+
+UnrealEditor-Cmd.exe
+    -run=LaLaBergImport
+    -Sector=alle
+    → /Game/City/Sectors/<id>/SM_<id>_<Klasse>
+
+Tools/baue_texturen.py
+Tools/baue_materialien.py
+    → /Game/Art
+
+Tools/Export/prepare-orte.cjs
+    → Content/SourceData/Orte/orte.json
+
+Tools/Export/prepare-wagen.cjs
+    → Content/SourceData/Fahrzeug/wagen.json
+
+Tools/Export/prepare-verkehr.cjs
+    → Content/SourceData/Verkehr/verkehr.json
+
+Tools/baue_farbklecks.py
+    → M_Farbklecks
+
+Tools/baue_waffenmetall.py
+Tools/erzeuge_waffentextur.py
+    → M_Waffenmetall
+
+Tools/importiere_waffen.py
+    → /Game/Art/Waffen
+
+Tools/importiere_npc.py
+    → /Game/Art/People
+
+Tools/erzeuge_sounds.py
+Tools/importiere_sounds.py
+    → /Game/Audio
+```
+
+### Datenquellen außerhalb des Repositories
+
+Die Exporter benötigen die Rohdaten des separaten Projekts **GTA LaLaBerg**. Diese Daten sind nicht Teil dieses Repositories.
+
+Die Umgebungsvariable `LALABERG_QUELLE` muss auf das Wurzelverzeichnis dieses Quellprojekts zeigen. Ohne gesetzte Variable wird ein benachbarter Ordner erwartet.
+
+```powershell
+$env:LALABERG_QUELLE = "D:\Projekte\GTA-LaLaBerg"
+```
+
+Danach müssen die Node-Abhängigkeiten der Export-Tools einmalig installiert werden:
+
+```powershell
+cd Tools\Export
+npm install
+```
+
+***
+
+## Schnellstart
+
+### Voraussetzungen
+
+- Unreal Engine **5.8**
+- Visual Studio 2022 mit C++ Desktop Development und Unreal-Unterstützung
+- Windows 10 oder Windows 11
+- Git und Git LFS
+- Node.js für die Export-Tools
+- Python für Textur-, Material- und Import-Tools
+- Optional: Epic Games Launcher bzw. Fab-Integration für **City Sample Vehicles**
+
+### Repository klonen
+
+```powershell
+git clone <repository-url>
+cd GTALaLaBerg
+git lfs pull
+```
+
+> Ohne `git lfs pull` fehlen große JSON-Dateien sowie Unreal-Assets wie `.uasset` und `.umap`.
+
+### City Sample Vehicles installieren
+
+Die 13 zusätzlichen Fahrzeugtypen sind nicht im Repository enthalten. Sie unterliegen der Fab Content License und dürfen nicht frei als Rohdaten weitergegeben werden.
+
+1. Projekt in Unreal Engine öffnen.
+2. Im Content Browser den Bereich **Fab** öffnen.
+3. Nach **City Sample Vehicles** suchen.
+4. Das kostenlose Paket zum Projekt hinzufügen.
+5. Alle Assets speichern.
+
+Falls `Content/CitySampleVehicles` nicht vorhanden ist, bleibt das Projekt funktionsfähig. Alle Fahrzeuge fallen automatisch auf das CarConcept-Modell zurück.
+
+### Projekt generieren und bauen
+
+```powershell
+UnrealVersionSelector.exe /projectfiles GTALaLaBerg.uproject
+```
+
+Danach die erzeugte Solution in Visual Studio öffnen und bauen:
+
+```text
+Configuration: Development Editor
+Platform: Win64
+Target: GTALaLaBergEditor
+```
+
+Alternativ über die Unreal-Engine-Buildwerkzeuge:
+
+```powershell
+<UE_ROOT>\Engine\Build\BatchFiles\Build.bat `
+  GTALaLaBergEditor Win64 Development `
+  -project="<PROJECT_ROOT>\GTALaLaBerg.uproject"
+```
+
+### Editor starten
+
+```powershell
+<UE_ROOT>\Engine\Binaries\Win64\UnrealEditor.exe `
+  GTALaLaBerg.uproject
+```
+
+***
+
+## Import- und Laufzeitregeln
+
+> **Wichtig: Import und Spiellauf niemals gleichzeitig ausführen.**
+
+Ein laufender Spielprozess mit `-game` hält Stadt-Assets geöffnet. Ein parallel laufender Import kann diese Assets nicht zuverlässig ersetzen und meldet in diesem Fall:
+
+```text
+LALABERG_STATIC_SAVE_FAILED
+```
+
+Am 11.09.2026 betraf dies drei Meshes im Sektor `S_N2_N3`.
+
+### Vor einem Spiellauf
+
+Sicherstellen, dass kein Importprozess läuft:
+
+```powershell
+Get-Process UnrealEditor-Cmd -ErrorAction SilentlyContinue
+```
+
+### Vor einem Import
+
+Sicherstellen, dass kein laufender Spielprozess aktiv ist:
+
+```powershell
+Get-CimInstance Win32_Process |
+    Where-Object {
+        $_.Name -eq "UnrealEditor.exe" -and
+        $_.CommandLine -match "-game"
+    } |
+    Select-Object ProcessId, CommandLine
+```
+
+### Stadtimport ausführen
+
+```powershell
+<UE_ROOT>\Engine\Binaries\Win64\UnrealEditor-Cmd.exe `
+  GTALaLaBerg.uproject `
+  -run=LaLaBergImport `
+  -Sector=alle `
+  -unattended `
+  -nop4 `
+  -log
+```
+
+Der Import erzeugt sektorisierte Static Meshes im folgenden Assetpfad:
+
+```text
+/Game/City/Sectors/<Sektor-ID>/SM_<Sektor-ID>_<Klasse>
+```
+
+***
+
+## Fahrzeuggenerierung
+
+Die Fahrzeugform ist zentral definiert:
+
+```text
+Tools/Export/wagen-form.cjs
+```
+
+Diese Definition wird verwendet für:
+
+- den fahrbaren Startwagen
+- fahrende KI-Autos
+- geparkte KI-Autos
+- die Laufzeitdaten in `wagen.json`
+
+Nach Änderungen an der Fahrzeugform muss der Export neu ausgeführt werden:
+
+```powershell
+node Tools\Export\prepare-wagen.cjs
+```
+
+Die generierten Fahrzeugdaten liegen anschließend hier:
+
+```text
+Content/SourceData/Fahrzeug/wagen.json
+```
+
+***
+
+## Automatisierte Prüfläufe
+
+Die Prüfläufe starten im Game-Modus, beenden sich selbst und schreiben strukturierte `LALABERG_…`-Zeilen in das Log.
+
+```powershell
+<UE_ROOT>\Engine\Binaries\Win64\UnrealEditor.exe `
+  GTALaLaBerg.uproject `
+  -game `
+  -windowed `
+  -ResX=1600 `
+  -ResY=900 `
+  -log `
+  <Schalter>
+```
+
+Logs:
+
+```text
+Saved/Logs/GTALaLaBerg.log
+```
+
+Screenshots:
+
+```text
+Saved/Screenshots/WindowsEditor
+```
+
+| Schalter | Zweck | Erwartetes Ergebnis |
 |---|---|---|
-| Kaskadenschatten (bis dahin) | 36,2 ms | 19,9 ms |
-| Virtual Shadow Maps (jetzt) | 19,3 ms | 1,2 ms |
+| `-LaLaBergSmoke` | Grundlegender Welttest | `LALABERG_SMOKE PASS` |
+| `-LaLaBergFahrtest` | Einsteigen und vier Sekunden Vollgas | `LALABERG_FAHRTEST PASS` ab 8 m Weg auf allen Rädern |
+| `-LaLaBergFoto` | Hauptplatz, Straße, Fahrzeug, Luftbild | Vier Screenshots |
+| `-LaLaBergHimmelEchtzeit` | Test der Echtzeit-Himmelsaufnahme | Diagnose im Log/Bild |
+| `-LaLaBergNacht` | Setzt die Tageszeit auf Mitternacht | Für Nachtbildtests |
+| `-LaLaBergGpu` | GPU-Zeiten pro Renderphase | Profilingdaten im Log |
+| `-LaLaBergWaffentest` | Alle Waffen plus Treffer auf Fahrzeug und Wand | `LALABERG_WAFFENTEST PASS` |
+| `-LaLaBergVerkehrFoto` | Screenshot von erstem KI-Auto und KI-Passanten | `LALABERG_VERKEHRFOTO PASS autos=70 passanten=90` |
+| `-LaLaBergLechFoto` | Luftaufnahme über dem Lech | Prüft `M_Lech` |
+| `-LaLaBergKoerperFoto` | Prüft Figur, Arm und Waffenhaltung | Screenshot |
+| `-LaLaBergAmpelTest` | Prüft Ampelkonflikte über vollen Zyklus | `LALABERG_AMPELTEST PASS verstoesse=0 ampeln=44` |
 
-Die Kaskadenschatten rasterten die ganze Nanite-Stadt je Kaskade neu, viermal pro Bild. VSM sind dafür gebaut. Mit einer RTX 3060 wurde noch nicht gemessen.
+### Beispiel: Fahrtest mit GPU-Profiling
+
+```powershell
+<UE_ROOT>\Engine\Binaries\Win64\UnrealEditor.exe `
+  GTALaLaBerg.uproject `
+  -game `
+  -windowed `
+  -ResX=1600 `
+  -ResY=900 `
+  -LaLaBergFahrtest `
+  -LaLaBergGpu `
+  -log
+```
+
+***
+
+## Packaging
+
+Für einen Shipping-Build wird `BuildCookRun` verwendet.
+
+```powershell
+<UE_ROOT>\Engine\Build\BatchFiles\RunUAT.bat BuildCookRun `
+  -project="<PROJECT_ROOT>\GTALaLaBerg.uproject" `
+  -noP4 `
+  -platform=Win64 `
+  -clientconfig=Shipping `
+  -build `
+  -cook `
+  -stage `
+  -pak `
+  -iostore `
+  -archive `
+  -archivedirectory="<OUTPUT_DIRECTORY>" `
+  -prereqs
+```
+
+Das Zielverzeichnis sollte außerhalb von OneDrive, Dropbox oder anderen Cloud-Sync-Ordnern liegen. Der Build umfasst mehrere hundert Megabyte.
+
+Der gepackte Build unterstützt dieselben Testschalter:
+
+```powershell
+GTALaLaBerg.exe `
+  -windowed `
+  -ResX=1600 `
+  -ResY=900 `
+  -LaLaBergFahrtest
+```
+
+Da Shipping-Builds nicht zwingend ein Unreal-Log schreiben, werden Ergebnis, Bildrate und Laufzeit zusätzlich hier protokolliert:
+
+```text
+Saved/Logs/LaLaBerg-Test.txt
+```
+
+Im installierten Paket liegt dieser Pfad typischerweise unter:
+
+```text
+%LOCALAPPDATA%\GTALaLaBerg\Saved\Logs\LaLaBerg-Test.txt
+```
+
+***
+
+## Performance
+
+Messung vom **11.09.2026** im Fahrtest bei 1600 × 900 Pixeln auf der AMD Radeon PRO Graphics des Entwicklungsrechners.
+
+| Schattenmodus | GPU-Zeit pro Bild | Schattenanteil |
+|---|---:|---:|
+| Cascaded Shadow Maps | 36,2 ms | 19,9 ms |
+| Virtual Shadow Maps | 19,3 ms | 1,2 ms |
+
+Der Wechsel auf Virtual Shadow Maps reduzierte die GPU-Zeit deutlich. Klassische Kaskadenschatten rasterten die gesamte Nanite-Stadt pro Kaskade erneut. VSM ist für große, dynamisch beleuchtete Nanite-Szenen wesentlich besser geeignet.
+
+Für eine RTX 3060 liegen derzeit noch keine Vergleichsmessungen vor.
+
+***
+
+## Rendering und Tageszeit
+
+Das Projekt nutzt Lumen für Global Illumination und Reflexionen:
+
+```ini
+r.DynamicGlobalIlluminationMethod=1
+r.ReflectionMethod=1
+```
+
+Die Tageszeit wird in `ALaLaBergGameMode::AktualisiereTageszeit` gesteuert.
+
+- Ein kompletter Tag-Nacht-Zyklus dauert zehn Minuten.
+- Die Sonne folgt einer künstlichen, aber visuell nachvollziehbaren Bahn.
+- Elevation wird über eine Kosinuskurve um die Mittagszeit modelliert.
+- Azimut ist bewusst vereinfacht und nicht astronomisch exakt.
+- Sonnenintensität, Sonnenfarbe, Skylight-Intensität und Skylight-Farbe ändern sich dynamisch.
+- Die Auto Exposure folgt einem absichtlich engen Helligkeitsfenster.
+- Nachts wandert dieses Fenster auf ein dunkleres Zielniveau, damit Innenhöfe, Torbögen und Straßenzüge nicht unnatürlich hell aufgeblendet werden.
+
+Die Skylight-Cubemap bleibt aktuell eine feste Tagesaufnahme. Die Echtzeitaufnahme liefert in dieser Welt bislang kein brauchbares Bild. Die Ausgabe wird deshalb dynamisch abgedunkelt und blau eingefärbt, jedoch bleibt die zugrundeliegende Cubemap sichtbar tagesbasiert.
+
+***
 
 ## Bekannte Grenzen
 
-- **Lumen aktiv, Tag-Nacht-Wechsel läuft, aber nur der Sonnenstand:** Seit die Stadt aus echten Nanite-StaticMeshes besteht (nicht mehr als ProceduralMesh zur Laufzeit), liefert Lumen über den Nanite-Surface-Cache saubere globale Beleuchtung ohne klassische Mesh-Distanzfelder (`r.DynamicGlobalIlluminationMethod=1`, `r.ReflectionMethod=1` in `DefaultEngine.ini`, per `-LaLaBergFoto` bestätigt). `ALaLaBergGameMode::AktualisiereTageszeit` dreht die Sonne über eine volle Umdrehung alle zehn Minuten (Elevation nach einer Kosinuskurve um den Mittag, fester Azimut - keine echte Sonnenbahn), passt Stärke und Farbe der Sonne sowie die Himmelslicht-Stärke an. Das enge Automatikfenster der Belichtung (`AutoExposureMinBrightness`/`-MaxBrightness`, bewusst schmal gegen das Aufblenden beim Blick in einen Torbogen) wandert mit derselben Kurve nach unten - dieselbe Fensterbreite, nur um ein dunkleres Ziel herum, sonst würde die Automatik nachts vergeblich gegen ein taghelles Ziel hochregeln und die Stadt bliebe unnatürlich hell. Das Himmelslicht selbst bleibt eine feste Cubemap-Aufnahme (die Echtzeit-Aufnahme liefert in dieser Welt weiterhin kein Bild, Ursache offen), aber `USkyLightComponent::SetLightColor` färbt ihre Ausgabe zusätzlich zur Stärke ein - mit derselben Warm-zu-Neutral-zu-Nachtblau-Kurve wie die Sonne, sodass das Umgebungslicht nachts spürbar dunkler und bläulicher wirkt statt tagestypisch hell zu bleiben (per `-LaLaBergFoto -LaLaBergNacht` bestätigt: der Himmel über dem Hauptplatz ist bei Mitternacht fast schwarz statt tagesblau). Das Cubemap-*Bild* selbst zeigt weiterhin eine Tagesszene, nur eingefärbt und abgedunkelt - ein Restunterschied zu einer echten Nacht-Himmelstextur bleibt. Nur die verbliebenen ProceduralMeshComponents (Spielfigur, KI-Passanten-Kasten-Rig, CarConcept-Kasten-Fallback) liefern selbst keine Distanzfelder und tragen nichts zur Verschattung bei.
-- **Drei echte Figuren mit Farb- und Größenvielfalt bei Spielfigur und KI-Passanten:** Spielfigur und jeder KI-Passant wählen zufällig eine von drei lizenzierten, echt geriggten CC0-Modellen aus demselben Paket (Quaternius, siehe „Datenquellen und Lizenzen“) mit echter Idle-/Walk-Animation statt des Kasten-Rigs - "Farmer" (modular, vier Teile + externe Animation) oder "Casual"/"Worker" (je ein vollständiges Mesh mit eingebauten Animationen). Kleidung und Statur variieren zusätzlich: `FaerbeSkelett` erzeugt je Material-Slot (außer Haut/Augen/Augenbrauen/Schnurrbart) eine dynamische Materialinstanz und setzt deren `DiffuseColor` (ein vom Interchange-Import automatisch angelegtes Phong-Material, kein fest gebackenes Bild) auf eine zufällige Farbe aus derselben Palette wie der Kasten-Rig; dieselbe Größenstreuung wie beim Kasten-Rig (`Groesse`, 1,60-1,84 m) skaliert bei KI-Passanten auch das Skelett (`SetRelativeScale3D`). Fehlt die per Zufall gewählte Figur in einem Checkout, fällt diese Figur auf den handgebauten Gelenk-Rig zurück (`LaLaBergKoerperTeile.h`, keine UAnimSequence) statt eine andere zu probieren. Der rechte Arm der Spielfigur haelt die Waffe in einer festen Pose, ohne sich beim Zielen zu beugen. Waffen und Fahrzeuge sind eigene, lizenzierte Meshes (CC0/CC BY 4.0/Fab). Kein Missionssystem.
-- **Fahrzeug-Detailgrad ist ein Sichtweiten-Kompromiss, kein Filmqualitäts-Fuhrpark:** Das CarConcept-Modell ist ein handmodelliertes, aber kein fotoreales Asset - für Detailgrad auf dem Niveau eines aktuellen Rennspiels bräuchte es eigens angefertigte, hochauflösende Fahrzeugmodelle mit Textur-Atelier, das übersteigt diesen Rahmen. Zusätzlich zeigen nur Autos innerhalb von 80 m um den Spieler das Detailmodell (`LOD_ABSTAND` in `LaLaBergVerkehrsauto.cpp`) - alle KI-Autos gleichzeitig im Detailmodell drückten die Bildrate im Test auf 2 fps. Weiter entfernte Autos springen beim Über-/Unterschreiten der Schwelle sichtbar zwischen Kasten und Detailmodell um, es gibt keine weichen Zwischenstufen. Der Kasten selbst ist bei den 1078 geparkten Autos ebenfalls gepoolt (`ALaLaBergKastenPool`, eine Instanz je Lackfarbe statt eines eigenen Netzes je Auto) - ohne diesen Pool fiel die Bildrate im Fahrtest von 26 auf 17 fps.
-- **Ampeln jetzt auch an echten Kreuzungsknoten gruppiert, Phasenteilung bleibt geometrisch:** `Tools/Export/prepare-verkehr.cjs` gruppiert die 44 Ampeln bevorzugt über denselben echten Straßengraphen wie die Vorfahrt unten (`city.graph`, Knoten mit ≥ 3 angeschlossenen Straßen) - eine Ampel an ihrem nächsten echten Kreuzungsknoten erkannt (≤ 60 m) teilt dessen Gruppe mit jeder anderen Ampel am selben oder einem nahen (≤ 30 m) Knoten; nur Ampeln ohne nahen echten Knoten (z. B. ein Fußgängerüberweg mitten auf einer Strecke) fallen auf die alte Abstandsgruppierung (45 m) zurück. Das ergibt 23 statt vormals 17 Gruppen - präziser, aber nicht perfekt: mindestens ein Fall bleibt fälschlich getrennt (zwei Ampeln 5,5 m auseinander, deren jeweils nächster Graphknoten zufällig weiter als 30 m auseinanderliegt). Die Phasenteilung innerhalb einer Gruppe bleibt geometrisch: zwei Phasen abwechselnd auf Grün, nach der Fahrbahnachse (`gier`) - ungefähr gleiche Achse = dieselbe Phase, ungefähr senkrechte Achse = die andere. Innerhalb einer Kreuzung schaltet nie mehr als eine Phase gleichzeitig auf Grün (`LaLaBergAmpel::SetzeGruppe`, geprüft über `-LaLaBergAmpelTest`: weiterhin 0 Verstöße über einen vollen Zyklus). Für unsignalisierte Kreuzungen nutzt `prepare-verkehr.cjs` denselben Graphen samt amtlicher Straßenklasse (`roads[].c`) für echtes Vorfahrtsrecht: ein KI-Auto von der unwichtigeren Straße bremst bis zum Stillstand, wenn ein anderes von der wichtigeren naht; bei gleicher Klasse zählt der Abstand zur Kreuzung als Näherung für die Ankunftsreihenfolge (näher dran = zuerst da), nur bei echtem Gleichstand entscheidet ersatzweise Rechts-vor-Links (`ALaLaBergVerkehrsauto::BremseVorKreuzung`). Kein echtes Queue-System je Kreuzung (kein Anhalten-und-Warten-bis-wirklich-frei als eigener Zustand, nur ein kontinuierliches Vorrang-Bremsen wie bei den anderen Bremsfunktionen) und keine Fahrspur-Zuordnung – eine breite Kreuzung mit mehr als vier Armen kann danebenliegen.
-- **Keine echte Fahrspurbreite, aber Fahrspurtrennung:** KI-Autos fahren jetzt dauerhaft rechts versetzt von der Straßenmitte (`SPUR_VERSATZ` in `LaLaBergVerkehrsauto.cpp`) statt exakt auf ihr – da dieselbe Route in beide Richtungen abgefahren wird (`FLaLaBergWegfolger` kehrt am Ende einfach um) und der Versatz relativ zur jeweils aktuellen Fahrtrichtung gilt, landet Gegenverkehr von selbst auf der jeweils anderen Fahrbahnseite. Kein Blick auf die tatsächliche Straßenbreite aus den Quelldaten – auf sehr schmalen Straßen kann der feste Versatz zu weit an den Rand führen. Der fahrbare Wagen selbst hält weiterhin keine Spur. KI-Autos und KI-Passanten bremsen zusätzlich vor einem gleichartigen Hindernis voraus und vor dem Spieler (zu Fuß oder im Wagen); steht das Hindernis, weichen sie mit einem zusätzlichen, temporären Versatz weiter aus, statt nur anzuhalten – vor einer roten Ampel oder einer wichtigeren Kreuzung bleibt es dagegen beim Anhalten.
+### Chaos Vehicles
 
-## Datenquellen und Lizenzen
+Ein Umbau auf echte Chaos-Vehicle-Physik wurde begonnen, jedoch nicht übernommen - der fahrbare Wagen läuft weiterhin über die ursprüngliche Federstrahl-Physik (vier Strahlen).
 
-Code, Konfiguration, Werkzeuge und Materialien stehen unter der [MIT-Lizenz](LICENSE). Die Stadtdaten nicht – für sie gilt:
+Untersucht wurde `UChaosWheeledVehicleMovementComponent` mit:
 
-- **Straßen, Plätze, Namen, Gebäudeumrisse, Bäume:** © OpenStreetMap-Mitwirkende, [ODbL 1.0](https://opendatacommons.org/licenses/odbl/). Die daraus abgeleiteten Stadtdaten in `Content/SourceData` und die Stadt-Assets in `Content/City` stehen ebenfalls unter der ODbL.
-- **Gebäudehöhen und Dachformen (LoD2):** Bayerische Vermessungsverwaltung – [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/); Daten für GTA LaLaBerg bearbeitet.
-- **Schmalzturm:** Beschreibung nach [Wikipedia](https://de.wikipedia.org/wiki/Schmalzturm_(Landsberg_am_Lech)); die Farbbänder des Helms sind eine Annäherung.
-- **Fahrzeugmodell „Car Concept“** (`Content/SourceData/Vehicles`, `Content/Art/Vehicles`): [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), siehe `CarConcept-LICENSE.md` im selben Ordner.
-- **„City Sample Vehicles“** (`Content/CitySampleVehicles`, 13 Fahrzeugtypen): Epic Games, kostenlos über Fab („Free For Life“) - anders als die übrigen Inhalte hier keine CC-Lizenz, sondern die Fab-Content-Lizenz (Nutzung innerhalb eigener Unreal-Engine-Projekte, keine freie Weitergabe der Rohdateien). Deshalb **nicht** Teil dieses Repos (`.gitignore`) - wer das Projekt klont, holt sich das Paket selbst kostenlos über den Fab-Reiter im Editor (Content Browser → Fab → „City Sample Vehicles“ suchen → „Zum Projekt hinzufügen“ → „Alles speichern“) und bekommt die Fahrzeugvielfalt dann automatisch dazu. Fehlt der Ordner, fällt jedes Auto auf das CarConcept-Modell zurück (`LaLaBergWagenTypen::BaueTeile` liefert dann einfach `false`).
-- **Waffenmodelle** (`Content/SourceData/Waffen`, `Content/Art/Waffen`): [Public Domain (CC0 1.0)](https://creativecommons.org/publicdomain/zero/1.0/), Quaternius/Toon Shooter Game Kit, siehe `LIZENZ.md` im selben Ordner.
-- **NPC-Figur „Farmer"** (`Content/SourceData/People`, `Content/Art/People`): [Public Domain (CC0 1.0)](https://creativecommons.org/publicdomain/zero/1.0/), Quaternius/Ultimate Modular Men Pack, siehe `LIZENZ.md` im selben Ordner.
-- **Git LFS:** `.uasset`, `.umap` und die großen JSON-Dateien liegen in Git LFS. Nach dem Klonen `git lfs pull`.
+- Motor- und Getriebekennfeldern
+- Vorderradlenkung
+- Hinterradantrieb
+- Radkontaktprüfung
+- Federkompression
+- Federkraft von ungefähr 125.000 N
+- Reifenreibung von 0,70
+- Antriebsmoment von ungefähr 986 Nm
+
+Die Radmesswerte waren plausibel, die Karosserie beschleunigte jedoch nicht. Auch eine Verzehnfachung des Drehmoments änderte daran nichts.
+
+Zusätzliche Engine-Probleme mussten bereits umgangen werden:
+
+- `CanCreateVehicle()` verlangt in UE 5.8 offenbar einen Bone-Namen pro Rad, selbst wenn kein Skeletal Mesh verwendet wird.
+- Die Radgeometrie musste an die Rumpf-Kollisionsbox angepasst werden.
+- Die Ursache der fehlenden Beschleunigung liegt vermutlich tiefer im experimentellen ChaosVehiclesPlugin oder in einer nicht verbundenen Komponente des Setups.
+
+Eine vorbereitete Community-Anfrage befindet sich unter:
+
+```text
+Docs/ChaosVehicle-ForumAnfrage.md
+```
+
+### Fahrzeug-LOD
+
+Der Fahrzeug-Detailgrad ist bewusst auf Echtzeit-Performance optimiert.
+
+- Detailfahrzeuge sind nur innerhalb von 80 m sichtbar.
+- Beim Über- oder Unterschreiten dieser Distanz ist ein sichtbarer Wechsel zwischen Detail- und Fernmodell möglich.
+- Es gibt derzeit keine weich überblendeten Fahrzeug-LODs.
+- Die Fahrzeugmodelle sind funktional und lizenzkonform, aber nicht auf Film- oder Rennspielniveau texturiert.
+
+### Verkehrsmodell
+
+Die Verkehrslogik priorisiert skalierbares, glaubwürdiges Verhalten gegenüber vollständiger Verkehrssimulation.
+
+- Keine echte Fahrspurbreite aus den Quelldaten.
+- Kein Spurwechselmodell.
+- Kein Queue-System pro Kreuzung.
+- Keine präzise Fahrspurgeometrie für komplexe Kreuzungen.
+- Breite Kreuzungen mit mehr als vier Armen können geometrisch ungenau aussehen.
+- Einzelfälle können trotz Graph-Gruppierung in getrennten Ampelgruppen landen.
+- Der fahrbare Wagen besitzt aktuell keine Spurhalteassistenz oder Fahrspurbindung.
+
+### Figuren
+
+- Der rechte Arm hält die Waffe aktuell in einer festen Pose.
+- Das Arm-Rig reagiert nicht dynamisch auf Zielrichtung.
+- Fehlt ein zufällig ausgewähltes Skeletal Asset, wird nicht auf eine andere verfügbare Figur ausgewichen, sondern auf das selbstgebaute Fallback-Rig zurückgegriffen.
+- Das Fallback-Rig trägt nicht zu klassischen Mesh-Distanzfeldern bei.
+
+### Kein Missionssystem
+
+Das Projekt enthält derzeit kein Missions-, Quest-, Polizei-, Economy- oder Persistenzsystem. Der Fokus liegt auf Stadtmodell, Exploration, Interaktion, technischer Pipeline und Performance.
+
+***
+
+## Zusammenarbeit mit KI-Assistenten
+
+Codex und Claude arbeiten beide im selben Projekt, verfügen aber über **keine automatische Nachrichtenverbindung**.
+
+Daher gilt:
+
+1. Vor jeder Änderung an einer bestehenden Datei den aktuellen Inhalt lesen.
+2. Änderungen anderer Assistenten nicht überschreiben oder stillschweigend zurücksetzen.
+3. Im Arbeitsbericht klar dokumentieren:
+   - welche Dateien geändert wurden,
+   - welche bestehende Logik berücksichtigt wurde,
+   - welche Auswirkungen oder offenen Punkte bestehen.
+4. Importläufe und Spielläufe koordinieren.
+5. Niemals `UnrealEditor-Cmd.exe -run=LaLaBergImport` parallel zu einem laufenden `UnrealEditor.exe -game` starten.
+
+Empfohlene Berichtsvorlage:
+
+```markdown
+## Änderung
+
+- Geänderte Datei: `Source/LaLaBerg/LaLaBergVerkehrsauto.cpp`
+- Vorheriger Stand gelesen: Ja
+- Bestehende Änderung anderer Assistenten berücksichtigt: Ja
+- Änderung: Bremsdistanz vor Ampeln angepasst.
+- Auswirkungen: Nur KI-Autos betroffen; Fahrtest und Ampeltest erneut ausführen.
+- Offene Punkte: Verhalten an mehrarmigen Kreuzungen prüfen.
+```
+
+***
+
+## Lizenzen und Datenquellen
+
+Der Quellcode, die Konfiguration, Werkzeuge und selbst erzeugten Materialien stehen unter der [MIT-Lizenz](LICENSE).
+
+### OpenStreetMap
+
+Straßen, Plätze, Namen, Gebäudeumrisse und Bäume stammen aus OpenStreetMap.
+
+- Copyright: © OpenStreetMap-Mitwirkende
+- Lizenz: [ODbL 1.0](https://opendatacommons.org/licenses/odbl/)
+- Abgeleitete Daten in `Content/SourceData` und Stadt-Assets in `Content/City` stehen ebenfalls unter ODbL.
+
+### Amtliche LoD2-Gebäude
+
+Gebäudehöhen und Dachformen basieren auf LoD2-Daten der Bayerischen Vermessungsverwaltung.
+
+- Lizenz: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
+- Die Daten wurden für GTALaLaBerg bearbeitet.
+
+### Schmalzturm
+
+Die Beschreibung orientiert sich an der [Wikipedia-Seite zum Schmalzturm](https://de.wikipedia.org/wiki/Schmalzturm_(Landsberg_am_Lech)).
+
+- Die farbigen Helm-Bänder sind eine visuelle Annäherung.
+- Sie stellen keine verbindliche historische Rekonstruktion dar.
+
+### CarConcept
+
+Das Fahrzeugmodell `Car Concept` liegt unter:
+
+```text
+Content/SourceData/Vehicles
+Content/Art/Vehicles
+```
+
+- Lizenz: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
+- Zusätzliche Hinweise: `Content/SourceData/Vehicles/CarConcept-LICENSE.md`
+
+### City Sample Vehicles
+
+Die 13 zusätzlichen Fahrzeugtypen stammen aus Epics kostenlosem Fab-Paket **City Sample Vehicles**.
+
+- Lizenz: Fab Content License
+- Nur innerhalb eigener Unreal-Engine-Projekte nutzbar
+- Nicht Bestandteil dieses Repositories
+- Kein freies Weitergeben der Rohassets
+- Bei fehlendem Ordner `Content/CitySampleVehicles` wird automatisch CarConcept als Fallback verwendet
+
+### Waffenmodelle
+
+```text
+Content/SourceData/Waffen
+Content/Art/Waffen
+```
+
+- Quelle: Quaternius, Toon Shooter Game Kit
+- Lizenz: [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)
+- Detailhinweise: `Content/SourceData/Waffen/LIZENZ.md`
+
+### NPC-Modelle
+
+```text
+Content/SourceData/People
+Content/Art/People
+```
+
+- Farmer, Casual, Worker: Quaternius, Ultimate Modular Men Pack
+- Lizenz: [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/)
+- Detailhinweise: `Content/SourceData/People/LIZENZ.md`
+
+***
+
+## Git LFS
+
+Unreal-Assets und große Datenbestände werden über Git LFS verwaltet.
+
+```text
+.uasset
+.umap
+große JSON-Dateien
+```
+
+Nach jedem frischen Clone ist zwingend auszuführen:
+
+```powershell
+git lfs pull
+```
+
+Prüfen, ob LFS verfügbar ist:
+
+```powershell
+git lfs version
+```
+
+Falls Git LFS noch nicht installiert ist:
+
+```powershell
+git lfs install
+```
+
+***
+
+## Roadmap
+
+Mögliche nächste Ausbaustufen:
+
+- bessere LOD-Übergänge für Fahrzeuge
+- dynamische Echtzeit-Skylight-Capture oder echte Nacht-Cubemap
+- stabiler Chaos-Vehicle-Physics-Ansatz mit Skeletal Vehicle Mesh
+- Spurbreiten aus Straßendaten ableiten
+- erweiterte Kreuzungslogik mit Warteschlangen
+- realistischere Fahrzeugnavigation und Abbiegeverhalten
+- Arm-IK und Zielanimation für die Spielfigur
+- weichere Fußgängeranimationen und Verhaltenszustände
+- weitere Stadtmöblierung und Interaktionen
+- Profiling auf RTX- und Gaming-Hardware
+- optionale Missions- oder Sandbox-Systeme
+
+***
+
+## Hinweise
+
+GTALaLaBerg ist ein technisch-kreatives Projekt zur Visualisierung, Erkundung und spielerischen Interaktion mit einem digitalen Stadtmodell von Landsberg am Lech. Es besteht keine Verbindung zu Rockstar Games, Grand Theft Auto oder deren Markeninhabern.
+
+Die Nutzung der Bezeichnung „GTA" im Projektnamen beschreibt die spielerische Open-World-Inspiration und stellt keine offizielle Zugehörigkeit dar.
