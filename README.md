@@ -1,6 +1,6 @@
 # GTALaLaBerg – Unreal 5.8
 
-Landsberg am Lech im Maßstab 1:1 als begehbare und befahrbare Stadt. Dies ist das native Unreal-Projekt. Der Projektname und der vollständige Projektpfad enthalten **keine Leerzeichen** – das bleibt so.
+Landsberg am Lech im Maßstab 1:1 als begehbare und befahrbare Stadt. Dies ist das native Unreal-Projekt. 
 
 - Projektdatei: `GTALaLaBerg.uproject`
 - Editor-Buildtarget: `GTALaLaBergEditor`, Spiel-Buildtarget: `GTALaLaBerg`
