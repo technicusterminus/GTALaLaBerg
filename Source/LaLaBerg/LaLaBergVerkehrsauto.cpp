@@ -37,6 +37,34 @@ namespace {
   AusBremse = Naechstes ? FMath::Clamp((BesteDist - 260.0f) / 640.0f, 0.05f, 1.0f) : 1.0f;
   return Naechstes;
  }
+ // Vor einer Kurve langsamer werden. Seit eine Fahrt ueber den Strassen-
+ // graphen mehrere Strassen verkettet (siehe Tools/Export/prepare-verkehr.cjs),
+ // biegt ein Auto an Kreuzungen wirklich ab - mit voller Reisegeschwindigkeit
+ // durch einen 90-Grad-Bogen sieht das aus, als schnalzte es um die Ecke:
+ // die Bewegung ist kinematisch, es gibt also keine Fliehkraft, die von
+ // selbst bremsen wuerde. Summiert die Richtungsaenderung der naechsten rund
+ // 25 m Route auf und bremst proportional dazu ab.
+ float BremseInKurve(const FLaLaBergWegfolger& Weg) {
+  if (!Weg.Gueltig()) return 1.0f;
+  constexpr float VORAUSSCHAU = 2500.0f;   // cm
+  float Strecke = 0.0f, Summe = 0.0f;
+  FVector Letzte = FVector::ZeroVector;
+  for (int32 i = Weg.Index; Strecke < VORAUSSCHAU; i += Weg.Richtung) {
+   const int32 Naechster = i + Weg.Richtung;
+   if (!Weg.Route.IsValidIndex(i) || !Weg.Route.IsValidIndex(Naechster)) break;
+   const FVector Segment = Weg.Route[Naechster] - Weg.Route[i];
+   const float Laenge = Segment.Size2D();
+   if (Laenge < 1.0f) continue;
+   const FVector Richtung = (Segment / Laenge);
+   if (!Letzte.IsNearlyZero())
+    Summe += FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(
+     FVector::DotProduct(Letzte, Richtung), -1.0f, 1.0f)));
+   Letzte = Richtung;
+   Strecke += Laenge;
+  }
+  // 90 Grad Richtungsaenderung (eine volle Abbiegung) bremsen auf 45 Prozent.
+  return FMath::Clamp(1.0f - Summe / 164.0f, 0.45f, 1.0f);
+ }
  // Ist die Gegenspur frei genug zum Ueberholen? Jedes andere Auto (ausser
  // dem zu ueberholenden selbst) innerhalb der Sicherheitsreichweite grob
  // voraus zaehlt als Hindernis - unabhaengig davon, ob es entgegenkommt
@@ -208,6 +236,12 @@ void ALaLaBergVerkehrsauto::SetzeLack(const FLinearColor& Farbe) {
  if (bNetzGebaut) LaLaBergWagenForm::BaueNetz(Netz, Lack);
 }
 
+void ALaLaBergVerkehrsauto::SetzeSpurdaten(const TArray<float>& BreitenM, const TArray<int32>& Klassen) {
+ BreiteJeWegpunkt.Reset(BreitenM.Num());
+ for (float BreiteM : BreitenM) BreiteJeWegpunkt.Add(BreiteM * 100.0f);
+ KlasseJeWegpunkt = Klassen;
+}
+
 void ALaLaBergVerkehrsauto::SetzeRoute(const TArray<FVector>& Punkte, float TempoKmh) {
  Weg.Route = Punkte;
  Tempo = TempoKmh / 3.6f;
@@ -288,7 +322,8 @@ void ALaLaBergVerkehrsauto::Tick(float Zeit) {
   float BremseAndauto = 1.0f;
   ALaLaBergVerkehrsauto* Voraus = NaechstesAutoVoraus(this, Ort, Vorwaerts, BremseAndauto);
   const float BremseAmpel = BremseVorAmpel(Ort, Vorwaerts);
-  const float BremseKreuzung = BremseVorKreuzung(this, Ort, Vorwaerts, EigeneKlasse, MeineKreuzungen);
+  const float BremseKreuzung = BremseVorKreuzung(this, Ort, Vorwaerts, HoleKlasse(), MeineKreuzungen);
+  const float BremseKurve = BremseInKurve(Weg);
 
   // Ueberholen starten: ein spuerbar langsameres oder stehendes Auto direkt
   // voraus (BremseAndauto < 0.75 - eine erste Kalibrierung mit 0.55 loeste
@@ -297,7 +332,7 @@ void ALaLaBergVerkehrsauto::Tick(float Zeit) {
   // anstehende Ampel oder Vorfahrt (sonst nur, um in der Gegenspur ebenfalls
   // anzuhalten) und eine ueber die Sicherheitsreichweite freie Gegenspur.
   if (!Ueberholt.IsValid() && Voraus
-      && StrassenBreite >= UEBERHOL_MINDESTBREITE && BremseAndauto < 0.75f
+      && BreiteJetzt() >= UEBERHOL_MINDESTBREITE && BremseAndauto < 0.75f
       && BremseAmpel > 0.8f && BremseKreuzung > 0.8f && !bGestoert
       && WegFreiZumUeberholen(this, Voraus, Ort, Vorwaerts, UEBERHOL_SICHERHEIT))
    Ueberholt = Voraus;
@@ -307,14 +342,14 @@ void ALaLaBergVerkehrsauto::Tick(float Zeit) {
   if (Ueberholt.IsValid()) {
    const float VorausDist = FVector::DotProduct(Ueberholt->GetActorLocation() - Ort, Vorwaerts);
    if (VorausDist < -UEBERHOL_ABSTAND_FREI || BremseAmpel < 0.8f || BremseKreuzung < 0.8f
-       || StrassenBreite < UEBERHOL_MINDESTBREITE)
+       || BreiteJetzt() < UEBERHOL_MINDESTBREITE)
     Ueberholt = nullptr;
   }
   // Waehrend des Ueberholens nicht mehr fuer das ueberholte Auto selbst
   // bremsen - sonst kaeme der Wagen trotz Ausscheren kaum naeher heran.
   const bool bUeberholtGerade = Ueberholt.IsValid() && Ueberholt.Get() == Voraus;
   const float BremseObjekt = FMath::Min(bUeberholtGerade ? 1.0f : BremseAndauto, BremseVorSpieler(GetWorld(), Ort, Vorwaerts));
-  const float Bremse = FMath::Min(FMath::Min(BremseObjekt, BremseAmpel), BremseKreuzung);
+  const float Bremse = FMath::Min(FMath::Min(BremseObjekt, BremseAmpel), FMath::Min(BremseKreuzung, BremseKurve));
   const FVector Richtung = Weg.Bewege(Ort, Tempo * Zeit * (bGestoert ? 0.08f : 1.0f) * Bremse);
   SetActorLocation(Ort);
   if (!Richtung.IsNearlyZero()) SetActorRotation(FMath::RInterpTo(GetActorRotation(), Richtung.Rotation(), Zeit, 5.0f));
@@ -331,8 +366,9 @@ void ALaLaBergVerkehrsauto::Tick(float Zeit) {
   // weniger Platz zum Ausweichen, statt ueber den Rand hinauszufahren.
   // Beim Ueberholen zaehlt stattdessen die Gegenspur (derselbe Abstand,
   // nur auf der anderen Seite) statt des Ausweich-Zuschlags.
-  const float SpurVersatz = StrassenBreite * 0.25f;
-  const float Rand = FMath::Max(0.0f, StrassenBreite * 0.5f - HALBE_WAGENBREITE);
+  const float BreiteHier = BreiteJetzt();
+  const float SpurVersatz = BreiteHier * 0.25f;
+  const float Rand = FMath::Max(0.0f, BreiteHier * 0.5f - HALBE_WAGENBREITE);
   const float SeitZiel = Ueberholt.IsValid()
    ? FMath::Clamp(-SpurVersatz, -Rand, Rand)
    : FMath::Min(SpurVersatz + (BremseObjekt < 0.9f ? MAX_SEITVERSATZ : 0.0f), Rand);

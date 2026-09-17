@@ -120,13 +120,231 @@ function findeKreuzungen(p) {
   return treffer;
 }
 
-const autos = [];
-for (const r of KANDIDATEN.slice(0, AUTO_ROUTEN)) {
-  const punkte = resample(r.p, 9);
-  if (punkte.length < 3) continue;
-  const weg = punkte.map(([x, z]) => [ux(x), uz(z), Math.round(boden(x, z) * M)]);
-  autos.push({ w: Math.max(3.0, r.w || 3.0), klasse: r.c ?? 3, kreuzungen: findeKreuzungen(r.p), p: weg.flat() });
+// Eine Fahrt verkettet jetzt mehrere Strassen ueber den Strassengraphen,
+// statt je Auto eine einzelne Strasse vor und zurueck zu fahren - erst
+// dadurch biegt ein Auto an einer Kreuzung ueberhaupt ab.
+//
+// Nur beidseitig befahrbare Kanten (graph.e[3] === 0): der Wegfolger im
+// Spiel faehrt die Route am Ende rueckwaerts wieder zurueck (siehe
+// FLaLaBergWegfolger::Bewege), auf einer Einbahnstrasse waere das
+// Geisterfahrt. Die Einbahnregel selbst ist dieselbe wie im Webprojekt
+// (js/world.js buildGraph: ed[3] >= 0 erlaubt a->b, <= 0 erlaubt b->a).
+// Kostet 574 von 8520 Kanten (11 von 146 km), die groesste zusammen-
+// haengende Komponente behaelt 5524 Knoten.
+const nachbarn = new Map();
+{
+  const fuege = (von, nach, klasse, weite) => {
+    if (!nachbarn.has(von)) nachbarn.set(von, []);
+    nachbarn.get(von).push({ nach, klasse, weite });
+  };
+  for (const [a, b, klasse, einbahn] of graph.e) {
+    if (einbahn !== 0) continue;
+    const weite = Math.hypot(graph.p[2 * b] - graph.p[2 * a], graph.p[2 * b + 1] - graph.p[2 * a + 1]);
+    if (weite < 0.5) continue;                 // entartete Kante
+    fuege(a, b, klasse, weite); fuege(b, a, klasse, weite);
+  }
 }
+const knotenOrt = n => [graph.p[2 * n], graph.p[2 * n + 1]];
+const kantenName = (a, b) => (a < b ? a + ':' + b : b + ':' + a);
+
+// Zufallsfahrt von Kante zu Kante. Geradeaus ist wahrscheinlicher als
+// Abbiegen (sonst irrt jedes Auto im Karree herum), eine wichtigere oder
+// gleich wichtige Strasse wird bevorzugt (Verkehr folgt Hauptstrassen),
+// und eine in dieser Fahrt schon befahrene Kante wird gemieden - ohne das
+// pendelt die Fahrt zwischen denselben zwei Kreuzungen.
+// Kalibriert: mit 1.5/0.4 (starke Geradeaus-Praeferenz) bog der Median aller
+// 70 Routen kein einziges Mal ab - die Fahrten sahen aus wie vorher, nur
+// laenger. 0.9/0.8 ergibt an einer T-Kreuzung rund ein Drittel Abbiegungen,
+// an einer Vierfachkreuzung etwa die Haelfte.
+const GERADE_GEWICHT = 0.9, ABBIEGE_GEWICHT = 0.8;
+let abbiegungenGesamt = 0, kreuzungsWahlen = 0;
+function baueFahrt(startVon, startNach, zielLaenge) {
+  const kette = [{ n: startVon, klasse: null }, { n: startNach, klasse: null }];
+  const benutzt = new Set([kantenName(startVon, startNach)]);
+  let vorher = startVon, jetzt = startNach;
+  const [sx, sz] = knotenOrt(startVon), [zx, zz] = knotenOrt(startNach);
+  let laenge = Math.hypot(zx - sx, zz - sz);
+  let klasseJetzt = 3;
+  for (const o of nachbarn.get(startVon) || []) if (o.nach === startNach) klasseJetzt = o.klasse;
+  kette[0].klasse = kette[1].klasse = klasseJetzt;
+  while (laenge < zielLaenge) {
+    const moeglich = (nachbarn.get(jetzt) || []).filter(o => o.nach !== vorher);
+    if (!moeglich.length) break;                          // Sackgasse
+    const [vx, vz] = knotenOrt(vorher), [jx, jz] = knotenOrt(jetzt);
+    const rein = Math.hypot(jx - vx, jz - vz) || 1;
+    const gewichte = moeglich.map(o => {
+      const [nx, nz] = knotenOrt(o.nach);
+      const raus = Math.hypot(nx - jx, nz - jz) || 1;
+      const gerade = ((jx - vx) * (nx - jx) + (jz - vz) * (nz - jz)) / (rein * raus);
+      let g = ABBIEGE_GEWICHT + Math.max(0, gerade) ** 2 * GERADE_GEWICHT;
+      if (o.klasse <= klasseJetzt) g *= 1.2;
+      if (benutzt.has(kantenName(jetzt, o.nach))) g *= 0.15;
+      // Sackgasse meiden: dort endet die Fahrt sofort, und je kuerzer die
+      // Route, desto oefter dreht das Auto im Spiel am Ende auf der Stelle um.
+      if ((nachbarn.get(o.nach) || []).length <= 1) g *= 0.05;
+      return g;
+    });
+    let wurf = Math.random() * gewichte.reduce((a, b) => a + b, 0), i = 0;
+    while (i < gewichte.length - 1 && (wurf -= gewichte[i]) > 0) i++;
+    const gewaehlt = moeglich[i];
+    // Nur echte Wahlmoeglichkeiten zaehlen: ein Knoten mit genau einer
+    // Fortsetzung ist ein Stuetzpunkt der Strassenlinie, keine Kreuzung.
+    if (moeglich.length > 1) {
+      kreuzungsWahlen++;
+      const [gx, gz] = knotenOrt(gewaehlt.nach);
+      const geradeGewaehlt = ((jx - vx) * (gx - jx) + (jz - vz) * (gz - jz)) /
+        (rein * (Math.hypot(gx - jx, gz - jz) || 1));
+      if (geradeGewaehlt < Math.cos(35 * Math.PI / 180)) abbiegungenGesamt++;
+    }
+    const [nx, nz] = knotenOrt(gewaehlt.nach);
+    if (Terrain.isWater(nx, nz)) break;
+    benutzt.add(kantenName(jetzt, gewaehlt.nach));
+    klasseJetzt = gewaehlt.klasse;
+    kette.push({ n: gewaehlt.nach, klasse: klasseJetzt });
+    laenge += gewaehlt.weite;
+    vorher = jetzt; jetzt = gewaehlt.nach;
+  }
+  return { kette, laenge };
+}
+
+// Wegpunkte verdichten wie resample(), aber Ecken erhalten: ein Punkt mit
+// deutlicher Richtungsaenderung ist eine Kreuzung oder ein echter Knick und
+// muss erhalten bleiben, sonst schneidet der gleichmaessige Abstand die
+// Kurve auf einer willkuerlichen Sehne ab, statt ihr zu folgen.
+const ECKE_AB = Math.cos((180 - 12) * Math.PI / 180);   // Knick ab 12 Grad
+function verdichte(pkte, schritt) {
+  const aus = [pkte[0]];
+  let rest = schritt;
+  for (let i = 0; i + 1 < pkte.length; i++) {
+    let a = pkte[i]; const b = pkte[i + 1];
+    let seglen = Math.hypot(b.x - a.x, b.z - a.z);
+    while (seglen >= rest) {
+      const t = rest / seglen;
+      a = { x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t, klasse: b.klasse };
+      aus.push(a); seglen -= rest; rest = schritt;
+    }
+    rest -= seglen;
+    // Ecke am Endpunkt dieses Segments? Dann diesen Punkt selbst behalten.
+    // Richtung aus den urspruenglichen Segmenten, nicht aus dem zuletzt
+    // ausgegebenen Punkt: der kann genau auf b liegen und ergaebe dann einen
+    // Nullvektor statt einer Richtung.
+    const v = pkte[i], c = pkte[i + 2];
+    if (!c) continue;
+    const l1 = Math.hypot(b.x - v.x, b.z - v.z), l2 = Math.hypot(c.x - b.x, c.z - b.z);
+    if (l1 < 0.2 || l2 < 0.2) continue;
+    const cos = ((b.x - v.x) * (c.x - b.x) + (b.z - v.z) * (c.z - b.z)) / (l1 * l2);
+    if (cos < ECKE_AB) { aus.push(b); rest = schritt; }
+  }
+  aus.push(pkte[pkte.length - 1]);
+  return aus;
+}
+
+// Echte Abbiegekurve statt rechtwinkliger Ecke: der Knick wird durch einen
+// quadratischen Bezierbogen ersetzt, dessen Radius mit der Fahrbahnbreite
+// waechst (eine Hauptstrasse hat einen weiteren Bogen als eine Gasse) und
+// nie mehr als knapp die Haelfte der angrenzenden Segmente verbraucht.
+// Die Bogenpunkte erben die wichtigere (niedrigere) der beiden Klassen: wer
+// von der Hauptstrasse abbiegt, behaelt in der Kreuzung deren Vorfahrt.
+const RUNDUNG_AB = 12 * Math.PI / 180;
+function rundeEcken(pkte) {
+  if (pkte.length < 3) return pkte;
+  const aus = [pkte[0]];
+  for (let i = 1; i + 1 < pkte.length; i++) {
+    const A = pkte[i - 1], B = pkte[i], C = pkte[i + 1];
+    const v1x = A.x - B.x, v1z = A.z - B.z, v2x = C.x - B.x, v2z = C.z - B.z;
+    const l1 = Math.hypot(v1x, v1z), l2 = Math.hypot(v2x, v2z);
+    if (l1 < 0.2 || l2 < 0.2) continue;
+    const cos = Math.max(-1, Math.min(1, (v1x * v2x + v1z * v2z) / (l1 * l2)));
+    const abweichung = Math.PI - Math.acos(cos);          // 0 = geradeaus
+    if (abweichung < RUNDUNG_AB) { aus.push(B); continue; }
+    const klasse = Math.min(B.klasse, C.klasse);
+    const breite = BREITE_JE_KLASSE[klasse] ?? 3.8;
+    const r = Math.min(breite * 1.6, 11, l1 * 0.45, l2 * 0.45);
+    const p0 = { x: B.x + v1x / l1 * r, z: B.z + v1z / l1 * r };
+    const p2 = { x: B.x + v2x / l2 * r, z: B.z + v2z / l2 * r };
+    const stufen = 2 + Math.round(abweichung / (Math.PI / 8));
+    for (let s = 0; s <= stufen; s++) {
+      const t = s / stufen, u = 1 - t;
+      aus.push({
+        x: u * u * p0.x + 2 * u * t * B.x + t * t * p2.x,
+        z: u * u * p0.z + 2 * u * t * B.z + t * t * p2.z,
+        klasse,
+      });
+    }
+  }
+  aus.push(pkte[pkte.length - 1]);
+  return aus;
+}
+
+// Startkanten: gewichtet gezogen statt nach Klasse sortiert. Streng sortiert
+// begannen alle 70 Fahrten auf Klasse-0-Strassen (Umgehung/Hauptstrassen) -
+// dort gibt es kaum Kreuzungen, entsprechend kam auf 487 m Fahrt nur eine
+// einzige Abzweigung. Hauptstrassen bleiben bevorzugt, Nebenstrassen kommen
+// aber vor; zusaetzlich ein Mindestabstand zwischen den Startpunkten, damit
+// der Verkehr ueber die Stadt verteilt ist und nicht 70 Autos auf derselben
+// Strasse stehen.
+// 1000 m statt der ersten 520 m: der Wegfolger im Spiel dreht am Routenende
+// auf der Stelle um (siehe FLaLaBergWegfolger::Bewege), und bei 346 m
+// Medianlaenge passierte das im Abbiegetest mehrfach je Auto in 38 s -
+// sichtbar haeufiger als beim alten Modell, das die laengsten Strassen der
+// Stadt nahm. Laengere Fahrten schieben die Wendepunkte auseinander.
+const FAHRT_LAENGE = 1000;
+const FAHRT_VERSUCHE = 4;
+const START_GEWICHT = { 0: 2.2, 1: 1.8, 2: 1.4, 3: 1.0, 4: 0.8 };
+const START_ABSTAND = 120;
+const startKanten = graph.e
+  .filter(([a, b, , einbahn]) => einbahn === 0 && nachbarn.has(a) && nachbarn.has(b) &&
+    !Terrain.isWater(graph.p[2 * a], graph.p[2 * a + 1]))
+  .map(([a, b, klasse]) => ({ a, b, klasse,
+    weite: Math.hypot(graph.p[2 * b] - graph.p[2 * a], graph.p[2 * b + 1] - graph.p[2 * a + 1]) }))
+  .filter(k => k.weite >= 8)
+  // Gewichtetes Ziehen ohne Zuruecklegen ueber den Exponential-Trick:
+  // kleinerer Schluessel = frueher gezogen, Gewicht erhoeht die Chance.
+  .map(k => ({ ...k, schluessel: -Math.log(Math.random()) / (START_GEWICHT[k.klasse] ?? 1.0) }))
+  .sort((x, y) => x.schluessel - y.schluessel);
+
+const autos = [];
+const startOrte = [];
+let uebersprungen = 0;
+for (const k of startKanten) {
+  if (autos.length >= AUTO_ROUTEN) break;
+  const [kx, kz] = knotenOrt(k.a);
+  if (startOrte.some(([x, z]) => Math.hypot(x - kx, z - kz) < START_ABSTAND)) continue;
+  // Mehrere Versuche je Startkante, die laengste Fahrt gewinnt: eine
+  // Zufallsfahrt kann frueh in einer Sackgasse oder einem Stichweg enden,
+  // ein zweiter Wurf ab derselben Kante findet meist weiter.
+  let kette = null, laenge = 0;
+  for (let versuch = 0; versuch < FAHRT_VERSUCHE; versuch++) {
+    const ziel = FAHRT_LAENGE * (0.75 + Math.random() * 0.65);
+    const fahrt = baueFahrt(k.a, k.b, ziel);
+    if (fahrt.laenge > laenge) { kette = fahrt.kette; laenge = fahrt.laenge; }
+    if (laenge >= ziel * 0.9) break;
+  }
+  if (laenge < 260 || !kette || kette.length < 3) { uebersprungen++; continue; }
+  const roh = kette.map(({ n, klasse }) => {
+    const [x, z] = knotenOrt(n);
+    return { x, z, klasse: klasse ?? 3 };
+  });
+  const punkte = rundeEcken(verdichte(roh, 9));
+  if (punkte.length < 3) { uebersprungen++; continue; }
+  const weg = punkte.map(p => [ux(p.x), uz(p.z), Math.round(boden(p.x, p.z) * M)]);
+  const flach = punkte.flatMap(p => [p.x, p.z]);
+  // Klasse und Breite jetzt je Wegpunkt statt je Route: eine Fahrt fuehrt
+  // ueber mehrere Strassen, also aendern sich Vorfahrtsrang und Fahrbahn-
+  // breite unterwegs. "klasse"/"w" bleiben als Rueckfall fuer aeltere
+  // Spielstaende, die kp/bp noch nicht kennen (siehe LadeVerkehr).
+  const kp = punkte.map(p => p.klasse);
+  const bp = punkte.map(p => BREITE_JE_KLASSE[p.klasse] ?? 3.8);
+  autos.push({
+    w: Math.max(3.0, Math.min(...bp)), klasse: Math.min(...kp),
+    kp, bp, kreuzungen: findeKreuzungen(flach), p: weg.flat(),
+  });
+  startOrte.push([kx, kz]);
+}
+console.log(JSON.stringify({ autoRouten: autos.length, uebersprungen,
+  mittlereWegpunkte: Math.round(autos.reduce((s, a) => s + a.p.length / 3, 0) / Math.max(1, autos.length)),
+  kreuzungsWahlen, abbiegungenGesamt,
+  abbiegeAnteil: +(abbiegungenGesamt / Math.max(1, kreuzungsWahlen)).toFixed(2) }));
 
 // Passanten: beidseitig entlang derselben Strassen, aber nur in der Alt-
 // stadt - dort ist die Dichte gewuenscht, nicht auf der Umgehungsstrasse.

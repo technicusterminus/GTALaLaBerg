@@ -48,13 +48,30 @@ public:
  // Vor BeginPlay setzen (siehe SetzeRoute): die eigene Strassenklasse und
  // welche der obigen Kreuzungen auf der eigenen Route liegen.
  void SetzeKreuzung(int32 Klasse, const TArray<int32>& Indizes) { EigeneKlasse = Klasse; MeineKreuzungen = Indizes; }
- int32 HoleKlasse() const { return EigeneKlasse; }
+ // Fahrbahnbreite (Meter) und Strassenklasse je Wegpunkt, parallel zur Route
+ // aus SetzeRoute (Tools/Export/prepare-verkehr.cjs "bp"/"kp"). Seit eine
+ // Fahrt ueber den Strassengraphen mehrere Strassen verkettet, gelten beide
+ // nicht mehr fuer die ganze Route: wer von der Hauptstrasse in eine Gasse
+ // abbiegt, faehrt ab dort auf schmalerer Fahrbahn und hat dort auch keine
+ // Vorfahrt mehr. Leer = Rueckfall auf die Route-Werte aus SetzeKreuzung/
+ // SetzeStrassenbreite.
+ void SetzeSpurdaten(const TArray<float>& BreitenM, const TArray<int32>& Klassen);
+ // Strassenklasse am aktuellen Wegpunkt (siehe SetzeSpurdaten) - nicht die
+ // der ganzen Route. BremseVorKreuzung vergleicht damit den Vorfahrtsrang
+ // dort, wo die Autos tatsaechlich aufeinandertreffen.
+ int32 HoleKlasse() const {
+  return KlasseJeWegpunkt.IsValidIndex(Weg.Index) ? KlasseJeWegpunkt[Weg.Index] : EigeneKlasse;
+ }
  const TArray<int32>& HoleKreuzungen() const { return MeineKreuzungen; }
  // Echte Fahrbahnbreite der eigenen Route (Tools/Export/prepare-verkehr.cjs
  // "w", Meter aus den Strassendaten) statt eines fuer alle Autos gleichen
  // Werts - vor BeginPlay setzen wie SetzeKreuzung. BreiteM bleibt unter 3 m
  // nie unterschritten (siehe Export), deshalb kein Rueckfall auf 0 noetig.
  void SetzeStrassenbreite(float BreiteM) { StrassenBreite = BreiteM * 100.0f; }
+ // Fahrbahnbreite in Zentimetern am aktuellen Wegpunkt - siehe SetzeSpurdaten.
+ float BreiteJetzt() const {
+  return BreiteJeWegpunkt.IsValidIndex(Weg.Index) ? BreiteJeWegpunkt[Weg.Index] : StrassenBreite;
+ }
  // Fuer LaLaBergUeberholTest (siehe LaLaBergGameMode): ob dieses Auto
  // gerade ein anderes ueberholt (siehe Ueberholt unten und Tick in der .cpp).
  bool IstAmUeberholen() const { return Ueberholt.IsValid(); }
@@ -111,6 +128,9 @@ private:
  // SetzeKreuzung. 3 = mittlere Klasse als Rueckfall, falls nie gesetzt.
  int32 EigeneKlasse = 3;
  TArray<int32> MeineKreuzungen;
+ // Parallel zu Weg.Route, siehe SetzeSpurdaten. Breiten in Zentimetern.
+ TArray<float> BreiteJeWegpunkt;
+ TArray<int32> KlasseJeWegpunkt;
  // Zentimeter, siehe SetzeStrassenbreite. 300 cm (3 m) als Rueckfall, falls
  // nie gesetzt - dieselbe Mindestbreite wie im Export.
  float StrassenBreite = 300.0f;

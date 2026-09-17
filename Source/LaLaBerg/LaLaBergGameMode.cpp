@@ -473,7 +473,8 @@ void ALaLaBergGameMode::BeginPlay() {
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergLechFoto")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergKoerperFoto")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergAmpelTest")) ||
-                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergUeberholTest"));
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergUeberholTest")) ||
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergAbbiegeTest"));
  if(bAutomatisch) Beleg(FString::Printf(TEXT("LALABERG_SPIELBEGINN nach %.1fs Programmlaufzeit, %d Gebaeude"),FPlatformTime::Seconds()-GStartTime,BuildingCount));
  if(!bAutomatisch) {
   if(UGameInstance* Spiel=GetGameInstance()) {
@@ -897,6 +898,43 @@ void ALaLaBergGameMode::BeginPlay() {
    FPlatformMisc::RequestExitWithStatus(false,bPass?0:1);
   },10.0f,false);
  }
+ // Biegen die KI-Autos im laufenden Spiel wirklich ab? Seit die Routen ueber
+ // den Strassengraphen mehrere Strassen verketten (siehe Tools/Export/
+ // prepare-verkehr.cjs), soll ein Auto an einer Kreuzung die Strasse
+ // wechseln, statt nur seine eine Strasse vor und zurueck zu fahren. Zaehlt
+ // nur zuegige Richtungsaenderungen (mehr als 4 Grad je Viertelsekunde):
+ // eine sanft gekruemmte Strasse dreht das Auto deutlich langsamer als eine
+ // Abbiegung, sonst waere jede Kurvenfahrt schon ein "Abbiegen".
+ if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergAbbiegeTest"))) {
+  static TMap<ALaLaBergVerkehrsauto*,float> LetzteGier, GierSumme;
+  FTimerHandle Takt;
+  GetWorldTimerManager().SetTimer(Takt,[this]() {
+   for(ALaLaBergVerkehrsauto* A:ALaLaBergVerkehrsauto::Alle) {
+    if(!A) continue;
+    const float Gier=A->GetActorRotation().Yaw;
+    if(const float* Vorher=LetzteGier.Find(A)) {
+     const float Schritt=FMath::Abs(FRotator::NormalizeAxis(Gier-*Vorher));
+     if(Schritt>4.0f) GierSumme.FindOrAdd(A)+=Schritt;
+    }
+    LetzteGier.Add(A,Gier);
+   }
+  },0.25f,true,3.0f);
+  FTimerHandle Ende;
+  GetWorldTimerManager().SetTimer(Ende,[this]() {
+   int32 Abgebogen=0; float Groesste=0.0f;
+   for(const auto& Paar:GierSumme) {
+    if(Paar.Value>60.0f) Abgebogen++;
+    Groesste=FMath::Max(Groesste,Paar.Value);
+   }
+   // Fuenf von 70 Autos als Untergrenze: genug, um einen Totalausfall
+   // (gar kein Abbiegen mehr) sicher zu erkennen, ohne dass der Test an
+   // roten Ampeln oder einem zufaellig geraden Streckenabschnitt scheitert.
+   const bool bPass=Abgebogen>=5;
+   Beleg(FString::Printf(TEXT("LALABERG_ABBIEGETEST %s abgebogen=%d von=%d groesste_drehung=%.0f"),
+    bPass?TEXT("PASS"):TEXT("FAIL"),Abgebogen,ALaLaBergVerkehrsauto::Alle.Num(),Groesste));
+   FPlatformMisc::RequestExitWithStatus(false,bPass?0:1);
+  },38.0f,false);
+ }
  if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergSmoke"))) {
   FTimerHandle Handle;
   GetWorldTimerManager().SetTimer(Handle,[this]() {
@@ -971,6 +1009,22 @@ void ALaLaBergGameMode::LadeVerkehr() {
    // Echte Fahrbahnbreite (Meter, siehe Tools/Export/prepare-verkehr.cjs
    // "w") statt eines fuer jede Strasse gleichen Spur-Versatzes.
    if(AutoObj->HasField(TEXT("w"))) Auto->SetzeStrassenbreite(AutoObj->GetNumberField(TEXT("w")));
+   // Breite und Klasse je Wegpunkt ("bp"/"kp"): eine Fahrt verkettet seit
+   // der Graph-Routenplanung mehrere Strassen, beide Werte gelten also
+   // nicht mehr fuer die ganze Route (siehe SetzeSpurdaten). Fehlen sie,
+   // bleibt es bei den Route-Werten oben.
+   const TArray<TSharedPtr<FJsonValue>>* BreitenJson=nullptr;
+   const TArray<TSharedPtr<FJsonValue>>* KlassenJson=nullptr;
+   if(AutoObj->TryGetArrayField(TEXT("bp"),BreitenJson) && AutoObj->TryGetArrayField(TEXT("kp"),KlassenJson)) {
+    TArray<float> Breiten; TArray<int32> Klassen;
+    for(const auto& B:*BreitenJson) Breiten.Add(B->AsNumber());
+    for(const auto& K:*KlassenJson) Klassen.Add(static_cast<int32>(K->AsNumber()));
+    if(Breiten.Num()==Route.Num() && Klassen.Num()==Route.Num())
+     Auto->SetzeSpurdaten(Breiten,Klassen);
+    else
+     UE_LOG(LogTemp,Warning,TEXT("LALABERG_VERKEHR spurdaten passen nicht: %d/%d zu %d Wegpunkten"),
+      Breiten.Num(),Klassen.Num(),Route.Num());
+   }
    AutoZahl++;
   }
  }
