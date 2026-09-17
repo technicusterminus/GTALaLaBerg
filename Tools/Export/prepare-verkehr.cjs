@@ -397,6 +397,54 @@ function rundeEcken(ring) {
   return knapp;
 }
 
+// Echte Fahrbahnbreite je Wegpunkt statt des Klassenmittels. Der Strassen-
+// graph traegt selbst keine Breite, nur die Klasse - deshalb stand in den
+// Routen zunaechst nur BREITE_JE_KLASSE, also fuenf feste Werte fuer alle
+// 20.000 Wegpunkte, obwohl city.roads[].w stufenlos zwischen 2,0 und 9,3 m
+// liegt. Eine schmale Hauptstrasse (3,1 m, Klasse 0) galt damit als 7,5 m
+// breit, und der Spurversatz von einem Viertel der Breite setzte das Auto
+// neben die Fahrbahn.
+//
+// Raster statt linearer Suche wie in naechsteStrassenrichtung(): das ist nur
+// fuer die 44 Ampeln bezahlbar, 20.000 Wegpunkte gegen rund 50.000
+// Strassensegmente waeren ueber eine Milliarde Vergleiche.
+const BREITEN_ZELLE = 30;
+const strassenRaster = new Map();
+{
+  for (const r of city.roads) {
+    if (!r.p || r.p.length < 4 || !(r.w > 0)) continue;
+    for (let i = 0; i + 3 < r.p.length; i += 2) {
+      const seg = { ax: r.p[i], az: r.p[i + 1], bx: r.p[i + 2], bz: r.p[i + 3], w: r.w };
+      const x0 = Math.floor(Math.min(seg.ax, seg.bx) / BREITEN_ZELLE);
+      const x1 = Math.floor(Math.max(seg.ax, seg.bx) / BREITEN_ZELLE);
+      const z0 = Math.floor(Math.min(seg.az, seg.bz) / BREITEN_ZELLE);
+      const z1 = Math.floor(Math.max(seg.az, seg.bz) / BREITEN_ZELLE);
+      for (let cx = x0; cx <= x1; cx++) for (let cz = z0; cz <= z1; cz++) {
+        const k = cx + ':' + cz;
+        if (!strassenRaster.has(k)) strassenRaster.set(k, []);
+        strassenRaster.get(k).push(seg);
+      }
+    }
+  }
+}
+// Mindestbreite wie zuvor im Export: schmaler als 3 m soll keine Fahrspur
+// werden, sonst bleibt fuer den Wagen (176 cm breit) kein Rand mehr.
+function breiteBei(x, z, rueckfall) {
+  const cx = Math.floor(x / BREITEN_ZELLE), cz = Math.floor(z / BREITEN_ZELLE);
+  let beste = Infinity, breite = rueckfall;
+  for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) {
+    for (const s of strassenRaster.get((cx + dx) + ':' + (cz + dz)) || []) {
+      const ex = s.bx - s.ax, ez = s.bz - s.az, len2 = ex * ex + ez * ez || 1;
+      const t = Math.max(0, Math.min(1, ((x - s.ax) * ex + (z - s.az) * ez) / len2));
+      const d = Math.hypot(x - (s.ax + ex * t), z - (s.az + ez * t));
+      if (d < beste) { beste = d; breite = s.w; }
+    }
+  }
+  // Mehr als 12 m daneben heisst: der Wegpunkt gehoert zu keiner erfassten
+  // Strasse (kommt an Kreuzungsboegen vor) - dann das Klassenmittel nehmen.
+  return Math.max(3.0, beste <= 12 ? breite : rueckfall);
+}
+
 // Startkanten: gewichtet gezogen statt nach Klasse sortiert. Streng sortiert
 // begannen alle 70 Fahrten auf Klasse-0-Strassen (Umgehung/Hauptstrassen) -
 // dort gibt es kaum Kreuzungen, entsprechend kam auf 487 m Fahrt nur eine
@@ -462,7 +510,7 @@ for (const k of startKanten) {
   // breite unterwegs. "klasse"/"w" bleiben als Rueckfall fuer aeltere
   // Spielstaende, die kp/bp noch nicht kennen (siehe LadeVerkehr).
   const kp = punkte.map(p => p.klasse);
-  const bp = punkte.map(p => BREITE_JE_KLASSE[p.klasse] ?? 3.8);
+  const bp = punkte.map(p => +breiteBei(p.x, p.z, BREITE_JE_KLASSE[p.klasse] ?? 3.8).toFixed(2));
   autos.push({
     w: Math.max(3.0, Math.min(...bp)), klasse: Math.min(...kp),
     // "rund": geschlossener Ring - der Wegfolger haengt hinter dem letzten
