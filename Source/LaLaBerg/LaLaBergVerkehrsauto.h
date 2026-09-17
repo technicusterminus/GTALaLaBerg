@@ -55,6 +55,9 @@ public:
  // Werts - vor BeginPlay setzen wie SetzeKreuzung. BreiteM bleibt unter 3 m
  // nie unterschritten (siehe Export), deshalb kein Rueckfall auf 0 noetig.
  void SetzeStrassenbreite(float BreiteM) { StrassenBreite = BreiteM * 100.0f; }
+ // Fuer LaLaBergUeberholTest (siehe LaLaBergGameMode): ob dieses Auto
+ // gerade ein anderes ueberholt (siehe Ueberholt unten und Tick in der .cpp).
+ bool IstAmUeberholen() const { return Ueberholt.IsValid(); }
 
 protected:
  virtual void BeginPlay() override;
@@ -79,6 +82,10 @@ private:
  // Seitlicher Versatz zum Ausweichen vor einem Hindernis (siehe Tick) -
  // weicht sanft aus und wieder zurueck, statt starr auf der Route zu bremsen.
  float Seitversatz = 0.0f;
+ // Waehrend eines Ueberholvorgangs das ueberholte Auto (siehe Tick) - leer,
+ // solange kein Ueberholen laeuft. TWeakObjectPtr, weil das ueberholte Auto
+ // unterwegs verschwinden kann (siehe ALaLaBergAutoPool-Verstecken/Zerstoeren).
+ TWeakObjectPtr<class ALaLaBergVerkehrsauto> Ueberholt;
  FLinearColor Lack = FLinearColor(0.6f, 0.6f, 0.6f);
  bool bNetzGebaut = false;
  // Nur fuer geparkte Autos (siehe SetzeLack): der Kasten kommt dann aus

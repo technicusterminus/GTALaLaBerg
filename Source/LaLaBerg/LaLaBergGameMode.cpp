@@ -472,7 +472,8 @@ void ALaLaBergGameMode::BeginPlay() {
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergVerkehrFoto")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergLechFoto")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergKoerperFoto")) ||
-                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergAmpelTest"));
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergAmpelTest")) ||
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergUeberholTest"));
  if(bAutomatisch) Beleg(FString::Printf(TEXT("LALABERG_SPIELBEGINN nach %.1fs Programmlaufzeit, %d Gebaeude"),FPlatformTime::Seconds()-GStartTime,BuildingCount));
  if(!bAutomatisch) {
   if(UGameInstance* Spiel=GetGameInstance()) {
@@ -645,7 +646,9 @@ void ALaLaBergGameMode::BeginPlay() {
     auto* PC=GetWorld()->GetFirstPlayerController();
     auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr;
     if(Figur) Figur->Einsteigen();
-    if(PC && PC->GetPawn()!=*It) PC->Possess(*It);
+    bFahrtestEinstieg = Figur && PC && PC->GetPawn()==*It;
+    Beleg(FString::Printf(TEXT("LALABERG_EINSTIEG_TEST %s"),bFahrtestEinstieg?TEXT("PASS"):TEXT("FAIL")));
+    if (!bFahrtestEinstieg) { FPlatformMisc::RequestExitWithStatus(false,1); return; }
     It->TestSteuerung(1.0f,0.0f);
     FahrtStart=It->GetActorLocation();
     FahrtBilder=GFrameCounter; FahrtZeit=FPlatformTime::Seconds(); FahrtSchlechteste=1000.0f;
@@ -681,13 +684,32 @@ void ALaLaBergGameMode::BeginPlay() {
     const float Weg=FVector::Dist2D(Jetzt,FahrtStart);
     const float Tempo=It->GetVelocity().Size()*0.036f;   // cm/s in km/h
     const bool bAufraedern=FVector::DotProduct(It->GetActorUpVector(),FVector::UpVector)>0.7f;
+    bFahrtestBestanden = bFahrtestEinstieg && Weg>800.0f && bAufraedern && It->RaederAmBoden()>=2;
+    It->TestAnhalten();
     const float Mittel=(GFrameCounter-FahrtBilder)/FMath::Max(0.001,FPlatformTime::Seconds()-FahrtZeit);
     Beleg(FString::Printf(TEXT("LALABERG_FAHRTEST %s weg=%.1fm tempo=%.0fkmh aufraedern=%d fps_mittel=%.0f fps_schlechteste=%.0f aufloesung=%s"),
      (Weg>800.0f&&bAufraedern)?TEXT("PASS"):TEXT("FAIL"),Weg/100.0f,Tempo,bAufraedern?1:0,Mittel,FahrtSchlechteste,
      GEngine&&GEngine->GameViewport?*FString::Printf(TEXT("%dx%d"),GEngine->GameViewport->Viewport->GetSizeXY().X,GEngine->GameViewport->Viewport->GetSizeXY().Y):TEXT("?")));
     break;
    }
-   FPlatformMisc::RequestExitWithStatus(false,0);
+   FTimerHandle Ausstieg;
+   GetWorldTimerManager().SetTimer(Ausstieg,[this]() {
+    for(TActorIterator<ALaLaBergWagen> It(GetWorld());It;++It) {
+     Beleg(FString::Printf(TEXT("LALABERG_BREMS_TEST tempo=%.2f"),It->GetVelocity().Size()*0.036f));
+     It->TestAussteigen(); break;
+    }
+    FScreenshotRequest::RequestScreenshot(FPaths::ScreenShotDir()/TEXT("Fahrtest_Ausstieg.png"),true,false);
+   },5.0f,false);
+   FTimerHandle Abschluss;
+   GetWorldTimerManager().SetTimer(Abschluss,[this]() {
+    auto* PC=GetWorld()->GetFirstPlayerController();
+    auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr;
+    const bool bAusgestiegen=Figur && !Figur->IsHidden() && Figur->GetActorEnableCollision();
+    Beleg(FString::Printf(TEXT("LALABERG_AUSSTIEG_TEST %s"),bAusgestiegen?TEXT("PASS"):TEXT("FAIL")));
+    const bool bPass=bFahrtestBestanden && bAusgestiegen;
+    Beleg(FString::Printf(TEXT("LALABERG_KRANKENHAUS_TEST %s"),bPass?TEXT("PASS"):TEXT("FAIL")));
+    FPlatformMisc::RequestExitWithStatus(false,bPass?0:1);
+   },6.5f,false);
   },10.5f,false);
  }
  // Waffentest: Figur vor den fahrbaren Wagen stellen (er ist die einzige
@@ -850,6 +872,30 @@ void ALaLaBergGameMode::BeginPlay() {
     GesamtVerstoesse==0?TEXT("PASS"):TEXT("FAIL"),GesamtVerstoesse,AmpelZahl));
    FPlatformMisc::RequestExitWithStatus(false,0);
   },TestDauer,false);
+ }
+ // Beweist die Ueberhollogik (siehe ALaLaBergVerkehrsauto::Tick) isoliert von
+ // echtem Stadtverkehr: zwei synthetische Autos weit ab jeder echten Strasse
+ // (sonst wuerde LadeVerkehr's Stadtverkehr die Kreuzungs-/Ampel-Baelle
+ // verfaelschen) - eines kriecht fast im Stillstand, das andere faehrt normal
+ // dahinter auf. Organische Beobachtung im echten Verkehr (mehrere 100s Spielzeit
+ // ueber mehrere Kalibrierungen) loeste das Ueberholen nie aus - zu selten die
+ // richtige Konstellation bei nur 70 verteilten Autos in einer ganzen Stadt.
+ // Dieser Test stellt die Konstellation gezielt her, statt auf Zufall zu warten.
+ if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergUeberholTest"))) {
+  const FVector Start(500000.0f,500000.0f,10000.0f);
+  const FVector Achse(1.0f,0.0f,0.0f);
+  TArray<FVector> RouteVorne={Start+Achse*700.0f,Start+Achse*30700.0f};
+  TArray<FVector> RouteHinten={Start,Start+Achse*30000.0f};
+  ALaLaBergVerkehrsauto* Vorne=GetWorld()->SpawnActor<ALaLaBergVerkehrsauto>(RouteVorne[0],FRotator::ZeroRotator);
+  ALaLaBergVerkehrsauto* Hinten=GetWorld()->SpawnActor<ALaLaBergVerkehrsauto>(RouteHinten[0],FRotator::ZeroRotator);
+  if(Vorne) { Vorne->SetzeRoute(RouteVorne,3.0f); Vorne->SetzeStrassenbreite(7.0f); }
+  if(Hinten) { Hinten->SetzeRoute(RouteHinten,30.0f); Hinten->SetzeStrassenbreite(7.0f); }
+  FTimerHandle Ende;
+  GetWorldTimerManager().SetTimer(Ende,[this,Hinten]() {
+   const bool bPass=Hinten && Hinten->IstAmUeberholen();
+   Beleg(FString::Printf(TEXT("LALABERG_UEBERHOLTEST %s"),bPass?TEXT("PASS"):TEXT("FAIL")));
+   FPlatformMisc::RequestExitWithStatus(false,bPass?0:1);
+  },10.0f,false);
  }
  if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergSmoke"))) {
   FTimerHandle Handle;

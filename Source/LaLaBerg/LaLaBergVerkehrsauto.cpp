@@ -20,18 +20,37 @@ TArray<float> ALaLaBergVerkehrsauto::KreuzungBreiten;
 namespace {
  // Keine echte Verkehrssimulation - nur: bremsen, wenn ein anderer
  // Verkehrswagen naeher als 9 m voraus steht, sonst faehrt jeder stur durch
- // jeden hindurch. Vorfahrt an Kreuzungen gibt es weiterhin nicht.
- float BremseVorAndauto(const AActor* Selbst, const FVector& Ort, const FVector& Vorwaerts) {
-  float Bremse = 1.0f;
+ // jeden hindurch. Vorfahrt an Kreuzungen gibt es weiterhin nicht. Liefert
+ // zusaetzlich den bremsenden Wagen selbst zurueck (fuer das Ueberholen
+ // unten - der braucht das konkrete Auto, nicht nur den Bremsfaktor).
+ ALaLaBergVerkehrsauto* NaechstesAutoVoraus(const AActor* Selbst, const FVector& Ort, const FVector& Vorwaerts, float& AusBremse) {
+  ALaLaBergVerkehrsauto* Naechstes = nullptr;
+  float BesteDist = 900.0f;
   for (ALaLaBergVerkehrsauto* Andere : ALaLaBergVerkehrsauto::Alle) {
    if (!Andere || Andere == Selbst) continue;
    const FVector Diff = Andere->GetActorLocation() - Ort;
    const float Dist = Diff.Size();
    if (Dist > 900.0f || Dist < 1.0f) continue;
    if (FVector::DotProduct(Diff / Dist, Vorwaerts) < 0.5f) continue;   // nicht voraus
-   Bremse = FMath::Min(Bremse, FMath::Clamp((Dist - 260.0f) / 640.0f, 0.05f, 1.0f));
+   if (Dist < BesteDist) { BesteDist = Dist; Naechstes = Andere; }
   }
-  return Bremse;
+  AusBremse = Naechstes ? FMath::Clamp((BesteDist - 260.0f) / 640.0f, 0.05f, 1.0f) : 1.0f;
+  return Naechstes;
+ }
+ // Ist die Gegenspur frei genug zum Ueberholen? Jedes andere Auto (ausser
+ // dem zu ueberholenden selbst) innerhalb der Sicherheitsreichweite grob
+ // voraus zaehlt als Hindernis - unabhaengig davon, ob es entgegenkommt
+ // oder in dieselbe Richtung faehrt, beides wuerde beim Ausscheren gefaehrlich.
+ bool WegFreiZumUeberholen(const AActor* Selbst, const AActor* Ausgenommen, const FVector& Ort, const FVector& Vorwaerts, float Reichweite) {
+  for (ALaLaBergVerkehrsauto* Andere : ALaLaBergVerkehrsauto::Alle) {
+   if (!Andere || Andere == Selbst || Andere == Ausgenommen) continue;
+   const FVector Diff = Andere->GetActorLocation() - Ort;
+   const float Dist = Diff.Size();
+   if (Dist > Reichweite || Dist < 1.0f) continue;
+   if (FVector::DotProduct(Diff / Dist, Vorwaerts) < 0.3f) continue;   // deutlich hinter uns zaehlt nicht
+   return false;
+  }
+  return true;
  }
  // Echtes Vorfahrtsrecht an den Kreuzungen der eigenen Route (siehe
  // Tools/Export/prepare-verkehr.cjs "kreuzungen", aus dem echten OSM-
@@ -121,6 +140,16 @@ namespace {
  // eigentlichen Fahrbahnrand hinausschiebt, auch nicht auf einer schmalen
  // Strasse mit wenig Platz zum Ausweichen.
  constexpr float HALBE_WAGENBREITE = 88.0f;
+ // Ueberholen: ein deutlich langsameres oder stehendes Auto direkt voraus
+ // (nicht der Spieler - der wird nicht ueberholt, nur gebremst) wird
+ // umfahren statt endlos dahinter herzukriechen. Nur auf ausreichend
+ // breiter Strasse (zwei Spuren plus etwas Reserve) und nur, wenn die
+ // Gegenspur ueber die Sicherheitsreichweite frei ist - keine Ruecksicht
+ // auf eine bestimmte Ueberholsichtweite entlang von Kurven, nur auf
+ // andere Autos im geraden Vorausblick.
+ constexpr float UEBERHOL_MINDESTBREITE = 550.0f;
+ constexpr float UEBERHOL_SICHERHEIT = 1800.0f;
+ constexpr float UEBERHOL_ABSTAND_FREI = 500.0f;
  // Sichtweiten-LOD (siehe Tick): jenseits davon der leichte Kasten statt
  // des CarConcept-Detailmodells. 70 Autos gleichzeitig im Detailmodell
  // druecken die Bildrate auf 2 fps (Glas/Chrom-Material, viele Dreiecke je
@@ -255,9 +284,37 @@ void ALaLaBergVerkehrsauto::Tick(float Zeit) {
   const bool bGestoert = GetWorld()->GetTimeSeconds() < StoerungBis;
   FVector Ort = GetActorLocation();
   const FVector Vorwaerts = GetActorForwardVector();
-  const float BremseObjekt = FMath::Min(BremseVorAndauto(this, Ort, Vorwaerts), BremseVorSpieler(GetWorld(), Ort, Vorwaerts));
+
+  float BremseAndauto = 1.0f;
+  ALaLaBergVerkehrsauto* Voraus = NaechstesAutoVoraus(this, Ort, Vorwaerts, BremseAndauto);
+  const float BremseAmpel = BremseVorAmpel(Ort, Vorwaerts);
   const float BremseKreuzung = BremseVorKreuzung(this, Ort, Vorwaerts, EigeneKlasse, MeineKreuzungen);
-  const float Bremse = FMath::Min(FMath::Min(BremseObjekt, BremseVorAmpel(Ort, Vorwaerts)), BremseKreuzung);
+
+  // Ueberholen starten: ein spuerbar langsameres oder stehendes Auto direkt
+  // voraus (BremseAndauto < 0.75 - eine erste Kalibrierung mit 0.55 loeste
+  // in 256s Beobachtung organischen Verkehrs kein einziges Mal aus), genug
+  // breite Strasse (siehe UEBERHOL_MINDESTBREITE), keine unmittelbar
+  // anstehende Ampel oder Vorfahrt (sonst nur, um in der Gegenspur ebenfalls
+  // anzuhalten) und eine ueber die Sicherheitsreichweite freie Gegenspur.
+  if (!Ueberholt.IsValid() && Voraus
+      && StrassenBreite >= UEBERHOL_MINDESTBREITE && BremseAndauto < 0.75f
+      && BremseAmpel > 0.8f && BremseKreuzung > 0.8f && !bGestoert
+      && WegFreiZumUeberholen(this, Voraus, Ort, Vorwaerts, UEBERHOL_SICHERHEIT))
+   Ueberholt = Voraus;
+  // Ueberholen beenden: das Auto liegt hinter uns (vorbei), ist
+  // verschwunden, oder eine Ampel/Vorfahrt macht das Ausscheren in die
+  // Gegenspur sinnlos - dann lieber wieder normal einordnen und mitbremsen.
+  if (Ueberholt.IsValid()) {
+   const float VorausDist = FVector::DotProduct(Ueberholt->GetActorLocation() - Ort, Vorwaerts);
+   if (VorausDist < -UEBERHOL_ABSTAND_FREI || BremseAmpel < 0.8f || BremseKreuzung < 0.8f
+       || StrassenBreite < UEBERHOL_MINDESTBREITE)
+    Ueberholt = nullptr;
+  }
+  // Waehrend des Ueberholens nicht mehr fuer das ueberholte Auto selbst
+  // bremsen - sonst kaeme der Wagen trotz Ausscheren kaum naeher heran.
+  const bool bUeberholtGerade = Ueberholt.IsValid() && Ueberholt.Get() == Voraus;
+  const float BremseObjekt = FMath::Min(bUeberholtGerade ? 1.0f : BremseAndauto, BremseVorSpieler(GetWorld(), Ort, Vorwaerts));
+  const float Bremse = FMath::Min(FMath::Min(BremseObjekt, BremseAmpel), BremseKreuzung);
   const FVector Richtung = Weg.Bewege(Ort, Tempo * Zeit * (bGestoert ? 0.08f : 1.0f) * Bremse);
   SetActorLocation(Ort);
   if (!Richtung.IsNearlyZero()) SetActorRotation(FMath::RInterpTo(GetActorRotation(), Richtung.Rotation(), Zeit, 5.0f));
@@ -272,9 +329,13 @@ void ALaLaBergVerkehrsauto::Tick(float Zeit) {
   // neben der Fahrbahnmitte. Der Gesamtversatz (Spur + Ausweichen) bleibt
   // innerhalb des Fahrbahnrands - auf einer schmalen Strasse bleibt dafuer
   // weniger Platz zum Ausweichen, statt ueber den Rand hinauszufahren.
+  // Beim Ueberholen zaehlt stattdessen die Gegenspur (derselbe Abstand,
+  // nur auf der anderen Seite) statt des Ausweich-Zuschlags.
   const float SpurVersatz = StrassenBreite * 0.25f;
   const float Rand = FMath::Max(0.0f, StrassenBreite * 0.5f - HALBE_WAGENBREITE);
-  const float SeitZiel = FMath::Min(SpurVersatz + (BremseObjekt < 0.9f ? MAX_SEITVERSATZ : 0.0f), Rand);
+  const float SeitZiel = Ueberholt.IsValid()
+   ? FMath::Clamp(-SpurVersatz, -Rand, Rand)
+   : FMath::Min(SpurVersatz + (BremseObjekt < 0.9f ? MAX_SEITVERSATZ : 0.0f), Rand);
   Seitversatz = FMath::FInterpTo(Seitversatz, SeitZiel, Zeit, 0.7f);
   if (FMath::Abs(Seitversatz) > 0.5f) SetActorLocation(GetActorLocation() + GetActorRightVector() * Seitversatz);
  }
