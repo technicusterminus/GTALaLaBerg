@@ -926,12 +926,18 @@ void ALaLaBergGameMode::BeginPlay() {
     if(Paar.Value>60.0f) Abgebogen++;
     Groesste=FMath::Max(Groesste,Paar.Value);
    }
+   // Wendemanoever zaehlen: seit die Routen geschlossene Rundkurse sind
+   // (siehe Tools/Export/prepare-verkehr.cjs), darf kein Auto mehr am
+   // Routenende auf der Stelle umkehren. Die aufsummierte Drehung oben kann
+   // Abbiegen und Wenden nicht unterscheiden - erst dieser Zaehler belegt es.
+   int32 Wenden=0;
+   for(ALaLaBergVerkehrsauto* A:ALaLaBergVerkehrsauto::Alle) if(A) Wenden+=A->HoleWenden();
    // Fuenf von 70 Autos als Untergrenze: genug, um einen Totalausfall
    // (gar kein Abbiegen mehr) sicher zu erkennen, ohne dass der Test an
    // roten Ampeln oder einem zufaellig geraden Streckenabschnitt scheitert.
-   const bool bPass=Abgebogen>=5;
-   Beleg(FString::Printf(TEXT("LALABERG_ABBIEGETEST %s abgebogen=%d von=%d groesste_drehung=%.0f"),
-    bPass?TEXT("PASS"):TEXT("FAIL"),Abgebogen,ALaLaBergVerkehrsauto::Alle.Num(),Groesste));
+   const bool bPass=Abgebogen>=5 && Wenden==0;
+   Beleg(FString::Printf(TEXT("LALABERG_ABBIEGETEST %s abgebogen=%d von=%d groesste_drehung=%.0f wenden=%d"),
+    bPass?TEXT("PASS"):TEXT("FAIL"),Abgebogen,ALaLaBergVerkehrsauto::Alle.Num(),Groesste,Wenden));
    FPlatformMisc::RequestExitWithStatus(false,bPass?0:1);
   },38.0f,false);
  }
@@ -1001,6 +1007,11 @@ void ALaLaBergGameMode::LadeVerkehr() {
   if(Route.Num()<2) continue;
   if(auto* Auto=GetWorld()->SpawnActor<ALaLaBergVerkehrsauto>(Route[0],FRotator::ZeroRotator)) {
    Auto->SetzeRoute(Route,FMath::FRandRange(28.0f,46.0f));
+   // Geschlossener Rundkurs (siehe Tools/Export/prepare-verkehr.cjs): das
+   // Auto haengt hinter dem letzten Wegpunkt wieder den ersten an, statt am
+   // Ende auf der Stelle zu wenden. Aeltere verkehr.json ohne das Feld
+   // bleiben beim alten Hin-und-Zurueck.
+   Auto->SetzeRundkurs(AutoObj->HasField(TEXT("rund")) && AutoObj->GetBoolField(TEXT("rund")));
    TArray<int32> Kreuzungen;
    const TArray<TSharedPtr<FJsonValue>>* KreuzungenJson=nullptr;
    if(AutoObj->TryGetArrayField(TEXT("kreuzungen"),KreuzungenJson))

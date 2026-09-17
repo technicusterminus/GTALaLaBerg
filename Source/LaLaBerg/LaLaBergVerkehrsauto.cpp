@@ -47,12 +47,19 @@ namespace {
  float BremseInKurve(const FLaLaBergWegfolger& Weg) {
   if (!Weg.Gueltig()) return 1.0f;
   constexpr float VORAUSSCHAU = 2500.0f;   // cm
+  const int32 Anzahl = Weg.Route.Num();
   float Strecke = 0.0f, Summe = 0.0f;
   FVector Letzte = FVector::ZeroVector;
-  for (int32 i = Weg.Index; Strecke < VORAUSSCHAU; i += Weg.Richtung) {
-   const int32 Naechster = i + Weg.Richtung;
+  int32 i = Weg.Index;
+  // Schrittzahl begrenzt: auf einem Rundkurs (siehe FLaLaBergWegfolger::bRund)
+  // liefe die Vorausschau sonst endlos im Kreis, wenn der Ring kuerzer als
+  // die Vorausschau ist.
+  for (int32 Schritt = 0; Schritt < Anzahl && Strecke < VORAUSSCHAU; Schritt++) {
+   int32 Naechster = i + Weg.Richtung;
+   if (Weg.bRund) Naechster = (Naechster + Anzahl) % Anzahl;
    if (!Weg.Route.IsValidIndex(i) || !Weg.Route.IsValidIndex(Naechster)) break;
    const FVector Segment = Weg.Route[Naechster] - Weg.Route[i];
+   i = Naechster;
    const float Laenge = Segment.Size2D();
    if (Laenge < 1.0f) continue;
    const FVector Richtung = (Segment / Laenge);

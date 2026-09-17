@@ -56,6 +56,12 @@ public:
  // Vorfahrt mehr. Leer = Rueckfall auf die Route-Werte aus SetzeKreuzung/
  // SetzeStrassenbreite.
  void SetzeSpurdaten(const TArray<float>& BreitenM, const TArray<int32>& Klassen);
+ // Geschlossener Rundkurs statt Hin-und-Zurueck - siehe
+ // FLaLaBergWegfolger::bRund. Nach SetzeRoute setzen.
+ void SetzeRundkurs(bool bRund) { Weg.bRund = bRund; }
+ // Wie oft dieses Auto am Routenende auf der Stelle umgekehrt ist - auf
+ // einem Rundkurs immer 0 (siehe FLaLaBergWegfolger::Wenden).
+ int32 HoleWenden() const { return Weg.Wenden; }
  // Strassenklasse am aktuellen Wegpunkt (siehe SetzeSpurdaten) - nicht die
  // der ganzen Route. BremseVorKreuzung vergleicht damit den Vorfahrtsrang
  // dort, wo die Autos tatsaechlich aufeinandertreffen.

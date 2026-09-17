@@ -10,6 +10,18 @@ struct FLaLaBergWegfolger {
  TArray<FVector> Route;
  int32 Index = 0;
  int32 Richtung = 1;      // +1 vorwaerts durch die Route, -1 zurueck
+ // Geschlossener Rundkurs: hinter dem letzten Wegpunkt kommt wieder der
+ // erste, statt die Route rueckwaerts zurueckzufahren. Die KI-Autos fahren
+ // seit der Routenplanung ueber den Strassengraphen solche Ringe (siehe
+ // Tools/Export/prepare-verkehr.cjs, Feld "rund") - damit dreht sich keiner
+ // mehr am Routenende auf der Stelle um, und weil die Route nie gegen die
+ // Fahrtrichtung durchlaufen wird, sind auch Einbahnstrassen nutzbar.
+ // Passanten laufen weiterhin hin und zurueck (bRund bleibt false).
+ bool bRund = false;
+ // Wie oft die Route schon umgekehrt wurde. Auf einem Rundkurs muss das 0
+ // bleiben - genau das prueft -LaLaBergAbbiegeTest, sonst waere "kein Wenden
+ // mehr" nur eine Behauptung ueber den Code statt ueber das Verhalten.
+ int32 Wenden = 0;
 
  bool Gueltig() const { return Route.Num() >= 2; }
  FVector Start() const { return Gueltig() ? Route[0] : FVector::ZeroVector; }
@@ -32,8 +44,12 @@ struct FLaLaBergWegfolger {
    FVector Delta = Ziel - Ort;
    const float Abstand = Delta.Size();
    if (Abstand < 1.0f) {
-    // Wegpunkt erreicht: naechsten ansteuern, am Ende umkehren.
-    if (Index + Richtung < 0 || Index + Richtung >= Route.Num()) Richtung = -Richtung;
+    // Wegpunkt erreicht: naechsten ansteuern, am Ende umkehren - oder auf
+    // einem Rundkurs vorn wieder anfangen (siehe bRund).
+    if (Index + Richtung < 0 || Index + Richtung >= Route.Num()) {
+     if (bRund) Index = (Index + Richtung + Route.Num()) % Route.Num();
+     else { Richtung = -Richtung; Wenden++; }
+    }
     else Index += Richtung;
     continue;
    }

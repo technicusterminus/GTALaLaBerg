@@ -124,24 +124,63 @@ function findeKreuzungen(p) {
 // statt je Auto eine einzelne Strasse vor und zurueck zu fahren - erst
 // dadurch biegt ein Auto an einer Kreuzung ueberhaupt ab.
 //
-// Nur beidseitig befahrbare Kanten (graph.e[3] === 0): der Wegfolger im
-// Spiel faehrt die Route am Ende rueckwaerts wieder zurueck (siehe
-// FLaLaBergWegfolger::Bewege), auf einer Einbahnstrasse waere das
-// Geisterfahrt. Die Einbahnregel selbst ist dieselbe wie im Webprojekt
-// (js/world.js buildGraph: ed[3] >= 0 erlaubt a->b, <= 0 erlaubt b->a).
-// Kostet 574 von 8520 Kanten (11 von 146 km), die groesste zusammen-
-// haengende Komponente behaelt 5524 Knoten.
+// Jede Fahrt ist ein geschlossener Rundkurs, kein Hin und Zurueck. Der
+// Wegfolger im Spiel haengt am Ende eines Rundkurses wieder an den Anfang an
+// (siehe FLaLaBergWegfolger::bRund), statt die Route rueckwaerts
+// zurueckzufahren. Das loest zwei Dinge auf einmal: das Auto dreht sich nicht
+// mehr am Routenende auf der Stelle um, und Einbahnstrassen sind nutzbar,
+// weil die Route nie gegen die Fahrtrichtung durchlaufen wird.
+//
+// Der Graph wird deshalb gerichtet gelesen (Einbahnregel wie im Webprojekt,
+// js/world.js buildGraph: ed[3] >= 0 erlaubt a->b, <= 0 erlaubt b->a) und auf
+// die groesste stark zusammenhaengende Komponente beschraenkt: nur dort ist
+// garantiert, dass es von jedem Knoten aus einen gerichteten Rueckweg gibt.
+// Die umfasst 6023 der 8192 Knoten, 100,6 km Strasse und 406 der 574
+// Einbahnkanten.
 const nachbarn = new Map();
 {
-  const fuege = (von, nach, klasse, weite) => {
-    if (!nachbarn.has(von)) nachbarn.set(von, []);
-    nachbarn.get(von).push({ nach, klasse, weite });
-  };
+  const anzahl = graph.p.length / 2;
+  const vor = Array.from({ length: anzahl }, () => []);
+  const rueck = Array.from({ length: anzahl }, () => []);
+  const kanten = [];
   for (const [a, b, klasse, einbahn] of graph.e) {
-    if (einbahn !== 0) continue;
     const weite = Math.hypot(graph.p[2 * b] - graph.p[2 * a], graph.p[2 * b + 1] - graph.p[2 * a + 1]);
     if (weite < 0.5) continue;                 // entartete Kante
-    fuege(a, b, klasse, weite); fuege(b, a, klasse, weite);
+    if (einbahn >= 0) { vor[a].push(b); rueck[b].push(a); kanten.push([a, b, klasse, weite]); }
+    if (einbahn <= 0) { vor[b].push(a); rueck[a].push(b); kanten.push([b, a, klasse, weite]); }
+  }
+  // Starke Zusammenhangskomponenten nach Kosaraju, iterativ (rekursiv waere
+  // bei 8192 Knoten ein Stapelueberlauf).
+  const gesehen = new Uint8Array(anzahl), ordnung = [];
+  for (let s = 0; s < anzahl; s++) {
+    if (gesehen[s]) continue;
+    const stapel = [[s, 0]]; gesehen[s] = 1;
+    while (stapel.length) {
+      const oben = stapel[stapel.length - 1];
+      if (oben[1] < vor[oben[0]].length) {
+        const w = vor[oben[0]][oben[1]++];
+        if (!gesehen[w]) { gesehen[w] = 1; stapel.push([w, 0]); }
+      } else { ordnung.push(oben[0]); stapel.pop(); }
+    }
+  }
+  const komponente = new Int32Array(anzahl).fill(-1);
+  const groesse = [];
+  for (let i = ordnung.length - 1; i >= 0; i--) {
+    const s = ordnung[i];
+    if (komponente[s] >= 0) continue;
+    const id = groesse.length; let anz = 0; const stapel = [s]; komponente[s] = id;
+    while (stapel.length) {
+      const v = stapel.pop(); anz++;
+      for (const w of rueck[v]) if (komponente[w] < 0) { komponente[w] = id; stapel.push(w); }
+    }
+    groesse.push(anz);
+  }
+  let beste = 0;
+  for (let i = 1; i < groesse.length; i++) if (groesse[i] > groesse[beste]) beste = i;
+  for (const [von, nach, klasse, weite] of kanten) {
+    if (komponente[von] !== beste || komponente[nach] !== beste) continue;
+    if (!nachbarn.has(von)) nachbarn.set(von, []);
+    nachbarn.get(von).push({ nach, klasse, weite });
   }
 }
 const knotenOrt = n => [graph.p[2 * n], graph.p[2 * n + 1]];
@@ -204,19 +243,76 @@ function baueFahrt(startVon, startNach, zielLaenge) {
     laenge += gewaehlt.weite;
     vorher = jetzt; jetzt = gewaehlt.nach;
   }
-  return { kette, laenge };
+  return { kette, laenge, benutzt, ende: jetzt, vorletzter: vorher };
+}
+
+// Kuerzester gerichteter Rueckweg zum Startknoten, damit die Fahrt ein
+// geschlossener Rundkurs wird. Schon befahrene Kanten kosten das Vierfache:
+// der Rueckweg soll moeglichst neue Strassen nehmen statt die Hinfahrt
+// einfach rueckwaerts abzufahren - erlaubt bleibt es, weil es sonst bei
+// Stichstrassen gar keinen Rueckweg gaebe.
+// Zwei Kehrtwenden muessen verhindert werden, sonst hat der Ring eine
+// 180-Grad-Spitze statt einer Kurve:
+//   "verbotenAmStart" ist der Knoten, aus dem die Hinfahrt zuletzt kam - der
+//   erste Schritt des Rueckwegs darf nicht dorthin zurueck (Wende am
+//   Umkehrpunkt).
+//   "verbotenAmZiel" ist der zweite Knoten des Rings - der Rueckweg darf
+//   nicht von dort auf den Startknoten einbiegen, sonst trifft er die
+//   Hinfahrt frontal an der Naht. Genau das erzeugte zuvor in 33 von 70
+//   Ringen eine exakte 180-Grad-Spitze direkt hinter dem Startpunkt.
+function rueckweg(von, ziel, benutzt, verbotenAmStart, verbotenAmZiel) {
+  const dist = new Map([[von, 0]]), herkunft = new Map();
+  // Binaerhaufen: bei 6000 Knoten je Auto ist eine lineare Suche zu langsam.
+  const haufen = [[0, von]];
+  const hoch = i => { while (i > 0) { const e = (i - 1) >> 1;
+    if (haufen[e][0] <= haufen[i][0]) break; [haufen[e], haufen[i]] = [haufen[i], haufen[e]]; i = e; } };
+  const runter = i => { for (;;) { const l = 2 * i + 1, r = l + 1; let k = i;
+    if (l < haufen.length && haufen[l][0] < haufen[k][0]) k = l;
+    if (r < haufen.length && haufen[r][0] < haufen[k][0]) k = r;
+    if (k === i) break; [haufen[k], haufen[i]] = [haufen[i], haufen[k]]; i = k; } };
+  while (haufen.length) {
+    const [d, v] = haufen[0];
+    haufen[0] = haufen[haufen.length - 1]; haufen.pop(); if (haufen.length) runter(0);
+    if (d > (dist.get(v) ?? Infinity)) continue;
+    if (v === ziel) break;
+    for (const o of nachbarn.get(v) || []) {
+      if (v === von && o.nach === verbotenAmStart) continue;
+      if (o.nach === ziel && v === verbotenAmZiel) continue;
+      const kosten = o.weite * (benutzt.has(kantenName(v, o.nach)) ? 4 : 1);
+      if (d + kosten < (dist.get(o.nach) ?? Infinity)) {
+        dist.set(o.nach, d + kosten);
+        herkunft.set(o.nach, { von: v, klasse: o.klasse, weite: o.weite });
+        haufen.push([d + kosten, o.nach]); hoch(haufen.length - 1);
+      }
+    }
+  }
+  if (!herkunft.has(ziel) && von !== ziel) return null;
+  const rueck = []; let k = ziel, laenge = 0;
+  while (k !== von) {
+    const h = herkunft.get(k);
+    if (!h) return null;
+    rueck.push({ n: k, klasse: h.klasse });
+    laenge += h.weite;
+    k = h.von;
+  }
+  rueck.reverse();
+  return { kette: rueck, laenge };
 }
 
 // Wegpunkte verdichten wie resample(), aber Ecken erhalten: ein Punkt mit
 // deutlicher Richtungsaenderung ist eine Kreuzung oder ein echter Knick und
 // muss erhalten bleiben, sonst schneidet der gleichmaessige Abstand die
 // Kurve auf einer willkuerlichen Sehne ab, statt ihr zu folgen.
+// Arbeitet auf einem geschlossenen Ring: der letzte Punkt ist mit dem ersten
+// verbunden, ohne dass er doppelt in der Liste steht (siehe Rundkurs oben).
 const ECKE_AB = Math.cos((180 - 12) * Math.PI / 180);   // Knick ab 12 Grad
-function verdichte(pkte, schritt) {
-  const aus = [pkte[0]];
+function verdichte(ring, schritt) {
+  const n = ring.length;
+  const aus = [ring[0]];
   let rest = schritt;
-  for (let i = 0; i + 1 < pkte.length; i++) {
-    let a = pkte[i]; const b = pkte[i + 1];
+  for (let i = 0; i < n; i++) {
+    let a = ring[i];
+    const b = ring[(i + 1) % n];
     let seglen = Math.hypot(b.x - a.x, b.z - a.z);
     while (seglen >= rest) {
       const t = rest / seglen;
@@ -227,15 +323,15 @@ function verdichte(pkte, schritt) {
     // Ecke am Endpunkt dieses Segments? Dann diesen Punkt selbst behalten.
     // Richtung aus den urspruenglichen Segmenten, nicht aus dem zuletzt
     // ausgegebenen Punkt: der kann genau auf b liegen und ergaebe dann einen
-    // Nullvektor statt einer Richtung.
-    const v = pkte[i], c = pkte[i + 2];
-    if (!c) continue;
+    // Nullvektor statt einer Richtung. Der letzte Durchlauf (i = n-1) endet
+    // auf ring[0], dessen Ecke schon als Startpunkt in "aus" steht.
+    if (i === n - 1) break;
+    const v = ring[i], c = ring[(i + 2) % n];
     const l1 = Math.hypot(b.x - v.x, b.z - v.z), l2 = Math.hypot(c.x - b.x, c.z - b.z);
     if (l1 < 0.2 || l2 < 0.2) continue;
     const cos = ((b.x - v.x) * (c.x - b.x) + (b.z - v.z) * (c.z - b.z)) / (l1 * l2);
     if (cos < ECKE_AB) { aus.push(b); rest = schritt; }
   }
-  aus.push(pkte[pkte.length - 1]);
   return aus;
 }
 
@@ -245,12 +341,16 @@ function verdichte(pkte, schritt) {
 // nie mehr als knapp die Haelfte der angrenzenden Segmente verbraucht.
 // Die Bogenpunkte erben die wichtigere (niedrigere) der beiden Klassen: wer
 // von der Hauptstrasse abbiegt, behaelt in der Kreuzung deren Vorfahrt.
+// Auch dies auf einem geschlossenen Ring: die Naht, an der sich der Rundkurs
+// schliesst, ist eine Ecke wie jede andere und muss genauso gerundet werden -
+// sonst faehrt das Auto genau einmal je Runde einen Knick.
 const RUNDUNG_AB = 12 * Math.PI / 180;
-function rundeEcken(pkte) {
-  if (pkte.length < 3) return pkte;
-  const aus = [pkte[0]];
-  for (let i = 1; i + 1 < pkte.length; i++) {
-    const A = pkte[i - 1], B = pkte[i], C = pkte[i + 1];
+function rundeEcken(ring) {
+  const n = ring.length;
+  if (n < 3) return ring;
+  const aus = [];
+  for (let i = 0; i < n; i++) {
+    const A = ring[(i - 1 + n) % n], B = ring[i], C = ring[(i + 1) % n];
     const v1x = A.x - B.x, v1z = A.z - B.z, v2x = C.x - B.x, v2z = C.z - B.z;
     const l1 = Math.hypot(v1x, v1z), l2 = Math.hypot(v2x, v2z);
     if (l1 < 0.2 || l2 < 0.2) continue;
@@ -260,6 +360,12 @@ function rundeEcken(pkte) {
     const klasse = Math.min(B.klasse, C.klasse);
     const breite = BREITE_JE_KLASSE[klasse] ?? 3.8;
     const r = Math.min(breite * 1.6, 11, l1 * 0.45, l2 * 0.45);
+    // Zu kurze Nachbarsegmente lassen keinen sinnvollen Bogen zu - ein Bogen
+    // mit Zentimeterradius waere nur eine Punktwolke auf der Ecke. Und bei
+    // einer echten Kehrtwende (ueber 150 Grad) liegen Anfang und Ende des
+    // Bogens fast auf demselben Strahl: der Bogen wuerde als Spitze
+    // hinauslaufen und wieder zurueck. In beiden Faellen die Ecke behalten.
+    if (r < 0.5 || abweichung > 150 * Math.PI / 180) { aus.push(B); continue; }
     const p0 = { x: B.x + v1x / l1 * r, z: B.z + v1z / l1 * r };
     const p2 = { x: B.x + v2x / l2 * r, z: B.z + v2z / l2 * r };
     const stufen = 2 + Math.round(abweichung / (Math.PI / 8));
@@ -272,8 +378,23 @@ function rundeEcken(pkte) {
       });
     }
   }
-  aus.push(pkte[pkte.length - 1]);
-  return aus;
+  // Zu dichte Punkte wegwerfen: an einem sehr kurzen Segment faellt der
+  // Bogenradius winzig aus, und die Bogenpunkte liegen dann im Zentimeter-
+  // abstand uebereinander. Fuer die Fahrt aendern sie nichts, verfaelschen
+  // aber jede Richtungsrechnung (Nullvektor) und blaehen die Datei auf.
+  const knapp = [];
+  for (const p of aus) {
+    const l = knapp[knapp.length - 1];
+    if (l && Math.hypot(p.x - l.x, p.z - l.z) < 0.3) continue;
+    knapp.push(p);
+  }
+  // Auch ueber die Naht hinweg, sonst liegt der letzte Punkt auf dem ersten.
+  while (knapp.length > 3) {
+    const a = knapp[knapp.length - 1], b = knapp[0];
+    if (Math.hypot(a.x - b.x, a.z - b.z) >= 0.3) break;
+    knapp.pop();
+  }
+  return knapp;
 }
 
 // Startkanten: gewichtet gezogen statt nach Klasse sortiert. Streng sortiert
@@ -283,12 +404,9 @@ function rundeEcken(pkte) {
 // aber vor; zusaetzlich ein Mindestabstand zwischen den Startpunkten, damit
 // der Verkehr ueber die Stadt verteilt ist und nicht 70 Autos auf derselben
 // Strasse stehen.
-// 1000 m statt der ersten 520 m: der Wegfolger im Spiel dreht am Routenende
-// auf der Stelle um (siehe FLaLaBergWegfolger::Bewege), und bei 346 m
-// Medianlaenge passierte das im Abbiegetest mehrfach je Auto in 38 s -
-// sichtbar haeufiger als beim alten Modell, das die laengsten Strassen der
-// Stadt nahm. Laengere Fahrten schieben die Wendepunkte auseinander.
-const FAHRT_LAENGE = 1000;
+// Laenge der Hinfahrt; der Rueckweg zum Startknoten kommt etwa in derselben
+// Groessenordnung dazu, ein Rundkurs wird also rund doppelt so lang.
+const FAHRT_LAENGE = 600;
 const FAHRT_VERSUCHE = 4;
 const START_GEWICHT = { 0: 2.2, 1: 1.8, 2: 1.4, 3: 1.0, 4: 0.8 };
 const START_ABSTAND = 120;
@@ -310,17 +428,27 @@ for (const k of startKanten) {
   if (autos.length >= AUTO_ROUTEN) break;
   const [kx, kz] = knotenOrt(k.a);
   if (startOrte.some(([x, z]) => Math.hypot(x - kx, z - kz) < START_ABSTAND)) continue;
-  // Mehrere Versuche je Startkante, die laengste Fahrt gewinnt: eine
-  // Zufallsfahrt kann frueh in einer Sackgasse oder einem Stichweg enden,
-  // ein zweiter Wurf ab derselben Kante findet meist weiter.
+  // Mehrere Versuche je Startkante, der laengste Rundkurs gewinnt: eine
+  // Zufallsfahrt kann frueh in einem Stichweg enden, ein zweiter Wurf ab
+  // derselben Kante findet meist weiter. Jede Hinfahrt wird ueber den
+  // kuerzesten gerichteten Rueckweg zum Startknoten zu einem Ring
+  // geschlossen - erst dadurch braucht das Auto im Spiel nie zu wenden.
   let kette = null, laenge = 0;
   for (let versuch = 0; versuch < FAHRT_VERSUCHE; versuch++) {
     const ziel = FAHRT_LAENGE * (0.75 + Math.random() * 0.65);
     const fahrt = baueFahrt(k.a, k.b, ziel);
-    if (fahrt.laenge > laenge) { kette = fahrt.kette; laenge = fahrt.laenge; }
-    if (laenge >= ziel * 0.9) break;
+    if (fahrt.kette.length < 3) continue;
+    const heim = rueckweg(fahrt.ende, k.a, fahrt.benutzt, fahrt.vorletzter, k.b);
+    if (!heim) continue;
+    // Der Rueckweg endet auf dem Startknoten, der schon als erstes Glied im
+    // Ring steht - sein letztes Glied deshalb weglassen, sonst liegt der
+    // Startpunkt doppelt im Ring.
+    const ring = fahrt.kette.concat(heim.kette.slice(0, -1));
+    const gesamt = fahrt.laenge + heim.laenge;
+    if (gesamt > laenge) { kette = ring; laenge = gesamt; }
+    if (laenge >= ziel * 1.4) break;
   }
-  if (laenge < 260 || !kette || kette.length < 3) { uebersprungen++; continue; }
+  if (laenge < 260 || !kette || kette.length < 4) { uebersprungen++; continue; }
   const roh = kette.map(({ n, klasse }) => {
     const [x, z] = knotenOrt(n);
     return { x, z, klasse: klasse ?? 3 };
@@ -337,6 +465,10 @@ for (const k of startKanten) {
   const bp = punkte.map(p => BREITE_JE_KLASSE[p.klasse] ?? 3.8);
   autos.push({
     w: Math.max(3.0, Math.min(...bp)), klasse: Math.min(...kp),
+    // "rund": geschlossener Ring - der Wegfolger haengt hinter dem letzten
+    // Wegpunkt wieder den ersten an, statt die Route rueckwaerts
+    // zurueckzufahren (siehe FLaLaBergWegfolger).
+    rund: true,
     kp, bp, kreuzungen: findeKreuzungen(flach), p: weg.flat(),
   });
   startOrte.push([kx, kz]);
