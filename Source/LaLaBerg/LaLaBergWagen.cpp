@@ -435,22 +435,42 @@ void ALaLaBergWagen::Aussteigen() {
 
 void ALaLaBergWagen::Tick(float Zeit) {
  Super::Tick(Zeit);
- UE_LOG(LogTemp, Warning, TEXT("LALABERG_CHAOS_DEBUG gang=%d ziel_gang=%d drehzahl=%.0f max_drehzahl=%.0f bremse=%d handbremse=%d gas=%.2f tempo_kmh=%.2f"),
-  Bewegung ? Bewegung->GetCurrentGear() : -999, Bewegung ? Bewegung->GetTargetGear() : -999,
-  Bewegung ? Bewegung->GetEngineRotationSpeed() : -1.0f, Bewegung ? Bewegung->GetEngineMaxRotationSpeed() : -1.0f,
-  bBremse, !GetController(), GasWert, Bewegung ? Bewegung->GetForwardSpeedMPH() * 1.60934f : -999.0f);
- if (Bewegung && Bewegung->HasValidPhysicsState())
-  for (int32 i = 0; i < Bewegung->GetNumWheels(); i++) {
-   const FWheelStatus& S = Bewegung->GetWheelState(i);
-   UE_LOG(LogTemp, Warning, TEXT("LALABERG_CHAOS_RAD %d kontakt=%d federweg=%.2f drehmoment=%.1f bremsmoment=%.1f schlupf=%.2f rutscht=%d federkraft=%.1f material=%s reibung=%.2f"),
-    i, S.bInContact, S.NormalizedSuspensionLength, S.DriveTorque, S.BrakeTorque, S.SlipMagnitude, S.bIsSkidding,
-    S.SpringForce, S.PhysMaterial.IsValid() ? *S.PhysMaterial->GetName() : TEXT("-"),
-    S.PhysMaterial.IsValid() ? S.PhysMaterial->Friction : -1.0f);
-  }
  if (!Bewegung || !Rumpf || !Rumpf->IsSimulatingPhysics()) return;
 
  // Lenkung nachziehen, nicht schlagartig setzen
  Lenkung = FMath::FInterpTo(Lenkung, LenkWert, Zeit, 6.0f);
+
+ // Spurhalteassistenz: zwei Seitensonden knapp vor dem Wagen pruefen, ob
+ // dort noch Fahrbahn liegt (Sektor-Actor mit Tag gleich dem Abschnitts-
+ // namen, siehe ALaLaBergGameMode::LadeAusAssets "Actor->Tags.Add(*Klasse)")
+ // - erkennt nur eine Seite die Strasse nicht mehr, schiebt eine sanfte
+ // Lenkkorrektur zur anderen Seite zurueck. Wirkt nur, solange der Fahrer
+ // selbst kaum lenkt (skaliert mit 1-|LenkWert|), uebersteuert also keine
+ // absichtliche scharfe Kurve, und nur bei nennenswertem Tempo - im Stand
+ // oder beim Rangieren waere die Vorausschau ohnehin bedeutungslos.
+ if (GetController() && FMath::Abs(TempoKmh()) > 12.0f) {
+  const FVector Ort = GetActorLocation();
+  const FVector Vorwaerts = GetActorForwardVector();
+  const FVector Rechts = GetActorRightVector();
+  const FVector Voraus = Ort + Vorwaerts * 550.0f;
+  auto AufFahrbahn = [this](const FVector& P) {
+   FHitResult Treffer; FCollisionQueryParams Fragen; Fragen.AddIgnoredActor(this);
+   if (!GetWorld()->LineTraceSingleByChannel(Treffer, P + FVector(0, 0, 150), P - FVector(0, 0, 400),
+        ECC_Visibility, Fragen)) return false;
+   if (!Treffer.GetActor()) return false;
+   // Tag ist der volle Abschnittsname (z.B. "Road_111", siehe LadeAusAssets
+   // "Actor->Tags.Add(*Klasse)") - kein exaktes "Road", deshalb Praefix-Test.
+   for (const FName& Tag : Treffer.GetActor()->Tags)
+    if (Tag.ToString().StartsWith(TEXT("Road"))) return true;
+   return false;
+  };
+  const bool bLinksFrei = AufFahrbahn(Voraus - Rechts * 260.0f);
+  const bool bRechtsFrei = AufFahrbahn(Voraus + Rechts * 260.0f);
+  if (bLinksFrei != bRechtsFrei) {
+   const float Korrektur = (bRechtsFrei ? -1.0f : 1.0f) * 0.22f * (1.0f - FMath::Abs(LenkWert));
+   Lenkung = FMath::Clamp(Lenkung + Korrektur, -1.0f, 1.0f);
+  }
+ }
 
  Bewegung->SetThrottleInput(bBremse ? 0.0f : GasWert);
  Bewegung->SetSteeringInput(Lenkung);
