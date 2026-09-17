@@ -114,7 +114,7 @@ Die Fahrzeugdarstellung nutzt einen bewusst aggressiven Sichtweiten-Kompromiss:
 
 Diese Pooling-Strategie reduziert Draw Calls massiv. Ohne Pooling sank die Bildrate bei 1.078 geparkten Fahrzeugen im Fahrtest von 26 auf 17 fps; alle Detailfahrzeuge gleichzeitig führten zu rund 2 fps.
 
-Der fahrbare Wagen selbst fährt aktuell über eine vereinfachte Federung aus vier Strahlen statt echter Chaos-Vehicle-Physik - siehe „Bekannte Grenzen" für den Stand eines begonnenen, aber nicht übernommenen Umbaus.
+Der fahrbare Wagen läuft über echte Chaos-Vehicle-Physik (`UChaosWheeledVehicleMovementComponent`) statt vier Federstrahlen - Motor-/Getriebekennfeld, Vorderradlenkung, Hinterradantrieb, echte Reifenreibung je Rad. Ein experimenteller Einheiten-Bug im ChaosVehiclesPlugin selbst schwächte Antriebs- und Bremskraft um Faktor 100 (Drehmoment wird durch den Radradius geteilt, der im Plugin als Zentimeter statt Meter geführt wird) - siehe „Bekannte Grenzen" für Details der Diagnose.
 
 ### Spielfigur
 
@@ -584,28 +584,14 @@ Die Skylight-Cubemap bleibt aktuell eine feste Tagesaufnahme. Die Echtzeitaufnah
 
 ### Chaos Vehicles
 
-Ein Umbau auf echte Chaos-Vehicle-Physik wurde begonnen, jedoch nicht übernommen - der fahrbare Wagen läuft weiterhin über die ursprüngliche Federstrahl-Physik (vier Strahlen).
+Der Umbau auf echte Chaos-Vehicle-Physik ist abgeschlossen und aktiv (`UChaosWheeledVehicleMovementComponent`, siehe `LaLaBergWagen`/`LaLaBergWagenBewegung`/`LaLaBergWagenRad`).
 
-Untersucht wurde `UChaosWheeledVehicleMovementComponent` mit:
+Zwei Engine-eigene Probleme im UE-5.8-`ChaosVehiclesPlugin` (Experimental) mussten dafür umgangen werden:
 
-- Motor- und Getriebekennfeldern
-- Vorderradlenkung
-- Hinterradantrieb
-- Radkontaktprüfung
-- Federkompression
-- Federkraft von ungefähr 125.000 N
-- Reifenreibung von 0,70
-- Antriebsmoment von ungefähr 986 Nm
+- `CanCreateVehicle()` verlangt einen Bone-Namen pro Rad, selbst wenn kein Skeletal Mesh verwendet wird, obwohl `UChaosVehicleMovementComponent::LocateBoneOffset()` `BoneName=NAME_None` ausdrücklich unterstützt - eine Unterklasse überspringt nur genau diese eine Prüfung.
+- Ein Einheiten-Bug in `WheelSystem.cpp` selbst: `AppliedLinearDriveForce = DriveTorque / Re` teilt ein in Newtonmetern authored Drehmoment durch `Re`, den Radradius - der ist im selben Plugin überall sonst ausdrücklich in Zentimetern dokumentiert (`WheelSystem.h`: `float Re; // [cm]`), obwohl der Code-Kommentar direkt über dieser Division selbst einräumt, dass „the simulated radius for torque must be real size" (= Meter) sein müsste. Bei `WheelRadius=33` (cm) macht das jede daraus berechnete Kraft (Antrieb wie Bremse) exakt hundertfach zu schwach - äußerte sich als: alle Rad-Messwerte (Kontakt, Federweg, Reibung, Antriebsmoment) sahen plausibel aus, die Karosserie beschleunigte trotzdem nie, auch nicht nach einer Verzehnfachung des Drehmoments (der eigentlich nötige Faktor lag bei 100, nicht 10). Workaround ohne Änderung am Engine-Code: `MaxTorque`/`MaxBrakeTorque`/`MaxHandBrakeTorque` in den eigenen Setups um Faktor 100 überhöht.
 
-Die Radmesswerte waren plausibel, die Karosserie beschleunigte jedoch nicht. Auch eine Verzehnfachung des Drehmoments änderte daran nichts.
-
-Zusätzliche Engine-Probleme mussten bereits umgangen werden:
-
-- `CanCreateVehicle()` verlangt in UE 5.8 offenbar einen Bone-Namen pro Rad, selbst wenn kein Skeletal Mesh verwendet wird.
-- Die Radgeometrie musste an die Rumpf-Kollisionsbox angepasst werden.
-- Die Ursache der fehlenden Beschleunigung liegt vermutlich tiefer im experimentellen ChaosVehiclesPlugin oder in einer nicht verbundenen Komponente des Setups.
-
-Eine vorbereitete Community-Anfrage befindet sich unter:
+Die ausführliche Diagnose (ursprünglich als Community-Anfrage vorbereitet, mittlerweile mit der Lösung ergänzt) steht unter:
 
 ```text
 Docs/ChaosVehicle-ForumAnfrage.md

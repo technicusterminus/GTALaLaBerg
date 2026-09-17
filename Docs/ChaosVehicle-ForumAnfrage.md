@@ -1,5 +1,23 @@
 # Forum-Beitrag: Chaos Vehicle - drive force never reaches chassis (non-skeletal setup, UE 5.8)
 
+**GELOEST (siehe Commit "Chaos-Vehicle-Bug geloest..."):** Ursache war ein
+Einheiten-Bug in `WheelSystem.cpp` selbst - `AppliedLinearDriveForce =
+DriveTorque / Re` teilt ein in Newtonmetern authored Drehmoment durch `Re`,
+das im selben Plugin ueberall sonst ausdruecklich in Zentimetern dokumentiert
+ist (`WheelSystem.h`: `float Re; // [cm]`), obwohl der Code-Kommentar direkt
+ueber dieser Division selbst einraeumt, dass "the simulated radius for
+torque must be real size" (= Meter) sein muesste. Bei `WheelRadius=33` (cm)
+macht das jede daraus berechnete Kraft exakt hundertfach zu schwach - sowohl
+Antrieb (`DriveTorque`) als auch Bremse (`BrakeTorque`), da beide dieselbe
+Formel mit demselben `Re` durchlaufen. Der Workaround (ohne Aenderung am
+Engine-Code): `MaxTorque`/`MaxBrakeTorque`/`MaxHandBrakeTorque` in den
+eigenen `UChaosVehicleWheel`-/Engine-Setups um Faktor 100 ueberhoehen, siehe
+`LaLaBergWagen.cpp` (`EngineSetup.MaxTorque`) und `LaLaBergWagenRad.cpp`
+(`MaxBrakeTorque`/`MaxHandBrakeTorque`). Die urspruengliche Frage 2 unten
+("Is the Re cm-vs-meters inconsistency ... a real bug?") ist damit
+empirisch bestaetigt: ja. Dieses Dokument bleibt als Fundstelle/Beleg
+erhalten, falls der Bug trotzdem irgendwann an Epic gemeldet werden soll.
+
 Zum Posten in z. B. forums.unrealengine.com (Physics/Vehicles-Bereich), UE Discord #physics oder AnswerHub. Englisch, da internationale Community.
 
 ---
