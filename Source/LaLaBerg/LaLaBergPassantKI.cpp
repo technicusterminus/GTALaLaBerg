@@ -230,51 +230,60 @@ void ALaLaBergPassantKI::BeginPlay() {
  // Einzel-Figuren (1..N, ein komplettes Mesh mit eigener Animation, siehe
  // EINZEL_FIGUREN) - fuer echte Gesichtsvielfalt statt immer derselben
  // Farmer-Person.
- const int32 Wahl = FMath::RandRange(0, EINZEL_FIGUREN_ANZAHL);
- if (Wahl == 0) {
-  USkeletalMesh* MeshKoerper = LadeNPCTeil(TEXT("Body"));
-  USkeletalMesh* MeshKopf = LadeNPCTeil(TEXT("Head"));
-  USkeletalMesh* MeshFuesse = LadeNPCTeil(TEXT("Feet"));
-  USkeletalMesh* MeshBeine = LadeNPCTeil(TEXT("Legs"));
-  if (MeshKoerper && MeshKopf && MeshFuesse && MeshBeine) {
-   bSkelettGenutzt = true;
-   FigurTyp = 0;
-   SkelettKoerper->SetSkeletalMesh(MeshKoerper);
-   SkelettKopf->SetSkeletalMesh(MeshKopf);
-   SkelettFuesse->SetSkeletalMesh(MeshFuesse);
-   SkelettBeine->SetSkeletalMesh(MeshBeine);
-   // Kopf/Fuesse/Beine folgen der Pose von SkelettKoerper, statt selbst eine
-   // AnimSequence abzuspielen - vier Teile, eine Animation. Die Skalierung
-   // dagegen muss auf allen vieren einzeln gesetzt werden: sie sind eigene
-   // Geschwisterkomponenten an Huelle, keine Kinder von SkelettKoerper -
-   // LeaderPoseComponent uebertraegt nur die Skelett-Pose, nicht die
-   // Komponenten-Transform.
-   SkelettKopf->SetLeaderPoseComponent(SkelettKoerper);
-   SkelettFuesse->SetLeaderPoseComponent(SkelettKoerper);
-   SkelettBeine->SetLeaderPoseComponent(SkelettKoerper);
-   for (USkeletalMeshComponent* Teil : { SkelettKoerper, SkelettKopf, SkelettFuesse, SkelettBeine }) {
-    Teil->SetVisibility(true);
-    Teil->SetRelativeScale3D(FVector(Statur));
-    FaerbeSkelett(Teil, Jacke);
+ // Reihenfolge zufaellig mischen und der Reihe nach versuchen, statt bei
+ // der ersten (zufaellig gezogenen) Figur mit fehlendem Asset direkt auf
+ // das Kasten-Fallback-Rig zurueckzufallen - das Rig bleibt so nur noch
+ // reserviert fuer den Fall, dass wirklich KEINE der Figuren laedt.
+ TArray<int32> Reihenfolge;
+ for (int32 i = 0; i <= EINZEL_FIGUREN_ANZAHL; i++) Reihenfolge.Add(i);
+ for (int32 i = Reihenfolge.Num() - 1; i > 0; i--) Reihenfolge.SwapMemory(i, FMath::RandRange(0, i));
+ for (int32 Wahl : Reihenfolge) {
+  if (bSkelettGenutzt) break;
+  if (Wahl == 0) {
+   USkeletalMesh* MeshKoerper = LadeNPCTeil(TEXT("Body"));
+   USkeletalMesh* MeshKopf = LadeNPCTeil(TEXT("Head"));
+   USkeletalMesh* MeshFuesse = LadeNPCTeil(TEXT("Feet"));
+   USkeletalMesh* MeshBeine = LadeNPCTeil(TEXT("Legs"));
+   if (MeshKoerper && MeshKopf && MeshFuesse && MeshBeine) {
+    bSkelettGenutzt = true;
+    FigurTyp = 0;
+    SkelettKoerper->SetSkeletalMesh(MeshKoerper);
+    SkelettKopf->SetSkeletalMesh(MeshKopf);
+    SkelettFuesse->SetSkeletalMesh(MeshFuesse);
+    SkelettBeine->SetSkeletalMesh(MeshBeine);
+    // Kopf/Fuesse/Beine folgen der Pose von SkelettKoerper, statt selbst eine
+    // AnimSequence abzuspielen - vier Teile, eine Animation. Die Skalierung
+    // dagegen muss auf allen vieren einzeln gesetzt werden: sie sind eigene
+    // Geschwisterkomponenten an Huelle, keine Kinder von SkelettKoerper -
+    // LeaderPoseComponent uebertraegt nur die Skelett-Pose, nicht die
+    // Komponenten-Transform.
+    SkelettKopf->SetLeaderPoseComponent(SkelettKoerper);
+    SkelettFuesse->SetLeaderPoseComponent(SkelettKoerper);
+    SkelettBeine->SetLeaderPoseComponent(SkelettKoerper);
+    for (USkeletalMeshComponent* Teil : { SkelettKoerper, SkelettKopf, SkelettFuesse, SkelettBeine }) {
+     Teil->SetVisibility(true);
+     Teil->SetRelativeScale3D(FVector(Statur));
+     FaerbeSkelett(Teil, Jacke);
+    }
+    if (auto* Anim = LoadObject<UAnimSequence>(nullptr, TEXT("/Game/Art/People/Animations/Anim_HumansCharacterArmature_Idle_Neutral.Anim_HumansCharacterArmature_Idle_Neutral")))
+     SkelettKoerper->PlayAnimation(Anim, true);
    }
-   if (auto* Anim = LoadObject<UAnimSequence>(nullptr, TEXT("/Game/Art/People/Animations/Anim_HumansCharacterArmature_Idle_Neutral.Anim_HumansCharacterArmature_Idle_Neutral")))
-    SkelettKoerper->PlayAnimation(Anim, true);
-  }
- } else {
-  // Einzel-Figur: ein komplettes Mesh mit eigener Animation (siehe
-  // Tools/importiere_npc_einzeln.py) - nur SkelettKoerper wird gebraucht,
-  // Kopf/Fuesse/Beine bleiben ungenutzt (unsichtbar per Default).
-  const TCHAR* Name = EINZEL_FIGUREN[Wahl - 1].Name;
-  if (USkeletalMesh* Mesh = LoadObject<USkeletalMesh>(nullptr,
-      *FString::Printf(TEXT("/Game/Art/People/%s/SK_%s.SK_%s"), Name, Name, Name))) {
-   bSkelettGenutzt = true;
-   FigurTyp = Wahl;
-   SkelettKoerper->SetSkeletalMesh(Mesh);
-   SkelettKoerper->SetVisibility(true);
-   SkelettKoerper->SetRelativeScale3D(FVector(Statur));
-   FaerbeSkelett(SkelettKoerper, Jacke);
-   if (auto* Anim = LoadObject<UAnimSequence>(nullptr, *EinzelAnimPfad(Name, TEXT("Idle_Neutral"))))
-    SkelettKoerper->PlayAnimation(Anim, true);
+  } else {
+   // Einzel-Figur: ein komplettes Mesh mit eigener Animation (siehe
+   // Tools/importiere_npc_einzeln.py) - nur SkelettKoerper wird gebraucht,
+   // Kopf/Fuesse/Beine bleiben ungenutzt (unsichtbar per Default).
+   const TCHAR* Name = EINZEL_FIGUREN[Wahl - 1].Name;
+   if (USkeletalMesh* Mesh = LoadObject<USkeletalMesh>(nullptr,
+       *FString::Printf(TEXT("/Game/Art/People/%s/SK_%s.SK_%s"), Name, Name, Name))) {
+    bSkelettGenutzt = true;
+    FigurTyp = Wahl;
+    SkelettKoerper->SetSkeletalMesh(Mesh);
+    SkelettKoerper->SetVisibility(true);
+    SkelettKoerper->SetRelativeScale3D(FVector(Statur));
+    FaerbeSkelett(SkelettKoerper, Jacke);
+    if (auto* Anim = LoadObject<UAnimSequence>(nullptr, *EinzelAnimPfad(Name, TEXT("Idle_Neutral"))))
+     SkelettKoerper->PlayAnimation(Anim, true);
+   }
   }
  }
 

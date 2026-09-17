@@ -32,6 +32,20 @@ namespace {
  // voll qualifiziert aufgerufen.
  const FLinearColor JACKE(0.20f, 0.22f, 0.25f), HOSE(0.15f, 0.16f, 0.18f), HAUT(0.79f, 0.63f, 0.51f);
  constexpr float HUEFT_GRAD = 22.0f, KNIE_GRAD = 38.0f, SCHULTER_GRAD = 16.0f;
+ // Grundrichtung des rechten Arms (Kamera-Pitch=0): schraeg nach vorn-rechts-
+ // unten, als wuerde die Figur die Waffe waagerecht vor sich halten. Der
+ // Pitch (in Grad, positiv = nach oben zielen) kippt diese Richtung um die
+ // lokale Rechts-Achse (Y) - der Oberarm haengt an Schulter->Kapsel, deren
+ // Gier bereits der Kamera folgt (bUseControllerRotationYaw), nur der Pitch
+ // fehlt hier noch. Ueber FindBetweenVectors statt eines geratenen
+ // FRotator-Winkels: das Glied haengt lokal an -Z, und ob ein positiver
+ // Pitch es nach vorn oder nach hinten kippt, ist ohne Testbild nicht
+ // zuverlaessig zu erraten.
+ FQuat ArmDrehungFuerPitch(float PitchGrad) {
+  const FVector Basis(0.75f, 0.4f, -0.35f);
+  const FVector Richtung = Basis.RotateAngleAxis(-PitchGrad, FVector(0, 1, 0));
+  return FQuat::FindBetweenVectors(FVector(0, 0, -1), Richtung.GetSafeNormal());
+ }
  // Wie LaLaBergPassantKI::FaerbeSkelett - das Farmer-Paket bringt nur eine
  // Kleidungsfarbe je Material-Slot mit, ohne dies saehe die Spielfigur wie
  // jeder KI-Passant aus.
@@ -104,13 +118,10 @@ ALaLaBergCharacter::ALaLaBergCharacter() {
   Oberarm[s]->SetCollisionEnabled(ECollisionEnabled::NoCollision);
  }
  // Rechter Oberarm haengt sonst gerade nach unten (wie beim Passanten) -
- // fest nach vorn angehoben, als wuerde die Figur dauerhaft anlegen. Anders
- // als beim linken Arm schwingt dieser nicht mit dem Gang mit (siehe Tick).
- // Ueber FindBetweenVectors statt eines geratenen FRotator-Winkels: das
- // Glied haengt lokal an -Z, und ob ein positiver Pitch es nach vorn oder
- // nach hinten kippt, ist ohne Testbild nicht zuverlaessig zu erraten.
- const FQuat ArmDrehung = FQuat::FindBetweenVectors(FVector(0, 0, -1), FVector(0.75f, 0.4f, -0.35f).GetSafeNormal());
- Schulter[0]->SetRelativeRotation(ArmDrehung.Rotator());
+ // fest nach vorn angehoben, als wuerde die Figur dauerhaft anlegen. Der
+ // Grundwinkel (Kamera-Pitch=0) hier gesetzt, Tick() dreht ihn danach jeden
+ // Frame nach der tatsaechlichen Zielrichtung weiter (siehe dort).
+ Schulter[0]->SetRelativeRotation(ArmDrehungFuerPitch(0.0f).Rotator());
 
  // Griffpunkt an seinem unteren Ende - keine eigene Drehung: seine lokale
  // +X-Achse zeigt durch die Elternkette (Schulter->Oberarm) bereits in die
@@ -217,40 +228,49 @@ void ALaLaBergCharacter::BeginPlay() {
  auto LadeSpielerTeil = [](const TCHAR* Name) {
   return LoadObject<USkeletalMesh>(nullptr, *FString::Printf(TEXT("/Game/Art/People/Farmer/SK_Farmer_%s.SK_Farmer_%s"), Name, Name));
  };
- const int32 Wahl = FMath::RandRange(0, EINZEL_FIGUREN_ANZAHL);
- if (Wahl == 0) {
-  USkeletalMesh* MeshKoerper = LadeSpielerTeil(TEXT("Body"));
-  USkeletalMesh* MeshKopf = LadeSpielerTeil(TEXT("Head"));
-  USkeletalMesh* MeshFuesse = LadeSpielerTeil(TEXT("Feet"));
-  USkeletalMesh* MeshBeine = LadeSpielerTeil(TEXT("Legs"));
-  if (MeshKoerper && MeshKopf && MeshFuesse && MeshBeine) {
-   bSkelettGenutzt = true;
-   FigurTyp = 0;
-   SkelettKoerper->SetSkeletalMesh(MeshKoerper);
-   SkelettKopf->SetSkeletalMesh(MeshKopf);
-   SkelettFuesse->SetSkeletalMesh(MeshFuesse);
-   SkelettBeine->SetSkeletalMesh(MeshBeine);
-   SkelettKopf->SetLeaderPoseComponent(SkelettKoerper);
-   SkelettFuesse->SetLeaderPoseComponent(SkelettKoerper);
-   SkelettBeine->SetLeaderPoseComponent(SkelettKoerper);
-   for (USkeletalMeshComponent* Teil : { SkelettKoerper, SkelettKopf, SkelettFuesse, SkelettBeine }) {
-    Teil->SetVisibility(true);
-    FaerbeSkelett(Teil, JACKE);
+ // Reihenfolge zufaellig mischen und der Reihe nach versuchen, statt bei
+ // der ersten (zufaellig gezogenen) Figur mit fehlendem Asset direkt auf
+ // das Kasten-Fallback-Rig zurueckzufallen - das Rig bleibt so nur noch
+ // reserviert fuer den Fall, dass wirklich KEINE der Figuren laedt.
+ TArray<int32> Reihenfolge;
+ for (int32 i = 0; i <= EINZEL_FIGUREN_ANZAHL; i++) Reihenfolge.Add(i);
+ for (int32 i = Reihenfolge.Num() - 1; i > 0; i--) Reihenfolge.SwapMemory(i, FMath::RandRange(0, i));
+ for (int32 Wahl : Reihenfolge) {
+  if (bSkelettGenutzt) break;
+  if (Wahl == 0) {
+   USkeletalMesh* MeshKoerper = LadeSpielerTeil(TEXT("Body"));
+   USkeletalMesh* MeshKopf = LadeSpielerTeil(TEXT("Head"));
+   USkeletalMesh* MeshFuesse = LadeSpielerTeil(TEXT("Feet"));
+   USkeletalMesh* MeshBeine = LadeSpielerTeil(TEXT("Legs"));
+   if (MeshKoerper && MeshKopf && MeshFuesse && MeshBeine) {
+    bSkelettGenutzt = true;
+    FigurTyp = 0;
+    SkelettKoerper->SetSkeletalMesh(MeshKoerper);
+    SkelettKopf->SetSkeletalMesh(MeshKopf);
+    SkelettFuesse->SetSkeletalMesh(MeshFuesse);
+    SkelettBeine->SetSkeletalMesh(MeshBeine);
+    SkelettKopf->SetLeaderPoseComponent(SkelettKoerper);
+    SkelettFuesse->SetLeaderPoseComponent(SkelettKoerper);
+    SkelettBeine->SetLeaderPoseComponent(SkelettKoerper);
+    for (USkeletalMeshComponent* Teil : { SkelettKoerper, SkelettKopf, SkelettFuesse, SkelettBeine }) {
+     Teil->SetVisibility(true);
+     FaerbeSkelett(Teil, JACKE);
+    }
+    if (auto* Anim = LoadObject<UAnimSequence>(nullptr, TEXT("/Game/Art/People/Animations/Anim_HumansCharacterArmature_Idle_Neutral.Anim_HumansCharacterArmature_Idle_Neutral")))
+     SkelettKoerper->PlayAnimation(Anim, true);
    }
-   if (auto* Anim = LoadObject<UAnimSequence>(nullptr, TEXT("/Game/Art/People/Animations/Anim_HumansCharacterArmature_Idle_Neutral.Anim_HumansCharacterArmature_Idle_Neutral")))
-    SkelettKoerper->PlayAnimation(Anim, true);
-  }
- } else {
-  const TCHAR* Name = EINZEL_FIGUREN[Wahl - 1].Name;
-  if (USkeletalMesh* NeuesMesh = LoadObject<USkeletalMesh>(nullptr,
-      *FString::Printf(TEXT("/Game/Art/People/%s/SK_%s.SK_%s"), Name, Name, Name))) {
-   bSkelettGenutzt = true;
-   FigurTyp = Wahl;
-   SkelettKoerper->SetSkeletalMesh(NeuesMesh);
-   SkelettKoerper->SetVisibility(true);
-   FaerbeSkelett(SkelettKoerper, JACKE);
-   if (auto* Anim = LoadObject<UAnimSequence>(nullptr, *EinzelAnimPfad(Name, TEXT("Idle_Neutral"))))
-    SkelettKoerper->PlayAnimation(Anim, true);
+  } else {
+   const TCHAR* Name = EINZEL_FIGUREN[Wahl - 1].Name;
+   if (USkeletalMesh* NeuesMesh = LoadObject<USkeletalMesh>(nullptr,
+       *FString::Printf(TEXT("/Game/Art/People/%s/SK_%s.SK_%s"), Name, Name, Name))) {
+    bSkelettGenutzt = true;
+    FigurTyp = Wahl;
+    SkelettKoerper->SetSkeletalMesh(NeuesMesh);
+    SkelettKoerper->SetVisibility(true);
+    FaerbeSkelett(SkelettKoerper, JACKE);
+    if (auto* Anim = LoadObject<UAnimSequence>(nullptr, *EinzelAnimPfad(Name, TEXT("Idle_Neutral"))))
+     SkelettKoerper->PlayAnimation(Anim, true);
+   }
   }
  }
  if (bSkelettGenutzt) {
@@ -297,6 +317,13 @@ void ALaLaBergCharacter::Tick(float DeltaSeconds) {
   Huefte[s]->SetRelativeRotation(FRotator(HueftGrad, 0, 0));
   Knie[s]->SetRelativeRotation(FRotator(-KnieGrad, 0, 0));
   if (s == 1) Schulter[s]->SetRelativeRotation(FRotator(-SCHULTER_GRAD * FMath::Sin(Phase) * Faktor, 0, 0));
+ }
+ // Rechter Arm (Waffe) folgt der Zielrichtung: Kamera-Pitch begrenzt auf
+ // einen plausiblen Schulterbereich, sonst zeigt die Muendung durch den
+ // eigenen Koerper (zu weit unten) oder unnatuerlich weit ueber Kopf.
+ if (Controller) {
+  const float Pitch = FMath::Clamp(FRotator::NormalizeAxis(Controller->GetControlRotation().Pitch), -50.0f, 70.0f);
+  Schulter[0]->SetRelativeRotation(ArmDrehungFuerPitch(Pitch).Rotator());
  }
 
  if (bSkelettGenutzt) {
