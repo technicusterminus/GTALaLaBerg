@@ -1,5 +1,6 @@
 #include "LaLaBergHUD.h"
 #include "LaLaBergWagen.h"
+#include "LaLaBergVerkehrsauto.h"
 #include "LaLaBergWaffe.h"
 #include "LaLaBergCharacter.h"
 #include "LaLaBergMenueSteuerung.h"
@@ -54,6 +55,11 @@ void ALaLaBergHUD::Tafel(float X, float Y, float B, float H, const FLinearColor&
  Canvas->DrawItem(Kachel);
 }
 
+void ALaLaBergHUD::ZeigeRueckmeldung(const FString& Text) {
+ Rueckmeldung = Text;
+ RueckmeldungBis = GetWorld()->GetRealTimeSeconds() + 3.5;
+}
+
 void ALaLaBergHUD::DrawHUD() {
  Super::DrawHUD();
  if (!Canvas || !PlayerOwner) return;
@@ -65,6 +71,15 @@ void ALaLaBergHUD::DrawHUD() {
  // Auf 1080 Zeilen bezogen, damit Schrift und Tafeln auf jedem Bildschirm
  // gleich gross wirken.
  Massstab = FMath::Max(0.6f, Canvas->ClipY / 1080.0f);
+ if (!Rueckmeldung.IsEmpty() && GetWorld()->GetRealTimeSeconds() < RueckmeldungBis) {
+  const float MaxBreite = Canvas->ClipX - 40.0f * Massstab;
+  const float TextBreite = Breite(Rueckmeldung, 18, false);
+  const float Punkt = 18.0f * FMath::Min(1.0f, (MaxBreite - 28.0f * Massstab) / FMath::Max(1.0f, TextBreite));
+  const float B = FMath::Min(MaxBreite, Breite(Rueckmeldung, Punkt, false) + 28.0f * Massstab);
+  const float Y = Canvas->ClipY * 0.76f;
+  Tafel((Canvas->ClipX-B)*0.5f, Y, B, 46.0f*Massstab, FLinearColor(0.025f,0.03f,0.04f,0.88f));
+  Schrift(Rueckmeldung, Canvas->ClipX*0.5f, Y+10.0f*Massstab, Punkt, Weiss, false, true);
+ }
 
  APawn* Figur = PlayerOwner->GetPawn();
  if (Figur) {
@@ -85,6 +100,14 @@ void ALaLaBergHUD::DrawHUD() {
  for (TActorIterator<ALaLaBergWagen> It(GetWorld()); It; ++It) {
   if (It->GetController()) continue;
   if (FVector::Dist(It->GetActorLocation(), Figur->GetActorLocation()) < Reichweite) { bWagenNah = true; break; }
+ }
+ // Entry also supports traffic vehicles; use the same range as Character.
+ if (!bWagenNah) {
+  for (TActorIterator<ALaLaBergVerkehrsauto> It(GetWorld()); It; ++It) {
+   if (FVector::Dist(It->GetActorLocation(), Figur->GetActorLocation()) < Reichweite) {
+    bWagenNah = true; break;
+   }
+  }
  }
  if (bWagenNah) Hinweis(TEXT("E"), TEXT("Einsteigen"));
  if (auto* Held = Cast<ALaLaBergCharacter>(Figur)) Fadenkreuz(Held->HoleWaffe());

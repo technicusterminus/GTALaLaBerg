@@ -21,6 +21,8 @@ private:
  // Naechste freie Stelle auf einer Strasse, ausgerichtet entlang der Fahrbahn.
  FTransform SucheFahrbahn(const FVector& Nahe,bool& bGefunden) const;
  FVector FahrtStart=FVector::ZeroVector;
+ bool bFahrtestBestanden = false;
+ bool bFahrtestEinstieg = false;
  FTimerHandle FahrtUhr;
  // Bildratenmessung waehrend des Fahrtests
  uint64 FahrtBilder=0, FahrtLetzteBilder=0;

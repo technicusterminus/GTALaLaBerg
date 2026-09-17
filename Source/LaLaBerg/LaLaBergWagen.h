@@ -5,9 +5,11 @@
 #include "LaLaBergWagen.generated.h"
 
 // Ein fahrbarer Wagen ohne Skelettnetz: die Karosserie entsteht zur Laufzeit
-// aus denselben Querschnitten wie die geparkten Fahrzeuge, die Federung aus
-// vier Strahlen nach unten. Das reicht fuer eine Stadt, in der man faehrt,
-// und kommt ohne vorbereitete Fahrzeug-Assets aus.
+// aus denselben Querschnitten wie die geparkten Fahrzeuge (oder aus den
+// CarConcept-/CitySample-Teilen, siehe BaueKarosserie). Die Physik selbst
+// laeuft ueber UChaosWheeledVehicleMovementComponent (Bewegung) - echtes
+// Motor-/Getriebe-Kennfeld statt vier Federstrahlen, ohne dass die
+// unsichtbare Rumpf-Kollisionsbox dafuer ein Skelettnetz braucht.
 UCLASS()
 class LALABERG_API ALaLaBergWagen : public APawn, public ILaLaBergFarbbar {
  GENERATED_BODY()
@@ -32,6 +34,8 @@ public:
  // unberuehrte Tastatur das Gas in jedem Bild auf null zurueck.
  void TestSteuerung(float Gas, float Lenken) { GasWert = Gas; LenkWert = Lenken; bTest = true; }
  int32 RaederAmBoden() const { return LetzteRaeder; }
+ void TestAnhalten() { TestSteuerung(0.0f, 0.0f); Bremsen(); }
+ void TestAussteigen() { Aussteigen(); }
  // Tempo in Fahrtrichtung, rueckwaerts negativ - fuer den Tacho.
  float TempoKmh() const { return FVector::DotProduct(GetVelocity(), GetActorForwardVector()) * 0.036f; }
  bool BremstGerade() const { return bBremse; }
@@ -52,8 +56,12 @@ private:
  void Aussteigen();
  void Bremsen();
  void Loesen();
+ // Dreht/lenkt die sichtbaren CarConcept-Felgen nach dem Chaos-Radzustand -
+ // nur kosmetisch, nur wenn das gewaehlte Fahrzeugmodell benannte
+ // Felgenteile hat (siehe LaLaBergWagenForm::CARCONCEPT_TEILE).
+ void AktualisiereRaeder();
 
- UPROPERTY() TObjectPtr<class UBoxComponent> Rumpf = nullptr;
+ UPROPERTY() TObjectPtr<class UStaticMeshComponent> Rumpf = nullptr;
  // Gemeinsamer Anschlusspunkt auf Fahrbahnhoehe fuer Netz (Procedural-
  // Fallback) UND die CarConcept-Teile - beide sollen an derselben Stelle
  // sitzen, nur einer davon ist zur Laufzeit tatsaechlich sichtbar.
@@ -68,6 +76,9 @@ private:
  UPROPERTY() TObjectPtr<class USpringArmComponent> Ausleger = nullptr;
  UPROPERTY() TObjectPtr<class UCameraComponent> Kamera = nullptr;
  UPROPERTY() TObjectPtr<class UAudioComponent> Motorklang = nullptr;
+ // Echte Chaos-Vehicle-Simulation statt vier Federstrahlen: Motor mit
+ // Drehmomentkurve, Automatikgetriebe, Vorderradlenkung, Hinterradantrieb.
+ UPROPERTY() TObjectPtr<class ULaLaBergWagenBewegung> Bewegung = nullptr;
 
  UPROPERTY() TObjectPtr<class ACharacter> Fahrer = nullptr;
  FLinearColor Lack = FLinearColor(0.72f, 0.74f, 0.76f);
@@ -79,8 +90,4 @@ private:
  int32 LetzteRaeder = 0;
  bool bTest = false;
  float EinstiegZeit = -10.0f;
-
- // Federung: vier Aufhaengungspunkte in Fahrzeugkoordinaten
- static constexpr int32 Raeder = 4;
- float Einfederung[Raeder] = { 0, 0, 0, 0 };
 };

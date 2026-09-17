@@ -11,6 +11,11 @@ class LALABERG_API ALaLaBergHUD : public AHUD {
  GENERATED_BODY()
 public:
  virtual void DrawHUD() override;
+ void ZeigeRueckmeldung(const FString& Text);
+private:
+ FString Rueckmeldung;
+ double RueckmeldungBis = 0.0;
+public:
  // Nach einem Versetzen der Figur: Ort im naechsten Bild neu bestimmen und
  // ohne Einblenden zeigen - sonst stand im Foto noch der vorige Ort.
  void OrtSofort() { OrtGeprueft = -10.0f; bOrtSofort = true; }

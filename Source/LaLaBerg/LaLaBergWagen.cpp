@@ -1,8 +1,11 @@
 #include "LaLaBergWagen.h"
+#include "LaLaBergHUD.h"
+#include "Sound/SoundAttenuation.h"
 #include "ProceduralMeshComponent.h"
-#include "Components/BoxComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Engine/World.h"
@@ -16,6 +19,8 @@
 #include "Serialization/JsonSerializer.h"
 #include "LaLaBergWagenForm.h"
 #include "LaLaBergWagenTypen.h"
+#include "LaLaBergWagenRad.h"
+#include "LaLaBergWagenBewegung.h"
 #include "Components/AudioComponent.h"
 #include "Sound/SoundBase.h"
 #include "Kismet/GameplayStatics.h"
@@ -102,8 +107,11 @@ namespace {
 ALaLaBergWagen::ALaLaBergWagen() {
  PrimaryActorTick.bCanEverTick = true;
 
- Rumpf = CreateDefaultSubobject<UBoxComponent>(TEXT("Rumpf"));
- Rumpf->InitBoxExtent(FVector(210, 88, 55));
+ // Unsichtbare Kollisionsbox als Wurzel - Chaos braucht eine Mesh-Komponente
+ // (kein reines Shape) als UpdatedComponent, sichtbar bleibt weiterhin nur
+ // Netz bzw. CarConceptTeile unten an Karosseriepunkt. Mesh und Sichtbarkeit
+ // setzt BeginPlay (siehe dort fuer den Grund).
+ Rumpf = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Rumpf"));
  SetRootComponent(Rumpf);
 
  Karosseriepunkt = CreateDefaultSubobject<USceneComponent>(TEXT("Karosseriepunkt"));
@@ -113,7 +121,9 @@ ALaLaBergWagen::ALaLaBergWagen() {
  // 1250 kg * 9,8 / 4 / 34000 = 9 cm ein. Die Fahrbahn liegt also
  // 55 + 88 - 9 = 134 cm unter der Mitte. Mit den frueher angesetzten 88 cm
  // schwebte der Wagen sichtbar eine Handbreit ueber der Strasse.
- Karosseriepunkt->SetRelativeLocation(FVector(0, 0, -134));
+ // The collision cube is scaled; imported visuals must retain centimetres.
+ Karosseriepunkt->SetAbsolute(false, false, true);
+ Karosseriepunkt->SetRelativeLocation(FVector(0, 0, -85.0f / 1.1f));
 
  Netz = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("Karosserie"));
  Netz->SetupAttachment(Karosseriepunkt);
@@ -126,6 +136,9 @@ ALaLaBergWagen::ALaLaBergWagen() {
  Ausleger->SetRelativeRotation(FRotator(-12, 0, 0));
  Ausleger->bEnableCameraLag = true;
  Ausleger->CameraLagSpeed = 6.0f;
+ Ausleger->bUseCameraLagSubstepping = true;
+ Ausleger->CameraLagMaxTimeStep = 1.0f / 60.0f;
+ Ausleger->CameraLagMaxDistance = 90.0f;
  Ausleger->bDoCollisionTest = true;
  // Die Kamera folgt der Fahrtrichtung, kippt aber nicht mit dem Wagen:
  // quer zum Hang stand sonst der ganze Horizont schief.
@@ -140,6 +153,86 @@ ALaLaBergWagen::ALaLaBergWagen() {
  Motorklang = CreateDefaultSubobject<UAudioComponent>(TEXT("Motorklang"));
  Motorklang->SetupAttachment(Rumpf);
  Motorklang->bAutoActivate = false;
+ FSoundAttenuationSettings MotorRaum;
+ MotorRaum.bAttenuate = true;
+ MotorRaum.bSpatialize = true;
+ MotorRaum.AttenuationShape = EAttenuationShape::Sphere;
+ MotorRaum.AttenuationShapeExtents = FVector(650.0f, 0.0f, 0.0f);
+ MotorRaum.FalloffDistance = 4500.0f;
+ Motorklang->AdjustAttenuation(MotorRaum);
+
+ // Chaos-Vehicle statt vier Federstrahlen: echtes Motor-/Getriebe-Kennfeld,
+ // Vorderradlenkung, Hinterradantrieb, eigene Reifenreibung je Rad statt
+ // einer pauschalen Seitenfuehrungskraft. Nabenpositionen laengs/quer wie
+ // zuvor bei den Federstrahlen (131/-131, 79/-79). Die Hoehe (-17) ist NICHT
+ // mehr vom alten Federstrahl-System uebernommen - die Einstiegsstelle (beim
+ // Fahrtest wie beim normalen Einsteigen) setzt den Wagen so ab, dass die
+ // Unterkante der Rumpf-Kollisionsbox (55 cm halbe Hoehe, siehe
+ // SetRelativeScale3D) auf der Strasse aufsitzt. Die Nabe muss deshalb
+ // relativ zu DIESER Boxhoehe sitzen, nicht an einer davon unabhaengigen
+ // Zahl: -17 laesst das Rad (33 cm Radius, ±10 cm Federweg) zwischen -40 und
+ // -60 reichen, die Fahrbahn bei -55 (Boxunterkante) liegt darin.
+ Bewegung = CreateDefaultSubobject<ULaLaBergWagenBewegung>(TEXT("Bewegung"));
+ Bewegung->WheelSetups.SetNum(4);
+ Bewegung->WheelSetups[0].WheelClass = ULaLaBergRadVorn::StaticClass();
+ Bewegung->WheelSetups[0].AdditionalOffset = FVector(131, 79, -50);
+ Bewegung->WheelSetups[1].WheelClass = ULaLaBergRadVorn::StaticClass();
+ Bewegung->WheelSetups[1].AdditionalOffset = FVector(131, -79, -50);
+ Bewegung->WheelSetups[2].WheelClass = ULaLaBergRadHinten::StaticClass();
+ Bewegung->WheelSetups[2].AdditionalOffset = FVector(-131, 79, -50);
+ Bewegung->WheelSetups[3].WheelClass = ULaLaBergRadHinten::StaticClass();
+ Bewegung->WheelSetups[3].AdditionalOffset = FVector(-131, -79, -50);
+
+ Bewegung->Mass = 1250.0f;
+ Bewegung->bEnableCenterOfMassOverride = true;
+ // Tiefer Schwerpunkt, sonst kippt der Wagen in der ersten Kurve um -
+ // derselbe Grund wie frueher bei Rumpf->SetCenterOfMass. Innerhalb der
+ // 110 cm hohen Rumpf-Box (siehe SetRelativeScale3D), nicht darunter.
+ Bewegung->CenterOfMassOverride = FVector(0, 0, -20);
+ Bewegung->ChassisWidth = 176.0f;
+ Bewegung->ChassisHeight = 110.0f;
+ Bewegung->DragCoefficient = 0.35f;
+
+ // 320 Nm waere ein realistischer Wert fuer diesen Wagen - hundertfach hoeher
+ // wegen eines Einheiten-Bugs im experimentellen ChaosVehiclesPlugin selbst
+ // (UE 5.8): WheelSystem.cpp teilt DriveTorque [Nm] durch Re, den Radradius -
+ // aber Re ist ueberall sonst im selben Plugin ausdruecklich in Zentimetern
+ // dokumentiert (siehe WheelSystem.h "float Re; // [cm]"), obwohl der
+ // Code-Kommentar direkt ueber dieser einen Division selbst einraeumt, dass
+ // "the simulated radius for torque must be real size" (= Meter). Bei unserem
+ // WheelRadius=33 (cm) kommt die Antriebskraft dadurch exakt hundertfach zu
+ // schwach heraus (33 cm statt der eigentlich noetigen 0.33 m) - beobachtet
+ // als: alle Rad-Werte (Kontakt, Federweg, Reibung, Antriebsmoment) sahen per
+ // -LaLaBergFahrtest korrekt aus, die Karosserie beschleunigte trotzdem nie.
+ // Erst eine Verzehnfachung von MaxTorque (als Test, ob es ueberhaupt ein
+ // Kraft-/Tuningproblem ist) zeigte weiterhin keine Bewegung; erst die volle
+ // Verhundertfachung bewegt den Wagen sichtbar - das bestaetigt die Diagnose.
+ Bewegung->EngineSetup.MaxTorque = 32000.0f;
+ Bewegung->EngineSetup.MaxRPM = 5500.0f;
+ // Ohne eigene Kurve bleibt TorqueCurve leer - FillEngineSetup() teilt dann
+ // durch den leeren Wertebereich (0) und liefert NaN-Drehmoment.
+ FRichCurve* Drehmoment = Bewegung->EngineSetup.TorqueCurve.GetRichCurve();
+ Drehmoment->AddKey(0.0f, 0.5f);
+ Drehmoment->AddKey(1500.0f, 0.85f);
+ Drehmoment->AddKey(3500.0f, 1.0f);
+ Drehmoment->AddKey(5500.0f, 0.55f);
+
+ Bewegung->DifferentialSetup.DifferentialType = EVehicleDifferential::RearWheelDrive;
+ // Zur Sicherheit ausdruecklich statt auf Vorgabewerte zu vertrauen: die
+ // Motordrehzahl blieb sonst exakt auf Standgas (EngineIdleRPM) haengen,
+ // trotz Vollgas und eingelegtem ersten Gang (per -LaLaBergFahrtest FAIL
+ // gefunden - Raeder hatten Bodenkontakt und ein geloggtes Antriebsmoment,
+ // der Wagen bewegte sich trotzdem nicht).
+ Bewegung->bMechanicalSimEnabled = true;
+ Bewegung->bSuspensionEnabled = true;
+ Bewegung->bWheelFrictionEnabled = true;
+ // Die "aggressive Schlaflogik" (SleepThreshold=10 per Vorgabe) legte den
+ // frisch erschienenen, fast unbewegten Wagen sofort wieder schlafen -
+ // gegen das eigene WakeAllRigidBodies() in Tick() ein Tauziehen, in dem
+ // die Schwerkraft nie genug ungestoerte Zeit bekam, um die Raeder auf den
+ // Boden sinken zu lassen (federweg blieb per -LaLaBergFahrtest FAIL immer
+ // bei 1.00). 0 schaltet sie ab.
+ Bewegung->SleepThreshold = 0.0f;
 }
 
 void ALaLaBergWagen::BeginPlay() {
@@ -148,13 +241,31 @@ void ALaLaBergWagen::BeginPlay() {
  // Folge auch fuer das Class Default Object, bevor GEngine bereit war; die
  // daraus entstehenden Materialfehler konnten ein echtes Fahrzeug mit
  // unvollstaendigen Body-Parametern hinterlassen.
- Rumpf->SetCollisionProfileName(TEXT("PhysicsActor"));
+ // Wuerfel nur als Kollisionshuelle (420x176x110 cm), nie sichtbar - die
+ // eigentliche Karosserie zeigt Netz/CarConceptTeile an Karosseriepunkt.
+ if (UStaticMesh* Wuerfel = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube")))
+  Rumpf->SetStaticMesh(Wuerfel);
+ // 420x176x110 cm - dieselben Massse wie beim alten UBoxComponent-Rumpf.
+ // Der eigentliche Fehler lag nicht in dieser Groesse, sondern darin, dass
+ // die Radnaben (siehe Bewegung oben) einen von der Boxhoehe unabhaengigen
+ // Fixwert (-101, aus dem alten Federstrahl-System) benutzten: die Einstiegs-
+ // /Fahrtest-Platzierung setzt den Wagen so ab, dass die Box-Unterkante auf
+ // der Strasse aufsitzt (per Kontrollstrahl bestaetigt: Fahrbahn traf exakt
+ // Ursprung-minus-halbe-Boxhoehe) - bei -101 lagen die Naben dabei 60-75 cm
+ // UNTER der Fahrbahn, die Raeder fanden nie Kontakt (federweg blieb per
+ // -LaLaBergFahrtest FAIL immer bei 1.00, unabhaengig von jeder Boxgroesse,
+ // die ich stattdessen anpasste). Jetzt sitzt die Nabenhoehe relativ zu
+ // dieser Boxhoehe (siehe Kommentar oben bei Bewegung), nicht mehr isoliert.
+ Rumpf->SetRelativeScale3D(FVector(4.2f, 1.76f, 1.1f));
+ Rumpf->SetVisibility(false);
+ Rumpf->SetCastShadow(false);
+ // Eigenes Profil statt "PhysicsActor": WheelTraceCollisionResponses (siehe
+ // Bewegung) ignoriert nur den Objekttyp "Vehicle" bei den Radstrahlen -
+ // sonst traefen die eigenen Raeder den eigenen Rumpf.
+ Rumpf->SetCollisionProfileName(TEXT("Vehicle"));
  Rumpf->SetSimulatePhysics(true);
  Rumpf->SetLinearDamping(0.04f);
  Rumpf->SetAngularDamping(3.5f);
- Rumpf->SetMassOverrideInKg(NAME_None, 1250.0f, true);
- // Schwerpunkt tief: sonst kippt der Wagen in der ersten Kurve um.
- Rumpf->SetCenterOfMass(FVector(0, 0, -45));
  Rumpf->WakeAllRigidBodies();
  BaueKarosserie();
  bGebaut = true;
@@ -252,6 +363,8 @@ void ALaLaBergWagen::Nicken(float Wert) {
  Ausleger->SetRelativeRotation(R);
 }
 void ALaLaBergWagen::SetzeFahrer(ACharacter* Figur) {
+ GasWert = LenkWert = Lenkung = 0.0f;
+ bBremse = bTest = false;
  Fahrer = Figur;
  EinstiegZeit = GetWorld()->GetTimeSeconds();
 }
@@ -266,105 +379,127 @@ void ALaLaBergWagen::Loesen() { bBremse = false; }
 void ALaLaBergWagen::Aussteigen() {
  APlayerController* PC = Cast<APlayerController>(GetController());
  if (!PC || !Fahrer) return;
+ const auto Meldung = [PC](const TCHAR* Text) {
+  if (auto* HUD = Cast<ALaLaBergHUD>(PC->GetHUD())) HUD->ZeigeRueckmeldung(Text);
+ };
  // Einsteigen und Aussteigen liegen auf derselben Taste. Ohne diese Frist
  // koennte derselbe Tastendruck den Wagen gleich wieder verlassen.
- if (GetWorld()->GetTimeSeconds() - EinstiegZeit < 0.4f) return;
- const FVector Neben = GetActorLocation() - GetActorRightVector() * 190.0f + FVector(0, 0, 40);
- FHitResult Boden;
+ if (GetWorld()->GetTimeSeconds() - EinstiegZeit < 0.4f) {
+  Meldung(TEXT("Kurz warten, dann E zum Aussteigen druecken."));
+  return;
+ }
  FCollisionQueryParams Fragen; Fragen.AddIgnoredActor(this); Fragen.AddIgnoredActor(Fahrer);
- FVector Ziel = Neben;
- if (GetWorld()->LineTraceSingleByChannel(Boden, Neben + FVector(0, 0, 400),
-                                          Neben - FVector(0, 0, 800), ECC_Visibility, Fragen)) {
-  Ziel = Boden.ImpactPoint + FVector(0, 0, 95);
+ // Do not eject the player at speed or into a wall. Check both sides and
+ // the rear using the actual player capsule, not a fixed height.
+ if (GetVelocity().SizeSquared() > FMath::Square(100.0f)) {
+  Meldung(TEXT("Zum Aussteigen zuerst mit der Leertaste anhalten."));
+  return;
+ }
+ const UCapsuleComponent* Kapsel = Fahrer->GetCapsuleComponent();
+ const float Halbhoehe = Kapsel->GetScaledCapsuleHalfHeight();
+ const FCollisionShape Form = FCollisionShape::MakeCapsule(Kapsel->GetScaledCapsuleRadius(), Halbhoehe);
+ FVector Ziel = FVector::ZeroVector;
+ bool bPlatz = false;
+ for (const FVector& Versatz : { -GetActorRightVector() * 190.0f,
+                                 GetActorRightVector() * 190.0f,
+                                -GetActorForwardVector() * 320.0f }) {
+  const FVector Neben = GetActorLocation() + Versatz;
+  FHitResult Boden;
+  if (!GetWorld()->LineTraceSingleByChannel(Boden, Neben + FVector(0,0,200),
+       Neben - FVector(0,0,500), ECC_Visibility, Fragen)) continue;
+  if (Boden.ImpactNormal.Z < Fahrer->GetCharacterMovement()->GetWalkableFloorZ()) continue;
+  const FVector Kandidat = Boden.ImpactPoint + FVector(0,0,Halbhoehe + 3.0f);
+  if (GetWorld()->OverlapBlockingTestByProfile(Kandidat, FQuat::Identity,
+       Kapsel->GetCollisionProfileName(), Form, Fragen)) continue;
+  FHitResult Hindernis;
+  if (GetWorld()->SweepSingleByProfile(Hindernis, GetActorLocation(), Kandidat,
+       FQuat::Identity, Kapsel->GetCollisionProfileName(), Form, Fragen)) continue;
+  Ziel = Kandidat; bPlatz = true; break;
+ }
+ if (!bPlatz) {
+  Meldung(TEXT("Kein sicherer Ausstieg. Bitte auf eine freie, ebene Stelle fahren."));
+  return;
  }
  PC->UnPossess();
  Fahrer->SetActorLocation(Ziel, false, nullptr, ETeleportType::TeleportPhysics);
  Fahrer->SetActorHiddenInGame(false);
  Fahrer->SetActorEnableCollision(true);
- if (auto* Bewegung = Fahrer->GetCharacterMovement()) Bewegung->SetMovementMode(MOVE_Walking);
+ if (auto* FahrerBewegung = Fahrer->GetCharacterMovement()) FahrerBewegung->SetMovementMode(MOVE_Walking);
  PC->Possess(Fahrer);
  PC->SetControlRotation(FRotator(0, GetActorRotation().Yaw, 0));
+ Meldung(TEXT("Ausgestiegen - WASD zum Gehen."));
  Fahrer = nullptr;
+ GasWert = LenkWert = Lenkung = 0.0f;
+ bBremse = bTest = false;
 }
 
 void ALaLaBergWagen::Tick(float Zeit) {
  Super::Tick(Zeit);
- if (!Rumpf || !Rumpf->IsSimulatingPhysics()) return;
-
- const FTransform Lage = Rumpf->GetComponentTransform();
- const FVector Vorne = Lage.GetUnitAxis(EAxis::X);
- const FVector Rechts = Lage.GetUnitAxis(EAxis::Y);
- const FVector Oben = Lage.GetUnitAxis(EAxis::Z);
-
- // Vier Federstrahlen. Ruhelaenge 55 cm, Rad 33 cm - der Wagen haengt also
- // knapp ueber der Fahrbahn und faengt Bordsteine ab.
- const FVector Naben[Raeder] = {
-  FVector(131,  79, -55), FVector(131, -79, -55),
-  FVector(-131,  79, -55), FVector(-131, -79, -55)
- };
- const float Ruhe = 55.0f, Steifigkeit = 34000.0f, Daempfung = 2600.0f;
- int32 AmBoden = 0;
-
- for (int32 i = 0; i < Raeder; i++) {
-  const FVector Ansatz = Lage.TransformPosition(Naben[i]);
-  FHitResult Treffer;
-  FCollisionQueryParams Fragen; Fragen.AddIgnoredActor(this);
-  const FVector Ende = Ansatz - Oben * (Ruhe + 33.0f);
-  if (!GetWorld()->LineTraceSingleByChannel(Treffer, Ansatz, Ende, ECC_Visibility, Fragen)) {
-   Einfederung[i] = 0.0f;
-   continue;
+ UE_LOG(LogTemp, Warning, TEXT("LALABERG_CHAOS_DEBUG gang=%d ziel_gang=%d drehzahl=%.0f max_drehzahl=%.0f bremse=%d handbremse=%d gas=%.2f tempo_kmh=%.2f"),
+  Bewegung ? Bewegung->GetCurrentGear() : -999, Bewegung ? Bewegung->GetTargetGear() : -999,
+  Bewegung ? Bewegung->GetEngineRotationSpeed() : -1.0f, Bewegung ? Bewegung->GetEngineMaxRotationSpeed() : -1.0f,
+  bBremse, !GetController(), GasWert, Bewegung ? Bewegung->GetForwardSpeedMPH() * 1.60934f : -999.0f);
+ if (Bewegung && Bewegung->HasValidPhysicsState())
+  for (int32 i = 0; i < Bewegung->GetNumWheels(); i++) {
+   const FWheelStatus& S = Bewegung->GetWheelState(i);
+   UE_LOG(LogTemp, Warning, TEXT("LALABERG_CHAOS_RAD %d kontakt=%d federweg=%.2f drehmoment=%.1f bremsmoment=%.1f schlupf=%.2f rutscht=%d federkraft=%.1f material=%s reibung=%.2f"),
+    i, S.bInContact, S.NormalizedSuspensionLength, S.DriveTorque, S.BrakeTorque, S.SlipMagnitude, S.bIsSkidding,
+    S.SpringForce, S.PhysMaterial.IsValid() ? *S.PhysMaterial->GetName() : TEXT("-"),
+    S.PhysMaterial.IsValid() ? S.PhysMaterial->Friction : -1.0f);
   }
-  AmBoden++;
-  const float Abstand = (Treffer.ImpactPoint - Ansatz).Size();
-  const float Weg = FMath::Max(0.0f, (Ruhe + 33.0f) - Abstand);
-  const float Geschwindigkeit = (Weg - Einfederung[i]) / FMath::Max(Zeit, 0.001f);
-  Einfederung[i] = Weg;
-  // Begrenzt auf das Dreifache der Radlast. Ohne Deckel warf ein Rad, das
-  // auf einer Boeschung tief einfedert, den ganzen Wagen auf das Dach.
-  const float Radlast = 1250.0f * 980.0f / Raeder;
-  const float Kraft = FMath::Clamp(Weg * Steifigkeit + Geschwindigkeit * Daempfung,
-                                   0.0f, Radlast * 3.0f);
-  Rumpf->AddForceAtLocation(Oben * Kraft, Ansatz);
- }
-
- LetzteRaeder = AmBoden;
- if (AmBoden == 0) return;
- const float Anteil = static_cast<float>(AmBoden) / Raeder;
+ if (!Bewegung || !Rumpf || !Rumpf->IsSimulatingPhysics()) return;
 
  // Lenkung nachziehen, nicht schlagartig setzen
  Lenkung = FMath::FInterpTo(Lenkung, LenkWert, Zeit, 6.0f);
 
- const FVector Tempo = Rumpf->GetPhysicsLinearVelocity();
- const float VorwaertsTempo = FVector::DotProduct(Tempo, Vorne);
- const float SeitTempo = FVector::DotProduct(Tempo, Rechts);
+ Bewegung->SetThrottleInput(bBremse ? 0.0f : GasWert);
+ Bewegung->SetSteeringInput(Lenkung);
+ Bewegung->SetBrakeInput(bBremse ? 1.0f : 0.0f);
+ // Handbremse statt Parkmodus, solange niemand faehrt - haelt den Wagen am
+ // Hang, ohne (wie SetParked im Verdacht steht) auch bei aktivem Fahrer noch
+ // nachzuwirken: trotz kontakt=1/federweg=0.75/drehmoment=985.9 blieb der
+ // Wagen bei aktivem SetParked(false) unbeweglich (tempo/weg=0 per
+ // -LaLaBergFahrtest FAIL, obwohl die Radphysik seit der Naben-Korrektur
+ // korrekt aussah) - SetHandbrakeInput betrifft laut Konstruktor nur die
+ // Hinterraeder und ist die etablierte, klar dokumentierte Bremse.
+ Bewegung->SetHandbrakeInput(!GetController());
+ // Ein ruhender Wagen schlaeft ein (Physik-Performance) und wacht nicht von
+ // selbst auf, nur weil Gas anliegt - ohne dies stand der Wagen trotz Motor
+ // still (per -LaLaBergFahrtest FAIL gefunden: simuliert=1 aber wach=0).
+ if (GetController() && !Rumpf->RigidBodyIsAwake()) Rumpf->WakeAllRigidBodies();
 
- // Antrieb, begrenzt auf rund 120 km/h
- const float Grenze = 3300.0f;
- if (!bBremse && FMath::Abs(GasWert) > 0.02f && FMath::Abs(VorwaertsTempo) < Grenze) {
-  Rumpf->AddForce(Vorne * GasWert * 900000.0f * Anteil);
- }
- // Bremse und Rollwiderstand
- // Bremse stark, Motorbremse maessig, unter Gas nur Rollwiderstand.
- const float Verzoegerung = bBremse ? 5.0f : (FMath::Abs(GasWert) < 0.02f ? 0.30f : 0.06f);
- Rumpf->AddForce(-Vorne * VorwaertsTempo * 260.0f * Verzoegerung * Anteil);
+ LetzteRaeder = 0;
+ for (int32 i = 0; i < Bewegung->GetNumWheels(); i++)
+  if (Bewegung->GetWheelState(i).bInContact) LetzteRaeder++;
 
- // Seitenfuehrung: ohne sie schwimmt der Wagen wie auf Eis
- Rumpf->AddForce(-Rechts * SeitTempo * 2600.0f * Anteil);
-
- // Parkbremse, solange niemand faehrt. Ohne sie rollte der abgestellte Wagen
- // am Hang von der Strasse in die Wiese, bevor man einsteigen konnte.
- if (!GetController()) Rumpf->AddForce(-Tempo * 1250.0f * 25.0f * Anteil);
-
- // Lenken wirkt nur, wenn der Wagen rollt - wie im Stand mit Servo aus
- const float Wirkung = FMath::Clamp(FMath::Abs(VorwaertsTempo) / 700.0f, 0.0f, 1.0f);
- const float Richtung = VorwaertsTempo >= 0 ? 1.0f : -1.0f;
- Rumpf->AddTorqueInRadians(Oben * Lenkung * Richtung * Wirkung * 5.4e8f * Anteil);
+ AktualisiereRaeder();
 
  // Motorklang: Leerlauf brummt leise und tief, Vollgas hoch und laut - aus
- // Gaspedal (sofort) und Tempo (traege) gemischt, wie eine Drehzahl.
+ // der tatsaechlichen Motordrehzahl statt einer Tempo-Naeherung.
  if (Motorklang && Motorklang->IsPlaying()) {
-  const float Drehzahl = FMath::Clamp(FMath::Abs(GasWert) * 0.6f + FMath::Abs(VorwaertsTempo) / Grenze * 0.4f, 0.0f, 1.0f);
+  const float Grenze = FMath::Max(Bewegung->GetEngineMaxRotationSpeed(), 1.0f);
+  const float Drehzahl = FMath::Clamp(Bewegung->GetEngineRotationSpeed() / Grenze, 0.0f, 1.0f);
   Motorklang->SetPitchMultiplier(FMath::Lerp(0.6f, 1.8f, Drehzahl));
   Motorklang->SetVolumeMultiplier(FMath::Lerp(0.35f, 1.0f, Drehzahl));
+ }
+}
+
+// Dreht/lenkt die sichtbaren CarConcept-Felgen nach dem Chaos-Radzustand -
+// nur beim CarConcept-Modell (FahrzeugTyp -1) sind die Felgen eigene, klar
+// benannte Teile (siehe LaLaBergWagenForm::CARCONCEPT_TEILE); die
+// CitySample-Typen und die ProceduralMesh-Form backen die Raeder in ein
+// Netz ein und bleiben deshalb ohne sichtbare Raddrehung.
+void ALaLaBergWagen::AktualisiereRaeder() {
+ if (FahrzeugTyp != -1 || CarConceptTeile.IsEmpty()) return;
+ static const TCHAR* Namen[4] = { TEXT("WheelFrontLRim"), TEXT("WheelFrontRRim"),
+                                  TEXT("WheelRearLRim"), TEXT("WheelRearRRim") };
+ for (int32 i = 0; i < 4 && i < Bewegung->Wheels.Num(); i++) {
+  UChaosVehicleWheel* Rad = Bewegung->Wheels[i];
+  if (!Rad) continue;
+  for (UStaticMeshComponent* Teil : CarConceptTeile) {
+   if (!Teil || !Teil->GetName().Contains(Namen[i])) continue;
+   Teil->SetRelativeRotation(FRotator(Rad->GetRotationAngle(), Rad->GetSteerAngle(), 0.0f));
+   break;
+  }
  }
 }
