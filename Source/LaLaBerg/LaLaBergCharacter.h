@@ -69,7 +69,8 @@ private:
  UPROPERTY() TObjectPtr<class USkeletalMeshComponent> SkelettFuesse = nullptr;
  UPROPERTY() TObjectPtr<class USkeletalMeshComponent> SkelettBeine = nullptr;
  bool bSkelettGenutzt = false;
- bool bLaeuftGerade = false;
+ // Die gerade laufende Animation (siehe Tick) - getauscht wird nur bei Wechsel.
+ FString AktuelleAnim;
  // Welche Figur gewaehlt wurde (siehe BeginPlay, wie LaLaBergPassantKI):
  // 0 = Farmer (modular), 1..N = Index+1 in EINZEL_FIGUREN.
  int32 FigurTyp = 0;

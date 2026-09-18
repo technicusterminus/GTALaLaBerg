@@ -40,7 +40,7 @@ namespace {
  // unten, als wuerde die Figur die Waffe waagerecht vor sich halten. Der
  // Pitch (in Grad, positiv = nach oben zielen) kippt diese Richtung um die
  // lokale Rechts-Achse (Y) - der Oberarm haengt an Schulter->Kapsel, deren
- // Gier bereits der Kamera folgt (bUseControllerRotationYaw), nur der Pitch
+ // Gier beim Zielen der Kamera folgt (siehe Tick), nur der Pitch
  // fehlt hier noch. Ueber FindBetweenVectors statt eines geratenen
  // FRotator-Winkels: das Glied haengt lokal an -Z, und ob ein positiver
  // Pitch es nach vorn oder nach hinten kippt, ist ohne Testbild nicht
@@ -175,7 +175,14 @@ ALaLaBergCharacter::ALaLaBergCharacter() {
  Kamera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
  Kamera->SetupAttachment(Ausleger);
  Kamera->bUsePawnControlRotation = false;
- bUseControllerRotationYaw = true;
+ // Wie in GTA: beim Laufen dreht sich die Figur in die Bewegungsrichtung
+ // und rennt vorwaerts; nur beim Schiessen schaut sie in Kamerarichtung
+ // (siehe Tick). Mit fest an die Kamera gebundener Blickrichtung
+ // (bUseControllerRotationYaw) lief sie bei A/D seitwaerts - mit der
+ // Vorwaerts-Laufanimation sah das aus, als rutsche sie zur Seite.
+ bUseControllerRotationYaw = false;
+ GetCharacterMovement()->bOrientRotationToMovement = true;
+ GetCharacterMovement()->RotationRate = FRotator(0, 720, 0);
  GetCharacterMovement()->MaxWalkSpeed = 450;
  GetCharacterMovement()->JumpZVelocity = 420;
 }
@@ -378,22 +385,46 @@ void ALaLaBergCharacter::Tick(float DeltaSeconds) {
   const float Pitch = FMath::Clamp(FRotator::NormalizeAxis(Controller->GetControlRotation().Pitch), -50.0f, 70.0f);
   Schulter[0]->SetRelativeRotation(ArmDrehungFuerPitch(Pitch).Rotator());
  }
+ // Beim Schiessen in Kamerarichtung drehen und seitlich gehen (mit den
+ // Richtungs-Laufanimationen unten), sonst in Laufrichtung drehen - siehe
+ // Konstruktor.
+ const bool bZielt = bFeuerKnopf && Controller;
+ GetCharacterMovement()->bOrientRotationToMovement = !bZielt;
+ if (bZielt) SetActorRotation(FRotator(0, Controller->GetControlRotation().Yaw, 0));
  RichteWaffeAus();
 
  if (bSkelettGenutzt) {
-  // Wie bei LaLaBergPassantKI::Tick: nur beim Wechsel zwischen Stehen und
-  // Gehen die AnimSequence tauschen, nicht jedes Bild neu abspielen.
-  const bool bLaeuftJetzt = Faktor > 0.05f;
-  if (bLaeuftJetzt != bLaeuftGerade) {
-   bLaeuftGerade = bLaeuftJetzt;
-   // Waffenhaltung statt neutraler Pose: die Spielfigur traegt immer eine
-   // Waffe (siehe Waffe unten). Im Stand "Idle_Gun_Pointing" (Arm nach vorn,
-   // Waffe in Blickrichtung) - per -LaLaBergKoerperFoto mit -LaLaBergPose
-   // verglichen: "Idle_Gun" laesst den Arm haengen, die Waffe zeigte zu
-   // Boden; "Idle_Gun_Shoot" hat dauernd Rueckstoss.
-   const FString AnimName = bLaeuftGerade ? FString(TEXT("Run_Shoot")) : StehPose();
+  // Waffenhaltung statt neutraler Pose: die Spielfigur traegt immer eine
+  // Waffe (siehe Waffe unten). Im Stand "Idle_Gun_Pointing" (Arm nach vorn,
+  // Waffe in Blickrichtung) - per -LaLaBergKoerperFoto mit -LaLaBergPose
+  // verglichen: "Idle_Gun" laesst den Arm haengen, die Waffe zeigte zu
+  // Boden; "Idle_Gun_Shoot" hat dauernd Rueckstoss.
+  //
+  // In Bewegung die Laufanimation nach der Richtung relativ zur Figur: beim
+  // Schiessen schaut sie in Kamerarichtung (siehe oben), mit A/D oder S
+  // bewegt sie sich dann seitlich oder rueckwaerts. Mit einer
+  // einzigen Vorwaerts-Laufanimation rutschte sie dabei sichtbar
+  // seitwaerts, die Beine liefen nach vorn (im -LaLaBergKoerperFoto-Bild
+  // "seitwaerts" gesehen). Das Figurenpaket bringt Run_Left/Run_Right/
+  // Run_Back mit. Etwas Nachlauf beim Umschalten, damit schraeges Laufen
+  // nicht jedes Bild zwischen zwei Animationen flackert.
+  FString AnimName = StehPose();
+  if (Faktor > 0.05f) {
+   const FVector V = GetVelocity().GetSafeNormal2D();
+   const float Vor = FVector::DotProduct(V, GetActorForwardVector());
+   const float Rechts = FVector::DotProduct(V, GetActorRightVector());
+   const bool bWarSeitlich = AktuelleAnim == TEXT("Run_Left") || AktuelleAnim == TEXT("Run_Right");
+   const float Nachlauf = 0.15f;
+   const bool bSeitlich = bWarSeitlich ? FMath::Abs(Rechts) + Nachlauf > FMath::Abs(Vor)
+                                       : FMath::Abs(Rechts) > FMath::Abs(Vor) + Nachlauf;
+   if (bSeitlich) AnimName = Rechts >= 0.0f ? TEXT("Run_Right") : TEXT("Run_Left");
+   else AnimName = Vor >= 0.0f ? TEXT("Run_Shoot") : TEXT("Run_Back");
+  }
+  // Nur beim Wechsel tauschen, nicht jedes Bild neu abspielen.
+  if (AnimName != AktuelleAnim) {
+   AktuelleAnim = AnimName;
    const FString Pfad = FigurTyp == 0
-    ? TEXT("/Game/Art/People/Animations/Anim_HumansCharacterArmature_") + FString(AnimName) + TEXT(".Anim_HumansCharacterArmature_") + FString(AnimName)
+    ? TEXT("/Game/Art/People/Animations/Anim_HumansCharacterArmature_") + AnimName + TEXT(".Anim_HumansCharacterArmature_") + AnimName
     : EinzelAnimPfad(EINZEL_FIGUREN[FigurTyp - 1].Name, *AnimName);
    if (auto* Anim = LoadObject<UAnimSequence>(nullptr, *Pfad)) SkelettKoerper->PlayAnimation(Anim, true);
   }
@@ -482,6 +513,9 @@ bool ALaLaBergCharacter::HoleWaffenabstand(float& AusAbstandCm) const {
 
 void ALaLaBergCharacter::Feuern() {
  if (!Waffe) return;
+ // Vor dem Schuss in Schussrichtung drehen: der Schuss geht aus der Kamera,
+ // die Figur soll dabei sichtbar dorthin zielen, auch nach dem Laufen.
+ if (Controller) SetActorRotation(FRotator(0, Controller->GetControlRotation().Yaw, 0));
  Waffe->Feuern(Kamera->GetComponentLocation() + Kamera->GetForwardVector() * 70.0f, Kamera->GetForwardVector());
 }
 void ALaLaBergCharacter::Waffe1() { if (Waffe) Waffe->SetzeArt(ELaLaBergWaffenArt::Pistole); }

@@ -616,14 +616,13 @@ void ALaLaBergGameMode::BeginPlay() {
    PC->ConsoleCommand(TEXT("HighResShot 1600x900"));
   },4.0f,false);
   // Zweites Bild von der Seite: von hinten laesst sich nicht erkennen, ob
-  // die Waffe nach vorn zeigt oder zu Boden haengt. Die Figur dreht sich
-  // sonst mit der Kamera mit (bUseControllerRotationYaw) - fuer das Bild
-  // bleibt sie stehen, und nur die Kamera schwenkt um 90 Grad.
+  // die Waffe nach vorn zeigt oder zu Boden haengt. Die Figur bleibt
+  // stehen, nur die Kamera schwenkt um 90 Grad.
   FTimerHandle Seite;
   GetWorldTimerManager().SetTimer(Seite,[this]() {
    auto* PC=GetWorld()->GetFirstPlayerController();
    if(!PC) return;
-   if(APawn* Held=PC->GetPawn()) { Held->bUseControllerRotationYaw=false; Held->SetActorRotation(FRotator(0,0,0)); }
+   if(APawn* Held=PC->GetPawn()) Held->SetActorRotation(FRotator(0,0,0));
    PC->SetControlRotation(FRotator(-5,-90,0));   // rechte Seite: dort sitzt die Waffe
   },5.0f,false);
   // Von der Seite jede der vier Waffen einmal: jede sitzt mit ihrem eigenen
@@ -661,11 +660,37 @@ void ALaLaBergGameMode::BeginPlay() {
   GetWorldTimerManager().SetTimer(BildLauf,[this]() {
    if(auto* PC=GetWorld()->GetFirstPlayerController()) PC->ConsoleCommand(TEXT("HighResShot 1600x900"));
   },13.6f,false);
+  // Dann aus der normalen Spielkamera von hinten: so sieht der Spieler die
+  // Figur. Erst vorwaerts laufend, dann mit Eingabe nach rechts (wie mit D):
+  // die Figur soll sich dabei in die Laufrichtung drehen und vorwaerts
+  // rennen, statt wie frueher seitwaerts zu rutschen.
+  FTimerHandle Hinten;
+  GetWorldTimerManager().SetTimer(Hinten,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   if(!PC) return;
+   PC->SetControlRotation(FRotator(-8,0,0));
+  },14.0f,false);
+  FTimerHandle BildHinten;
+  GetWorldTimerManager().SetTimer(BildHinten,[this]() {
+   if(auto* PC=GetWorld()->GetFirstPlayerController()) PC->ConsoleCommand(TEXT("HighResShot 1600x900"));
+  },15.2f,false);
+  FTimerHandle Seitwaerts;
+  GetWorldTimerManager().SetTimer(Seitwaerts,[this]() {
+   GetWorldTimerManager().ClearTimer(Laufen);
+   GetWorldTimerManager().SetTimer(Laufen,[this]() {
+    if(auto* PC=GetWorld()->GetFirstPlayerController())
+     if(APawn* Held=PC->GetPawn()) Held->AddMovementInput(FVector::RightVector,1.0f);
+   },0.016f,true);
+  },15.6f,false);
+  FTimerHandle BildSeitwaerts;
+  GetWorldTimerManager().SetTimer(BildSeitwaerts,[this]() {
+   if(auto* PC=GetWorld()->GetFirstPlayerController()) PC->ConsoleCommand(TEXT("HighResShot 1600x900"));
+  },16.8f,false);
   FTimerHandle Ende;
   GetWorldTimerManager().SetTimer(Ende,[this]() {
    GetWorldTimerManager().ClearTimer(Laufen);
    FPlatformMisc::RequestExitWithStatus(false,0);
-  },15.0f,false);
+  },18.0f,false);
  }
  // Fahrtest: Wagen uebernehmen, vier Sekunden Gas geben, Weg messen. Ohne
  // diesen Test waere "der Wagen faehrt" eine Behauptung.
@@ -899,8 +924,15 @@ void ALaLaBergGameMode::BeginPlay() {
    auto* PC=GetWorld()->GetFirstPlayerController();
    APawn* Pawn=PC?PC->GetPawn():nullptr;
    for(TActorIterator<ALaLaBergPassantKI> It(GetWorld());It&&Pawn;++It) {
-    const FVector Ort=It->GetActorLocation()-It->GetActorForwardVector()*380.0f+FVector(0,0,60);
+    // Von der Seite statt von hinten: nur im Profil ist erkennbar, ob der
+    // Passant in Laufrichtung schaut oder seitwaerts geht - von hinten
+    // sieht beides fast gleich aus.
+    const FVector Ort=It->GetActorLocation()+It->GetActorRightVector()*260.0f+FVector(0,0,60);
     Pawn->SetActorLocation(Ort,false,nullptr,ETeleportType::TeleportPhysics);
+    // Die eigene Figur stand zwischen Kamera und Passant und verdeckte ihn -
+    // fuer dieses Bild ausblenden, samt der an ihr haengenden Waffe.
+    Pawn->SetActorHiddenInGame(true);
+    if(auto* Held=Cast<ALaLaBergCharacter>(Pawn)) if(Held->HoleWaffe()) Held->HoleWaffe()->SetActorHiddenInGame(true);
     PC->SetControlRotation((It->GetActorLocation()-Ort).Rotation());
     if(auto* Anzeige=Cast<ALaLaBergHUD>(PC->GetHUD())) Anzeige->OrtSofort();
     Beleg(FString::Printf(TEXT("LALABERG_VERKEHR_PASSANT bei %s"),*It->GetActorLocation().ToString()));
@@ -910,7 +942,7 @@ void ALaLaBergGameMode::BeginPlay() {
   FTimerHandle BildPassant;
   GetWorldTimerManager().SetTimer(BildPassant,[this]() {
    if(auto* PC=GetWorld()->GetFirstPlayerController()) PC->ConsoleCommand(TEXT("HighResShot 1600x900"));
-  },8.4f,false);
+  },7.0f,false);   // kurz nach dem Hinstellen, bevor der Passant aus dem Bild laeuft
   FTimerHandle Ende;
   GetWorldTimerManager().SetTimer(Ende,[this]() {
    Beleg(FString::Printf(TEXT("LALABERG_VERKEHRFOTO PASS autos=%d passanten=%d"),AutoZahl,PassantZahl));

@@ -115,10 +115,14 @@ ALaLaBergPassantKI::ALaLaBergPassantKI() {
  // Skeletal-Mesh-Alternative zum Kasten-Rig oben (siehe BeginPlay) - vier
  // Teile desselben modularen Pakets, am Boden (Huelle-relativ -86, wie
  // Netz) statt in Huelle-Mitte, weil das importierte Skelett seine eigene
- // Bodenreferenz mitbringt.
+ // Bodenreferenz mitbringt. Um -90 Grad gedreht wie bei der Spielfigur
+ // (ALaLaBergCharacter): die importierten Figuren schauen nach +Y, der
+ // Passant laeuft aber entlang +X (SetActorRotation in Tick) - ohne die
+ // Drehung liefen alle Passanten seitwaerts.
  SkelettKoerper = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("SkelettKoerper"));
  SkelettKoerper->SetupAttachment(Huelle);
  SkelettKoerper->SetRelativeLocation(FVector(0, 0, -86));
+ SkelettKoerper->SetRelativeRotation(FRotator(0, -90.0f, 0));
  SkelettKoerper->SetCollisionEnabled(ECollisionEnabled::NoCollision);
  SkelettKoerper->SetVisibility(false);
  // Dieselbe Bodenversatz -86 wie SkelettKoerper: SetLeaderPoseComponent
@@ -128,16 +132,19 @@ ALaLaBergPassantKI::ALaLaBergPassantKI() {
  SkelettKopf = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("SkelettKopf"));
  SkelettKopf->SetupAttachment(Huelle);
  SkelettKopf->SetRelativeLocation(FVector(0, 0, -86));
+ SkelettKopf->SetRelativeRotation(FRotator(0, -90.0f, 0));
  SkelettKopf->SetCollisionEnabled(ECollisionEnabled::NoCollision);
  SkelettKopf->SetVisibility(false);
  SkelettFuesse = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("SkelettFuesse"));
  SkelettFuesse->SetupAttachment(Huelle);
  SkelettFuesse->SetRelativeLocation(FVector(0, 0, -86));
+ SkelettFuesse->SetRelativeRotation(FRotator(0, -90.0f, 0));
  SkelettFuesse->SetCollisionEnabled(ECollisionEnabled::NoCollision);
  SkelettFuesse->SetVisibility(false);
  SkelettBeine = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("SkelettBeine"));
  SkelettBeine->SetupAttachment(Huelle);
  SkelettBeine->SetRelativeLocation(FVector(0, 0, -86));
+ SkelettBeine->SetRelativeRotation(FRotator(0, -90.0f, 0));
  SkelettBeine->SetCollisionEnabled(ECollisionEnabled::NoCollision);
  SkelettBeine->SetVisibility(false);
 }
