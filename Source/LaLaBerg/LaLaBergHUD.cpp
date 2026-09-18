@@ -4,7 +4,10 @@
 #include "LaLaBergWaffe.h"
 #include "LaLaBergCharacter.h"
 #include "LaLaBergMenueSteuerung.h"
+#include "LaLaBergAuftraege.h"
 #include "Engine/Canvas.h"
+#include "Camera/PlayerCameraManager.h"
+#include "RenderUtils.h"
 #include "Engine/Engine.h"
 #include "Engine/Font.h"
 #include "Engine/GameInstance.h"
@@ -88,6 +91,7 @@ void ALaLaBergHUD::DrawHUD() {
   const float Jetzt = GetWorld()->GetTimeSeconds();
   if (Jetzt - OrtGeprueft > 0.5f) { OrtGeprueft = Jetzt; BestimmeOrt(Figur->GetActorLocation()); }
   Ortsanzeige();
+  Auftrag();
  }
  if (auto* Wagen = Cast<ALaLaBergWagen>(Figur)) {
   Tacho(Wagen);
@@ -167,6 +171,65 @@ void ALaLaBergHUD::Hinweis(const FString& Taste, const FString& Text) {
  Tafel(X + Rand, Y + Rand, K, K, FLinearColor(0.96f, 0.96f, 0.94f, 0.94f));
  Schrift(Taste, X + Rand + K * 0.5f, Y + Rand + 4 * S, 18, FLinearColor(0.05f, 0.05f, 0.06f), true, true);
  Schrift(Text, X + Rand + K + 14 * S, Y + Rand + 3 * S, 20, Weiss);
+}
+
+void ALaLaBergHUD::Auftrag() {
+ const ALaLaBergAuftraege* A = ALaLaBergAuftraege::Instanz.Get();
+ APawn* Figur = PlayerOwner->GetPawn();
+ if (!A || !Figur || (!A->IstUnterwegs() && !A->HatAngebot())) return;
+ const float S = Massstab;
+ const bool bUnterwegs = A->IstUnterwegs();
+ const FVector Ziel = A->HoleWegpunkt();
+ const FVector Wo = Figur->GetActorLocation();
+ const float Meter = FVector::Dist2D(Wo, Ziel) / 100.0f;
+ const FString Weg = Meter >= 1000.0f ? FString::Printf(TEXT("%.1f km"), Meter / 1000.0f).Replace(TEXT("."), TEXT(","))
+                                      : FString::Printf(TEXT("%d m"), FMath::RoundToInt(Meter));
+ const FLinearColor Farbe = bUnterwegs ? FLinearColor(1.0f, 0.78f, 0.05f) : FLinearColor(0.25f, 0.6f, 1.0f);
+
+ const float B = 340 * S, H = 104 * S;
+ const float X = Canvas->ClipX - B - 40 * S, Y = 40 * S;
+ // Dichter als die anderen Tafeln: sie steht oben vor hellem Himmel.
+ Tafel(X, Y, B, H, FLinearColor(0.02f, 0.025f, 0.035f, 0.78f));
+ Tafel(X, Y, 5 * S, H, Farbe);
+
+ // Pfeil in einem Kreis links: oben ist, wohin die Kamera schaut.
+ const float PX = X + 52 * S, PY = Y + H * 0.5f, R = 30 * S;
+ const float Kamera = PlayerOwner->PlayerCameraManager ? PlayerOwner->PlayerCameraManager->GetCameraRotation().Yaw
+                                                        : PlayerOwner->GetControlRotation().Yaw;
+ const float Winkel = FMath::DegreesToRadians((Ziel - Wo).Rotation().Yaw - Kamera);
+ const FVector2D Vor(FMath::Sin(Winkel), -FMath::Cos(Winkel));
+ const FVector2D Quer(-Vor.Y, Vor.X);
+ const FVector2D M(PX, PY);
+ // Zwei Dreiecke von der Spitze zur Kerbe - ein Pfeil mit Einschnitt hinten.
+ const FVector2D Spitze = M + Vor * R, Kerbe = M - Vor * R * 0.3f;
+ for (const float Seite : { 1.0f, -1.0f }) {
+  FCanvasTriangleItem Haelfte(Spitze, M - Vor * R * 0.6f + Quer * R * 0.62f * Seite, Kerbe, GWhiteTexture);
+  Haelfte.SetColor(Farbe);
+  Canvas->DrawItem(Haelfte);
+ }
+
+ const float TX = X + 100 * S;
+ Schrift(bUnterwegs ? TEXT("LIEFERUNG NACH") : TEXT("AUFTRAG VERFÜGBAR"), TX, Y + 12 * S, 11, Leise, true);
+ const FString Titel = bUnterwegs ? A->HoleZielName() : FString(TEXT("Zur blauen Säule"));
+ const float Platz = B - (TX - X) - 16 * S;
+ const float Punkt = 19.0f * FMath::Min(1.0f, Platz / FMath::Max(1.0f, Breite(Titel, 19, true)));
+ Schrift(Titel, TX, Y + 30 * S, Punkt, Weiss, true);
+ FString Zeile = Weg;
+ FLinearColor ZeilenFarbe = Leise;
+ if (bUnterwegs) {
+  const int32 Rest = FMath::CeilToInt(A->HoleRestzeit());
+  Zeile += FString::Printf(TEXT("   ·   %d:%02d"), Rest / 60, Rest % 60);
+  // Die letzten 20 Sekunden in Rot - dann lohnt kein Umweg mehr.
+  if (Rest <= 20) ZeilenFarbe = FLinearColor(1.0f, 0.42f, 0.32f);
+ }
+ Schrift(Zeile, TX, Y + 60 * S, 15, ZeilenFarbe);
+ const FString Geld = bUnterwegs ? FString::Printf(TEXT("+%d €"), A->HoleLohn()) : FString::Printf(TEXT("%d €"), A->HoleGeld());
+ Schrift(Geld, X + B - 16 * S - Breite(Geld, 15, true), Y + 60 * S, 15, bUnterwegs ? Farbe : Weiss, true);
+ // Kontostand auch waehrend der Fahrt, klein darunter.
+ if (bUnterwegs) {
+  const FString Konto = FString::Printf(TEXT("Konto %d €"), A->HoleGeld());
+  Schrift(Konto, X + B - 16 * S - Breite(Konto, 11, false), Y + 82 * S, 11, Leise);
+ }
 }
 
 // Ganz unten, klein: welche Tasten jetzt gelten.

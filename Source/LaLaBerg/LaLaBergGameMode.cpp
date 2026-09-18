@@ -34,6 +34,8 @@
 #include "Engine/GameInstance.h"
 #include "LaLaBergMenueSteuerung.h"
 #include "LaLaBergWagen.h"
+#include "LaLaBergAuftraege.h"
+#include "LaLaBergHUD.h"
 #include "LaLaBergWaffe.h"
 #include "LaLaBergVerkehrsauto.h"
 #include "LaLaBergAutoPool.h"
@@ -372,6 +374,17 @@ void ALaLaBergGameMode::InitGame(const FString& MapName,const FString& Options,F
    }
   },2.0f,false);
  }
+ // Lieferauftraege: die erste blaue Saeule zwischen Startpunkt und Wagen, auf
+ // einer Fahrbahn - erst wenn die Stadtkollision steht (Bodenhoehe, Ziele).
+ {
+  FTimerHandle H;
+  const FVector Mitte((-167210.0-158830.0)*0.5,(14530.0+20580.0)*0.5,StartOrt.Z);
+  GetWorldTimerManager().SetTimer(H,[this,Mitte]() {
+   auto* Auftraege=GetWorld()->SpawnActor<ALaLaBergAuftraege>();
+   bool bFrei=false;
+   if(Auftraege) Auftraege->SetzeStartOrt(SucheFahrbahn(Mitte,bFrei).GetLocation());
+  },2.5f,false);
+ }
  // KI-Verkehr und Passanten, aus demselben Grund erst verzoegert wie der
  // fahrbare Wagen: die Stadtkollision muss stehen, bevor jemand darauf
  // faehrt oder geht.
@@ -474,7 +487,8 @@ void ALaLaBergGameMode::BeginPlay() {
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergKoerperFoto")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergAmpelTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergUeberholTest")) ||
-                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergAbbiegeTest"));
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergAbbiegeTest")) ||
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergAuftragTest"));
  if(bAutomatisch) Beleg(FString::Printf(TEXT("LALABERG_SPIELBEGINN nach %.1fs Programmlaufzeit, %d Gebaeude"),FPlatformTime::Seconds()-GStartTime,BuildingCount));
  if(!bAutomatisch) {
   if(UGameInstance* Spiel=GetGameInstance()) {
@@ -1013,6 +1027,55 @@ void ALaLaBergGameMode::BeginPlay() {
  // nur zuegige Richtungsaenderungen (mehr als 4 Grad je Viertelsekunde):
  // eine sanft gekruemmte Strasse dreht das Auto deutlich langsamer als eine
  // Abbiegung, sonst waere jede Kurvenfahrt schon ein "Abbiegen".
+ // -LaLaBergAuftragTest: ein ganzer Lieferauftrag ohne Tastatur. Die Figur
+ // wird vor die blaue Saeule gestellt (Foto), hineingesetzt (Auftrag laeuft,
+ // Foto Richtung Ziel), vor das Ziel (Foto) und hinein (Geld). Dann in die
+ // naechste blaue Saeule, die Frist laeuft ab - der Auftrag muss scheitern.
+ if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergAuftragTest"))) {
+  auto Stelle=[this](const FVector& Ort,const FVector& Blick) {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   APawn* Figur=PC?PC->GetPawn():nullptr;
+   if(!Figur) return;
+   Figur->SetActorLocation(Ort+FVector(0,0,110),false,nullptr,ETeleportType::TeleportPhysics);
+   PC->SetControlRotation(FRotator(-8.0f,(Blick-Ort).Rotation().Yaw,0));
+   Figur->SetActorRotation(FRotator(0,(Blick-Ort).Rotation().Yaw,0));
+   if(auto* HUD=Cast<ALaLaBergHUD>(PC->GetHUD())) HUD->OrtSofort();
+  };
+  auto Foto=[this]() { if(auto* PC=GetWorld()->GetFirstPlayerController()) PC->ConsoleCommand(TEXT("HighResShot 1600x900")); };
+  struct FSchritt { float Zeit; TFunction<void()> Tu; };
+  TArray<FSchritt> Plan={
+   {4.5f,[this,Stelle]() { if(auto* A=ALaLaBergAuftraege::Instanz.Get()) {
+      const FVector S=A->HoleWegpunkt(); Stelle(S+FVector(-2500,-1200,0),S); } }},
+   {6.0f,Foto},
+   {7.0f,[this,Stelle]() { if(auto* A=ALaLaBergAuftraege::Instanz.Get()) {
+      const FVector S=A->HoleWegpunkt(); Stelle(S,S+FVector(1000,0,0)); } }},
+   {7.6f,[this,Stelle]() { if(auto* A=ALaLaBergAuftraege::Instanz.Get(); A&&A->IstUnterwegs()) {
+      const FVector Z=A->HoleWegpunkt(); auto* PC=GetWorld()->GetFirstPlayerController();
+      if(PC&&PC->GetPawn()) Stelle(PC->GetPawn()->GetActorLocation()-FVector(0,0,110),Z); } }},
+   {9.0f,Foto},
+   {10.0f,[this,Stelle]() { if(auto* A=ALaLaBergAuftraege::Instanz.Get(); A&&A->IstUnterwegs()) {
+      const FVector Z=A->HoleWegpunkt(); auto* PC=GetWorld()->GetFirstPlayerController();
+      const FVector Von=PC&&PC->GetPawn()?PC->GetPawn()->GetActorLocation():Z;
+      Stelle(Z+(Von-Z).GetSafeNormal2D()*3500.0f,Z); } }},
+   {11.5f,Foto},
+   // Ins Ziel: erledigt, die naechste blaue Saeule steht woanders.
+   {12.0f,[this,Stelle]() { if(auto* A=ALaLaBergAuftraege::Instanz.Get()) { const FVector Z=A->HoleWegpunkt(); Stelle(Z,Z+FVector(1000,0,0)); } }},
+   {12.6f,[this,Stelle]() { if(auto* A=ALaLaBergAuftraege::Instanz.Get(); A&&!A->IstUnterwegs()) {
+      auto* PC=GetWorld()->GetFirstPlayerController();
+      if(PC&&PC->GetPawn()) Stelle(PC->GetPawn()->GetActorLocation()-FVector(0,0,110),A->HoleWegpunkt()); } }},
+   {13.4f,Foto},
+   {14.0f,[this,Stelle]() { if(auto* A=ALaLaBergAuftraege::Instanz.Get(); A&&!A->IstUnterwegs()) { const FVector S=A->HoleWegpunkt(); Stelle(S,S+FVector(1000,0,0)); } }},
+   {15.0f,[]() { if(auto* A=ALaLaBergAuftraege::Instanz.Get(); A&&A->IstUnterwegs()) A->TestAblaufen(); }},
+   {16.0f,[]() {
+     auto* A=ALaLaBergAuftraege::Instanz.Get();
+     const bool bPass=A&&A->HoleZielzahl()>=10&&A->HoleErledigt()==1&&A->HoleGescheitert()==1&&A->HoleGeld()>0&&!A->IstUnterwegs();
+     Beleg(FString::Printf(TEXT("LALABERG_AUFTRAGTEST %s ziele=%d erledigt=%d gescheitert=%d geld=%d"),bPass?TEXT("PASS"):TEXT("FAIL"),
+      A?A->HoleZielzahl():0,A?A->HoleErledigt():0,A?A->HoleGescheitert():0,A?A->HoleGeld():0));
+     FPlatformMisc::RequestExitWithStatus(false,bPass?0:1);
+   }},
+  };
+  for(const FSchritt& S:Plan) { FTimerHandle H; TFunction<void()> Tu=S.Tu; GetWorldTimerManager().SetTimer(H,MoveTemp(Tu),S.Zeit,false); }
+ }
  if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergAbbiegeTest"))) {
   static TMap<ALaLaBergVerkehrsauto*,float> LetzteGier, GierSumme;
   FTimerHandle Takt;

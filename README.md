@@ -150,6 +150,18 @@ Treffer erzeugen einen Decal-Farbklecks auf der getroffenen Fläche.
 - Treffer auf KI-Passanten lösen ein kurzes Stolpern aus.
 - Die Waffenmodelle stammen aus einem CC0-lizenzierten Quaternius-Paket.
 
+### Lieferaufträge
+
+Die erste Aufgabe im Spiel. Neben dem Startpunkt am Klinikum steht eine **blaue Säule** (60 m hoch, mit Ring am Boden). Wer hineinläuft oder -fährt, nimmt eine Lieferfahrt an:
+
+- Ziel ist ein echter Ort in Landsberg: die 39 Wahrzeichen aus `orte.json` (Bahnhof, Schmalzturm, Bayertor, Heilig-Kreuz-Kirche …), jeweils auf den nächsten Punkt einer Straße davor gesetzt, damit man mit dem Wagen hinkommt. Gewählt wird zufällig unter den Orten 400 m bis 2,5 km Luftlinie entfernt.
+- Das Ziel markiert eine **gelbe Säule**. Zeit: Luftlinie × 1,5 bei 10 m/s plus 30 s (1,8 km ≈ 5 Minuten). Lohn: 100 € plus 1 € je 5 m Luftlinie, auf 10 € gerundet.
+- Angekommen (8 m Umkreis): Geld aufs Konto, die nächste blaue Säule steht an einem anderen Ort 150–900 m weiter.
+- Zu spät: der Auftrag verfällt, die blaue Säule bleibt, wo sie war. Wer noch darin steht, muss einmal hinaus und wieder hinein.
+- Oben rechts zeigt eine Tafel Ziel, Entfernung, Restzeit (die letzten 20 s rot), Lohn und Kontostand, dazu einen Pfeil in Blickrichtung der Kamera.
+
+Bewusst noch nicht dabei: Speicherstand (das Konto gilt für eine Sitzung), Fracht oder Fahrgäste als Figuren, Schadenabzug, eine Karte mit Route.
+
 ### HUD und Menüs
 
 Das HUD enthält:
@@ -161,6 +173,7 @@ Das HUD enthält:
 - Schussanzahl
 - Steuerungshinweise
 - Ortsanzeige mit Straße, Platz oder Wahrzeichen
+- Auftragstafel mit Richtungspfeil, Restzeit und Kontostand
 - Ortsteil und Stadt
 
 Das Menü umfasst:
@@ -481,6 +494,7 @@ Saved/Screenshots/WindowsEditor
 | `-LaLaBergVerkehrFoto` | Screenshot von erstem KI-Auto und KI-Passanten | `LALABERG_VERKEHRFOTO PASS autos=70 passanten=90` |
 | `-LaLaBergLechFoto` | Luftaufnahme über dem Lech | Prüft `M_Lech` |
 | `-LaLaBergKoerperFoto` | Prüft Figur, Arm und Waffenhaltung: Bild von hinten, je Waffe ein Seitenbild, ein Bild im Laufen | `LALABERG_WAFFE_GEHALTEN PASS` je Waffe (Griff unter 25 cm von der Handfläche) |
+| `-LaLaBergAuftragTest` | Ganzer Lieferauftrag ohne Tastatur: vor die blaue Säule (Bild), hinein (Bild Richtung Ziel), vor das Ziel (Bild), hinein, dann in die nächste blaue Säule und die Frist ablaufen lassen | `LALABERG_AUFTRAGTEST PASS` mit `erledigt=1 gescheitert=1`, Geld > 0 und mindestens 10 Zielen |
 | `-LaLaBergAmpelTest` | Prüft Ampelkonflikte über vollen Zyklus | `LALABERG_AMPELTEST PASS verstoesse=0 ampeln=44` |
 
 ### Beispiel: Fahrtest mit GPU-Profiling
@@ -635,9 +649,9 @@ Die Verkehrslogik priorisiert skalierbares, glaubwürdiges Verhalten gegenüber 
 - Fehlt ein zufällig ausgewähltes Skeletal Asset, wird jetzt der Reihe nach jede andere verfügbare Figur versucht (Spielfigur wie KI-Passanten) - das selbstgebaute Fallback-Rig bleibt nur noch reserviert für den Fall, dass wirklich keine der Figuren lädt.
 - Das Fallback-Rig trägt nicht zu klassischen Mesh-Distanzfeldern bei - eine echte Engine-Grenze: `UProceduralMeshComponent` unterstützt grundsätzlich keine gebackenen Distanzfelder (keine `bAffectDistanceFieldLighting`-Eigenschaft, kein SDF-Asset wie bei Static Meshes), ohne die prozedurale Natur des Fallback-Rigs komplett aufzugeben nicht behebbar.
 
-### Kein Missionssystem
+### Aufgaben
 
-Das Projekt enthält derzeit kein Missions-, Quest-, Polizei-, Economy- oder Persistenzsystem. Der Fokus liegt auf Stadtmodell, Exploration, Interaktion, technischer Pipeline und Performance.
+Es gibt eine Art Aufgabe: Lieferaufträge (siehe oben). Kein Quest-, Polizei- oder Persistenzsystem; das Geld gilt nur für die laufende Sitzung und lässt sich noch für nichts ausgeben.
 
 ***
 
@@ -787,7 +801,7 @@ Mögliche nächste Ausbaustufen:
 - weichere Fußgängeranimationen und Verhaltenszustände
 - weitere Stadtmöblierung und Interaktionen
 - Profiling auf RTX- und Gaming-Hardware
-- optionale Missions- oder Sandbox-Systeme
+- weitere Auftragsarten, Speicherstand und etwas, wofür man das Geld ausgibt
 
 ***
 

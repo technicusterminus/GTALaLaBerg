@@ -32,6 +32,9 @@ private:
  void Fadenkreuz(class ALaLaBergWaffe* Waffe);
  void Hinweis(const FString& Taste, const FString& Text);
  void Tastenleiste(const FString& Text);
+ // Lieferauftrag oben rechts: Ziel, Entfernung, Restzeit, Geld und ein Pfeil
+ // dorthin, bezogen auf die Blickrichtung der Kamera.
+ void Auftrag();
  float Massstab = 1.0f;
  UPROPERTY() TObjectPtr<class UFont> Roboto = nullptr;
 
