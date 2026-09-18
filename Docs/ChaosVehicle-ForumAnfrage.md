@@ -1,22 +1,26 @@
 # Forum-Beitrag: Chaos Vehicle - drive force never reaches chassis (non-skeletal setup, UE 5.8)
 
-**GELOEST (siehe Commit "Chaos-Vehicle-Bug geloest..."):** Ursache war ein
-Einheiten-Bug in `WheelSystem.cpp` selbst - `AppliedLinearDriveForce =
-DriveTorque / Re` teilt ein in Newtonmetern authored Drehmoment durch `Re`,
-das im selben Plugin ueberall sonst ausdruecklich in Zentimetern dokumentiert
-ist (`WheelSystem.h`: `float Re; // [cm]`), obwohl der Code-Kommentar direkt
-ueber dieser Division selbst einraeumt, dass "the simulated radius for
-torque must be real size" (= Meter) sein muesste. Bei `WheelRadius=33` (cm)
-macht das jede daraus berechnete Kraft exakt hundertfach zu schwach - sowohl
-Antrieb (`DriveTorque`) als auch Bremse (`BrakeTorque`), da beide dieselbe
-Formel mit demselben `Re` durchlaufen. Der Workaround (ohne Aenderung am
-Engine-Code): `MaxTorque`/`MaxBrakeTorque`/`MaxHandBrakeTorque` in den
-eigenen `UChaosVehicleWheel`-/Engine-Setups um Faktor 100 ueberhoehen, siehe
-`LaLaBergWagen.cpp` (`EngineSetup.MaxTorque`) und `LaLaBergWagenRad.cpp`
-(`MaxBrakeTorque`/`MaxHandBrakeTorque`). Die urspruengliche Frage 2 unten
-("Is the Re cm-vs-meters inconsistency ... a real bug?") ist damit
-empirisch bestaetigt: ja. Dieses Dokument bleibt als Fundstelle/Beleg
-erhalten, falls der Bug trotzdem irgendwann an Epic gemeldet werden soll.
+**Umgangen, Ursache offen.** Der Wagen faehrt, seit `EngineSetup.MaxTorque`
+hundertfach ueberhoeht ist (32.000 statt 320 Nm, siehe `LaLaBergWagen.cpp`);
+das Zehnfache reichte nicht. Das ist gemessen, nicht erklaert.
+
+Die hier zwischenzeitlich eingetragene Erklaerung - ein Zentimeter-/Meter-
+Fehler bei `AppliedLinearDriveForce = DriveTorque / Re` in `WheelSystem.cpp`,
+der Antrieb und Bremse gleichermassen hundertfach schwaeche - war falsch:
+`ChaosWheeledVehicleMovementComponent.cpp` rechnet beide Momente vor dieser
+Division mit `TorqueMToCm` um (Zeile 820 Bremse, Zeile 902 Antrieb), die
+Division ist damit dimensional stimmig. Und die Bremse braucht den Faktor
+nachweislich nicht: mit realistischen 1500 Nm haelt der Wagen von 22 km/h in
+0,5 s auf 1,2 m an; die daraufhin ebenfalls hundertfach ueberhoehte Bremse
+erzeugte nur einen abrupten Halt und ist wieder zurueckgenommen.
+
+Warum allein der Antrieb den Faktor 100 braucht, ist damit wieder eine offene
+Frage - die Anfrage unten bleibt deshalb in Teilen aktuell (Frage 2 ist in
+ihrer urspruenglichen Form widerlegt, das Symptom besteht).
+
+Nebenbefund beim Bremsen: `bReverseAsBrake` (Standard true) deutet eine im
+Stand gehaltene Bremse als Rueckwaertsgas - der Wagen hielt an und fuhr dann
+mit ueber 30 km/h rueckwaerts. Im Projekt abgeschaltet.
 
 Zum Posten in z. B. forums.unrealengine.com (Physics/Vehicles-Bereich), UE Discord #physics oder AnswerHub. Englisch, da internationale Community.
 

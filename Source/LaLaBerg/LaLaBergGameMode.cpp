@@ -604,6 +604,15 @@ void ALaLaBergGameMode::BeginPlay() {
    auto* PC=GetWorld()->GetFirstPlayerController();
    if(!PC) return;
    PC->SetControlRotation(FRotator(0,0,0));
+   // Sitzt die Waffe in der Hand? Sie hing zuvor am Kasten-Arm, der bei
+   // einer Skelettfigur unsichtbar ist - im Bild schwebte sie dann neben
+   // der Figur. Am Bild allein ist das nur zu sehen, wenn man hinschaut;
+   // der Abstand zum Handpunkt macht es pruefbar.
+   float Waffenabstand=0.0f;
+   if(auto* Held=Cast<ALaLaBergCharacter>(PC->GetPawn()))
+    if(Held->HoleWaffenabstand(Waffenabstand))
+     Beleg(FString::Printf(TEXT("LALABERG_WAFFE_GEHALTEN %s abstand=%.0fcm"),
+      Waffenabstand<25.0f?TEXT("PASS"):TEXT("FAIL"),Waffenabstand));
    PC->ConsoleCommand(TEXT("HighResShot 1600x900"));
   },4.0f,false);
   FTimerHandle Ende;
@@ -689,28 +698,46 @@ void ALaLaBergGameMode::BeginPlay() {
     It->TestAnhalten();
     const float Mittel=(GFrameCounter-FahrtBilder)/FMath::Max(0.001,FPlatformTime::Seconds()-FahrtZeit);
     Beleg(FString::Printf(TEXT("LALABERG_FAHRTEST %s weg=%.1fm tempo=%.0fkmh aufraedern=%d fps_mittel=%.0f fps_schlechteste=%.0f aufloesung=%s"),
-     (Weg>800.0f&&bAufraedern)?TEXT("PASS"):TEXT("FAIL"),Weg/100.0f,Tempo,bAufraedern?1:0,Mittel,FahrtSchlechteste,
+     bFahrtestBestanden?TEXT("PASS"):TEXT("FAIL"),Weg/100.0f,Tempo,bAufraedern?1:0,Mittel,FahrtSchlechteste,
      GEngine&&GEngine->GameViewport?*FString::Printf(TEXT("%dx%d"),GEngine->GameViewport->Viewport->GetSizeXY().X,GEngine->GameViewport->Viewport->GetSizeXY().Y):TEXT("?")));
     break;
    }
-   FTimerHandle Ausstieg;
-   GetWorldTimerManager().SetTimer(Ausstieg,[this]() {
+   // Erst anhalten, dann aussteigen. ALaLaBergWagen::Aussteigen verweigert
+   // den Ausstieg oberhalb von 1 m/s ("zuerst mit der Leertaste anhalten") -
+   // seit der Wagen durch die Antriebskraft-Korrektur wirklich faehrt, lief
+   // der Test genau in diese Sicherung: er stieg stur 5 s nach dem Bremsen
+   // aus, da waren noch 32 km/h drauf, und AUSSTIEG/KRANKENHAUS schlugen
+   // fehl. Jetzt wird auf den Stillstand gewartet statt auf die Uhr, und die
+   // gebrauchte Bremszeit steht im Beleg - daran sieht man zugleich, ob die
+   // Bremse ueberhaupt wirkt.
+   const double BremsStart=GetWorld()->GetTimeSeconds();
+   FVector BremsOrt=FVector::ZeroVector;
+   for(TActorIterator<ALaLaBergWagen> It(GetWorld());It;++It) { BremsOrt=It->GetActorLocation(); break; }
+   GetWorldTimerManager().SetTimer(BremsUhr,[this,BremsStart,BremsOrt]() {
     for(TActorIterator<ALaLaBergWagen> It(GetWorld());It;++It) {
-     Beleg(FString::Printf(TEXT("LALABERG_BREMS_TEST tempo=%.2f"),It->GetVelocity().Size()*0.036f));
-     It->TestAussteigen(); break;
+     const float Tempo=It->GetVelocity().Size()*0.036f;
+     const double Gebraucht=GetWorld()->GetTimeSeconds()-BremsStart;
+     if(Tempo>3.0f && Gebraucht<12.0) return;               // weiter bremsen
+     GetWorldTimerManager().ClearTimer(BremsUhr);
+     const bool bBremsPass=Tempo<=3.0f;
+     bFahrtestBestanden=bFahrtestBestanden && bBremsPass;
+     Beleg(FString::Printf(TEXT("LALABERG_BREMS_TEST %s tempo=%.2f nach=%.2fs_spiel bremsweg=%.2fm"),
+      bBremsPass?TEXT("PASS"):TEXT("FAIL"),Tempo,Gebraucht,FVector::Dist2D(It->GetActorLocation(),BremsOrt)/100.0f));
+     It->TestAussteigen();
+     FScreenshotRequest::RequestScreenshot(FPaths::ScreenShotDir()/TEXT("Fahrtest_Ausstieg.png"),true,false);
+     FTimerHandle Abschluss;
+     GetWorldTimerManager().SetTimer(Abschluss,[this]() {
+      auto* PC=GetWorld()->GetFirstPlayerController();
+      auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr;
+      const bool bAusgestiegen=Figur && !Figur->IsHidden() && Figur->GetActorEnableCollision();
+      Beleg(FString::Printf(TEXT("LALABERG_AUSSTIEG_TEST %s"),bAusgestiegen?TEXT("PASS"):TEXT("FAIL")));
+      const bool bPass=bFahrtestBestanden && bAusgestiegen;
+      Beleg(FString::Printf(TEXT("LALABERG_KRANKENHAUS_TEST %s"),bPass?TEXT("PASS"):TEXT("FAIL")));
+      FPlatformMisc::RequestExitWithStatus(false,bPass?0:1);
+     },1.5f,false);
+     return;
     }
-    FScreenshotRequest::RequestScreenshot(FPaths::ScreenShotDir()/TEXT("Fahrtest_Ausstieg.png"),true,false);
-   },5.0f,false);
-   FTimerHandle Abschluss;
-   GetWorldTimerManager().SetTimer(Abschluss,[this]() {
-    auto* PC=GetWorld()->GetFirstPlayerController();
-    auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr;
-    const bool bAusgestiegen=Figur && !Figur->IsHidden() && Figur->GetActorEnableCollision();
-    Beleg(FString::Printf(TEXT("LALABERG_AUSSTIEG_TEST %s"),bAusgestiegen?TEXT("PASS"):TEXT("FAIL")));
-    const bool bPass=bFahrtestBestanden && bAusgestiegen;
-    Beleg(FString::Printf(TEXT("LALABERG_KRANKENHAUS_TEST %s"),bPass?TEXT("PASS"):TEXT("FAIL")));
-    FPlatformMisc::RequestExitWithStatus(false,bPass?0:1);
-   },6.5f,false);
+   },0.5f,true,0.5f);
   },10.5f,false);
  }
  // Waffentest: Figur vor den fahrbaren Wagen stellen (er ist die einzige

@@ -77,7 +77,7 @@ Enthalten sind unter anderem:
 
 Die Verkehrslogik basiert auf vorbereiteten Wegen, OpenStreetMap-Straßendaten und Kreuzungsinformationen:
 
-- KI-Autos fahren Strecken ab und kehren am Routenende um.
+- KI-Autos fahren geschlossene Rundkurse über das Straßennetz, biegen dabei an Kreuzungen ab und befahren auch Einbahnstraßen in Fahrtrichtung.
 - Fahrzeuge fahren grundsätzlich rechts versetzt zur Straßenachse.
 - Gegenverkehr entsteht automatisch durch den fahrtrichtungsabhängigen Spurversatz.
 - Fahrzeuge bremsen vor Autos, Spielern, roten Ampeln und bevorrechtigtem Verkehr.
@@ -114,7 +114,7 @@ Die Fahrzeugdarstellung nutzt einen bewusst aggressiven Sichtweiten-Kompromiss:
 
 Diese Pooling-Strategie reduziert Draw Calls massiv. Ohne Pooling sank die Bildrate bei 1.078 geparkten Fahrzeugen im Fahrtest von 26 auf 17 fps; alle Detailfahrzeuge gleichzeitig führten zu rund 2 fps.
 
-Der fahrbare Wagen läuft über echte Chaos-Vehicle-Physik (`UChaosWheeledVehicleMovementComponent`) statt vier Federstrahlen - Motor-/Getriebekennfeld, Vorderradlenkung, Hinterradantrieb, echte Reifenreibung je Rad. Ein experimenteller Einheiten-Bug im ChaosVehiclesPlugin selbst schwächte Antriebs- und Bremskraft um Faktor 100 (Drehmoment wird durch den Radradius geteilt, der im Plugin als Zentimeter statt Meter geführt wird) - siehe „Bekannte Grenzen" für Details der Diagnose.
+Der fahrbare Wagen läuft über echte Chaos-Vehicle-Physik (`UChaosWheeledVehicleMovementComponent`) statt vier Federstrahlen - Motor-/Getriebekennfeld, Vorderradlenkung, Hinterradantrieb, echte Reifenreibung je Rad. Das Motormoment muss dafür hundertfach überhöht werden, sonst beschleunigt die Karosserie nicht; die Ursache ist offen, die Bremse arbeitet mit realistischen Werten - siehe „Bekannte Grenzen".
 
 ### Spielfigur
 
@@ -126,7 +126,7 @@ Die Spielfigur wird aus einer Third-Person-Kamera gesteuert.
 - Zufällige Farbvarianten für Kleidung und Körpergröße
 - KI-Passanten verwenden dieselben Varianten
 - Fallback auf ein selbstgebautes, animiertes Gelenk-Rig, falls die Skeletal Assets nicht verfügbar sind
-- Die Waffe ist physisch am rechten Arm positioniert und schwebt nicht frei an der Kamera
+- Die Spielfigur hält die Waffe in der rechten Hand und nimmt die Waffenhaltung des Figurenpakets ein (`Idle_Gun` im Stand, `Run_Shoot` in Bewegung). Das Rig endet beim Unterarm (`LowerArm_R`), einen Hand-Knochen gibt es nicht - der Griffpunkt sitzt deshalb am äußeren Unterarmende, Lage und Ausrichtung aus dem Skelett selbst berechnet. Geprüft über `-LaLaBergKoerperFoto` (`LALABERG_WAFFE_GEHALTEN`, 6 cm vom Handpunkt). Zuvor hing die Waffe am unsichtbaren Kasten-Arm des Fallback-Rigs und schwebte neben der Figur; dazu kam, dass die Knochen den Maßstab 100 tragen, den der Griffpunkt nicht erben darf - sonst wird die Waffe hundertfach so groß und hängt 2 m daneben.
 
 ### Paintball-Waffen
 
@@ -469,7 +469,7 @@ Saved/Screenshots/WindowsEditor
 | Schalter | Zweck | Erwartetes Ergebnis |
 |---|---|---|
 | `-LaLaBergSmoke` | Grundlegender Welttest | `LALABERG_SMOKE PASS` |
-| `-LaLaBergFahrtest` | Einsteigen und vier Sekunden Vollgas | `LALABERG_FAHRTEST PASS` ab 8 m Weg auf allen Rädern |
+| `-LaLaBergFahrtest` | Einsteigen, vier Sekunden Vollgas, bis zum Stillstand bremsen, aussteigen | `LALABERG_FAHRTEST PASS` ab 8 m Weg auf allen Rädern, `LALABERG_BREMS_TEST PASS` (Stillstand unter 3 km/h, mit Bremszeit und Bremsweg), `LALABERG_AUSSTIEG_TEST PASS` |
 | `-LaLaBergFoto` | Hauptplatz, Straße, Fahrzeug, Luftbild | Vier Screenshots |
 | `-LaLaBergHimmelEchtzeit` | Test der Echtzeit-Himmelsaufnahme | Diagnose im Log/Bild |
 | `-LaLaBergNacht` | Setzt die Tageszeit auf Mitternacht | Für Nachtbildtests |
@@ -477,7 +477,7 @@ Saved/Screenshots/WindowsEditor
 | `-LaLaBergWaffentest` | Alle Waffen plus Treffer auf Fahrzeug und Wand | `LALABERG_WAFFENTEST PASS` |
 | `-LaLaBergVerkehrFoto` | Screenshot von erstem KI-Auto und KI-Passanten | `LALABERG_VERKEHRFOTO PASS autos=70 passanten=90` |
 | `-LaLaBergLechFoto` | Luftaufnahme über dem Lech | Prüft `M_Lech` |
-| `-LaLaBergKoerperFoto` | Prüft Figur, Arm und Waffenhaltung | Screenshot |
+| `-LaLaBergKoerperFoto` | Prüft Figur, Arm und Waffenhaltung | Screenshot und `LALABERG_WAFFE_GEHALTEN PASS` (Waffe unter 25 cm vom Handpunkt) |
 | `-LaLaBergAmpelTest` | Prüft Ampelkonflikte über vollen Zyklus | `LALABERG_AMPELTEST PASS verstoesse=0 ampeln=44` |
 
 ### Beispiel: Fahrtest mit GPU-Profiling
@@ -589,7 +589,9 @@ Der Umbau auf echte Chaos-Vehicle-Physik ist abgeschlossen und aktiv (`UChaosWhe
 Zwei Engine-eigene Probleme im UE-5.8-`ChaosVehiclesPlugin` (Experimental) mussten dafür umgangen werden:
 
 - `CanCreateVehicle()` verlangt einen Bone-Namen pro Rad, selbst wenn kein Skeletal Mesh verwendet wird, obwohl `UChaosVehicleMovementComponent::LocateBoneOffset()` `BoneName=NAME_None` ausdrücklich unterstützt - eine Unterklasse überspringt nur genau diese eine Prüfung.
-- Ein Einheiten-Bug in `WheelSystem.cpp` selbst: `AppliedLinearDriveForce = DriveTorque / Re` teilt ein in Newtonmetern authored Drehmoment durch `Re`, den Radradius - der ist im selben Plugin überall sonst ausdrücklich in Zentimetern dokumentiert (`WheelSystem.h`: `float Re; // [cm]`), obwohl der Code-Kommentar direkt über dieser Division selbst einräumt, dass „the simulated radius for torque must be real size" (= Meter) sein müsste. Bei `WheelRadius=33` (cm) macht das jede daraus berechnete Kraft (Antrieb wie Bremse) exakt hundertfach zu schwach - äußerte sich als: alle Rad-Messwerte (Kontakt, Federweg, Reibung, Antriebsmoment) sahen plausibel aus, die Karosserie beschleunigte trotzdem nie, auch nicht nach einer Verzehnfachung des Drehmoments (der eigentlich nötige Faktor lag bei 100, nicht 10). Workaround ohne Änderung am Engine-Code: `MaxTorque`/`MaxBrakeTorque`/`MaxHandBrakeTorque` in den eigenen Setups um Faktor 100 überhöht.
+- Der Antrieb braucht ein hundertfach überhöhtes Motormoment (`MaxTorque` 32.000 statt realistischer 320 Nm): Mit dem realistischen Wert sahen alle Rad-Messwerte (Kontakt, Federweg, Reibung, Antriebsmoment) plausibel aus, die Karosserie beschleunigte trotzdem nie - auch nicht mit dem Zehnfachen, erst mit dem Hundertfachen. Die zunächst dokumentierte Ursache, ein Zentimeter-/Meter-Fehler bei `AppliedLinearDriveForce = DriveTorque / Re` in `WheelSystem.cpp`, hält so nicht: `ChaosWheeledVehicleMovementComponent.cpp` rechnet Antriebs- **und** Bremsmoment vor dieser Division gleichermaßen mit `TorqueMToCm` um. Warum trotzdem nur der Antrieb den Faktor braucht, ist ungeklärt; belegt ist nur das Messergebnis.
+- Die Bremse braucht diesen Faktor **nicht**: Mit realistischen 1500 Nm (Handbremse 3000 Nm) hält der Wagen von 22 km/h in 0,5 s auf 1,2 m an (`-LaLaBergFahrtest`, `LALABERG_BREMS_TEST`). Die zwischenzeitlich ebenfalls hundertfach überhöhte Bremse führte nur zu einem abrupten Halt.
+- `bReverseAsBrake` ist abgeschaltet: Chaos deutet eine im Stand gehaltene Bremse sonst als Rückwärtsgas - der Wagen hielt kurz an und fuhr dann mit über 30 km/h rückwärts. Vorwärts und rückwärts wählt stattdessen die Gangschaltung (`SetTargetGear`), die Leertaste bremst nur.
 
 Die ausführliche Diagnose (ursprünglich als Community-Anfrage vorbereitet, mittlerweile mit der Lösung ergänzt) steht unter:
 

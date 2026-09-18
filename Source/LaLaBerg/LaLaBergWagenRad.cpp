@@ -1,12 +1,9 @@
 #include "LaLaBergWagenRad.h"
 
-// Hundertfach ueberhoehte Brems- statt realistischer Werte (1500/3000 Nm) -
-// siehe der ausfuehrliche Kommentar bei EngineSetup.MaxTorque in
-// LaLaBergWagen.cpp: derselbe Re-in-Zentimeter-statt-Meter-Bug im
-// experimentellen ChaosVehiclesPlugin schwaecht jede ueber WheelSystem.cpp
-// berechnete Kraft (Antrieb wie Bremse) um denselben Faktor 100.
-constexpr float BREMSMOMENT_KORRIGIERT = 150000.0f;
-constexpr float HANDBREMSMOMENT_KORRIGIERT = 300000.0f;
+// Nm: Chaos konvertiert diese Werte beim Anwenden des Bremsmoments.
+// Die fruehere pauschale 100x-Korrektur erzeugte einen abrupten Stopp.
+constexpr float BREMSMOMENT_KORRIGIERT = 1500.0f;
+constexpr float HANDBREMSMOMENT_KORRIGIERT = 3000.0f;
 
 ULaLaBergRadVorn::ULaLaBergRadVorn() {
  WheelRadius = 33.0f;

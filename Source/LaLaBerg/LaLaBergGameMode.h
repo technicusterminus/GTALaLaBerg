@@ -24,6 +24,8 @@ private:
  bool bFahrtestBestanden = false;
  bool bFahrtestEinstieg = false;
  FTimerHandle FahrtUhr;
+ // Wartet im Fahrtest auf den Stillstand, bevor die Figur aussteigt.
+ FTimerHandle BremsUhr;
  // Bildratenmessung waehrend des Fahrtests
  uint64 FahrtBilder=0, FahrtLetzteBilder=0;
  double FahrtZeit=0, FahrtLetzteUhr=0;

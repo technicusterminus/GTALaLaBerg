@@ -28,6 +28,11 @@ public:
  // Fuer den Waffentest: Schuss ohne Tastatur aus Blickrichtung.
  void Feuern();
  class ALaLaBergWaffe* HoleWaffe() const { return Waffe; }
+ // Abstand der Waffe vom Handpunkt am Ende des Unterarms (siehe BeginPlay),
+ // in Zentimetern. Fuer -LaLaBergKoerperFoto: ob die Waffe tatsaechlich
+ // gehalten wird oder wie zuvor neben der Figur schwebt, laesst sich sonst
+ // nur am Bild erkennen. Liefert false ohne Skelettfigur oder ohne Waffe.
+ bool HoleWaffenabstand(float& AusAbstandCm) const;
 
 private:
  UPROPERTY() TObjectPtr<class USpringArmComponent> Ausleger = nullptr;

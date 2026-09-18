@@ -173,6 +173,8 @@ ALaLaBergWagen::ALaLaBergWagen() {
  // Zahl: -17 laesst das Rad (33 cm Radius, ±10 cm Federweg) zwischen -40 und
  // -60 reichen, die Fahrbahn bei -55 (Boxunterkante) liegt darin.
  Bewegung = CreateDefaultSubobject<ULaLaBergWagenBewegung>(TEXT("Bewegung"));
+ // Space is a dedicated brake, never a request to reverse.
+ Bewegung->bReverseAsBrake = false;
  Bewegung->WheelSetups.SetNum(4);
  Bewegung->WheelSetups[0].WheelClass = ULaLaBergRadVorn::StaticClass();
  Bewegung->WheelSetups[0].AdditionalOffset = FVector(131, 79, -50);
@@ -193,20 +195,16 @@ ALaLaBergWagen::ALaLaBergWagen() {
  Bewegung->ChassisHeight = 110.0f;
  Bewegung->DragCoefficient = 0.35f;
 
- // 320 Nm waere ein realistischer Wert fuer diesen Wagen - hundertfach hoeher
- // wegen eines Einheiten-Bugs im experimentellen ChaosVehiclesPlugin selbst
- // (UE 5.8): WheelSystem.cpp teilt DriveTorque [Nm] durch Re, den Radradius -
- // aber Re ist ueberall sonst im selben Plugin ausdruecklich in Zentimetern
- // dokumentiert (siehe WheelSystem.h "float Re; // [cm]"), obwohl der
- // Code-Kommentar direkt ueber dieser einen Division selbst einraeumt, dass
- // "the simulated radius for torque must be real size" (= Meter). Bei unserem
- // WheelRadius=33 (cm) kommt die Antriebskraft dadurch exakt hundertfach zu
- // schwach heraus (33 cm statt der eigentlich noetigen 0.33 m) - beobachtet
- // als: alle Rad-Werte (Kontakt, Federweg, Reibung, Antriebsmoment) sahen per
- // -LaLaBergFahrtest korrekt aus, die Karosserie beschleunigte trotzdem nie.
- // Erst eine Verzehnfachung von MaxTorque (als Test, ob es ueberhaupt ein
- // Kraft-/Tuningproblem ist) zeigte weiterhin keine Bewegung; erst die volle
- // Verhundertfachung bewegt den Wagen sichtbar - das bestaetigt die Diagnose.
+ // 320 Nm waere ein realistischer Wert fuer diesen Wagen - hundertfach hoeher,
+ // weil der Wagen sonst nicht faehrt: alle Rad-Werte (Kontakt, Federweg,
+ // Reibung, Antriebsmoment) sahen per -LaLaBergFahrtest korrekt aus, die
+ // Karosserie beschleunigte trotzdem nie; das Zehnfache reichte nicht, erst
+ // das Hundertfache bewegt ihn. Die Ursache ist offen. Die frueher hier
+ // stehende Erklaerung (Zentimeter-/Meter-Fehler bei DriveTorque / Re in
+ // WheelSystem.cpp) war falsch: ChaosWheeledVehicleMovementComponent.cpp
+ // rechnet das Moment vorher mit TorqueMToCm um, und die Bremse - die dieselbe
+ // Rechnung durchlaeuft - braucht den Faktor nachweislich nicht (siehe
+ // LaLaBergWagenRad.cpp und Docs/ChaosVehicle-ForumAnfrage.md).
  Bewegung->EngineSetup.MaxTorque = 32000.0f;
  Bewegung->EngineSetup.MaxRPM = 5500.0f;
  // Ohne eigene Kurve bleibt TorqueCurve leer - FillEngineSetup() teilt dann
@@ -472,9 +470,19 @@ void ALaLaBergWagen::Tick(float Zeit) {
   }
  }
 
- Bewegung->SetThrottleInput(bBremse ? 0.0f : GasWert);
+ const float VorwaertsTempo = Bewegung->GetForwardSpeed();
+ const bool bRichtungswechsel = (GasWert > 0.02f && VorwaertsTempo < -100.0f)
+                            || (GasWert < -0.02f && VorwaertsTempo > 100.0f);
+ const bool bAnhalten = bBremse || bRichtungswechsel;
+ if (!bAnhalten && FMath::Abs(GasWert) > 0.02f) {
+  if (GasWert < 0.0f && Bewegung->GetTargetGear() >= 0)
+   Bewegung->SetTargetGear(-1, true);
+  else if (GasWert > 0.0f && Bewegung->GetTargetGear() <= 0)
+   Bewegung->SetTargetGear(1, true);
+ }
+ Bewegung->SetThrottleInput(bAnhalten ? 0.0f : FMath::Abs(GasWert));
  Bewegung->SetSteeringInput(Lenkung);
- Bewegung->SetBrakeInput(bBremse ? 1.0f : 0.0f);
+ Bewegung->SetBrakeInput(bAnhalten ? 1.0f : 0.0f);
  // Handbremse statt Parkmodus, solange niemand faehrt - haelt den Wagen am
  // Hang, ohne (wie SetParked im Verdacht steht) auch bei aktivem Fahrer noch
  // nachzuwirken: trotz kontakt=1/federweg=0.75/drehmoment=985.9 blieb der

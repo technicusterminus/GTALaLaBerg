@@ -10,6 +10,7 @@
 #include "Engine/GameInstance.h"
 #include "LaLaBergMenueSteuerung.h"
 #include "LaLaBergWagen.h"
+#include "LaLaBergHUD.h"
 #include "LaLaBergVerkehrsauto.h"
 #include "LaLaBergWaffe.h"
 #include "LaLaBergKoerperTeile.h"
@@ -148,6 +149,8 @@ ALaLaBergCharacter::ALaLaBergCharacter() {
   auto* Teil = CreateDefaultSubobject<USkeletalMeshComponent>(Name);
   Teil->SetupAttachment(GetCapsuleComponent());
   Teil->SetRelativeLocation(FVector(0, 0, BodenZ));
+  // Imported humanoids face +Y; gameplay and camera forward is +X.
+  Teil->SetRelativeRotation(FRotator(0, -90.0f, 0));
   Teil->SetCollisionEnabled(ECollisionEnabled::NoCollision);
   Teil->SetVisibility(false);
   Teil->bOwnerNoSee = false;
@@ -256,7 +259,7 @@ void ALaLaBergCharacter::BeginPlay() {
      Teil->SetVisibility(true);
      FaerbeSkelett(Teil, JACKE);
     }
-    if (auto* Anim = LoadObject<UAnimSequence>(nullptr, TEXT("/Game/Art/People/Animations/Anim_HumansCharacterArmature_Idle_Neutral.Anim_HumansCharacterArmature_Idle_Neutral")))
+    if (auto* Anim = LoadObject<UAnimSequence>(nullptr, TEXT("/Game/Art/People/Animations/Anim_HumansCharacterArmature_Idle_Gun.Anim_HumansCharacterArmature_Idle_Gun")))
      SkelettKoerper->PlayAnimation(Anim, true);
    }
   } else {
@@ -268,7 +271,7 @@ void ALaLaBergCharacter::BeginPlay() {
     SkelettKoerper->SetSkeletalMesh(NeuesMesh);
     SkelettKoerper->SetVisibility(true);
     FaerbeSkelett(SkelettKoerper, JACKE);
-    if (auto* Anim = LoadObject<UAnimSequence>(nullptr, *EinzelAnimPfad(Name, TEXT("Idle_Neutral"))))
+    if (auto* Anim = LoadObject<UAnimSequence>(nullptr, *EinzelAnimPfad(Name, TEXT("Idle_Gun"))))
      SkelettKoerper->PlayAnimation(Anim, true);
    }
   }
@@ -278,23 +281,56 @@ void ALaLaBergCharacter::BeginPlay() {
   for (int32 s = 0; s < 2; s++) {
    Oberschenkel[s]->SetVisibility(false); Unterschenkel[s]->SetVisibility(false); Oberarm[s]->SetVisibility(false);
   }
+  // Griffpunkt an den Arm des Skeletts umhaengen. Er haengt sonst weiter am
+  // Kasten-Arm (Oberarm[0]), der hier gerade unsichtbar geschaltet wurde -
+  // die Waffe schwebte dadurch neben der Figur, statt gehalten zu werden.
+  //
+  // Das Rig aller drei Figuren (Farmer, Casual, Worker - dasselbe
+  // CharacterArmature) endet bei LowerArm_R, einen Hand-Knochen gibt es
+  // nicht. Der Griffpunkt kommt deshalb ans aeussere Ende des Unterarms:
+  // dort, wo die Hand waere. Laenge und Richtung stammen aus dem Skelett
+  // selbst (Oberarm als Mass fuer den etwa gleich langen Unterarm), damit
+  // kein geratener Zahlenwert nachjustiert werden muss.
+  const int32 Ellbogen = SkelettKoerper->GetBoneIndex(TEXT("LowerArm_R"));
+  if (Ellbogen != INDEX_NONE) {
+   const FVector EllbogenOrt = SkelettKoerper->GetBoneLocation(TEXT("LowerArm_R"));
+   const FVector Arm = EllbogenOrt - SkelettKoerper->GetBoneLocation(TEXT("UpperArm_R"));
+   const FTransform Knochen = SkelettKoerper->GetBoneTransform(Ellbogen);
+   WaffenHalter->AttachToComponent(SkelettKoerper,
+    FAttachmentTransformRules::KeepRelativeTransform, TEXT("LowerArm_R"));
+   // Die Knochen dieses Rigs tragen den Massstab 100 (Blender-Export: 18 cm
+   // Oberarm sind im Knochenraum 0,18). Ohne absoluten Massstab erbt der
+   // Griffpunkt ihn, und alles daran haengende waechst mit: der 2-cm-Versatz
+   // der Waffe wurde zu 2 m, die Waffe selbst hundertfach so gross - per
+   // -LaLaBergKoerperFoto gemessen hing sie 201 cm neben der Hand. Die Lage
+   // (unten) rechnet der Knochenmassstab dagegen richtig um.
+   WaffenHalter->SetUsingAbsoluteScale(true);
+   WaffenHalter->SetWorldScale3D(FVector::OneVector);
+   WaffenHalter->SetRelativeLocation(Knochen.InverseTransformPosition(EllbogenOrt + Arm));
+   // +X des Griffpunkts entlang des Unterarms ausrichten - das ist die
+   // Achse, die die Waffe als Muendungsrichtung benutzt (siehe ModellInfo
+   // in LaLaBergWaffe.cpp). Ueber die Armrichtung statt ueber die lokalen
+   // Achsen des Knochens: welche davon den Arm entlang zeigt, haengt am
+   // Export der Figur und waere geraten.
+   const FQuat Entlang = FRotationMatrix::MakeFromX(Arm.GetSafeNormal()).ToQuat();
+   WaffenHalter->SetRelativeRotation((Knochen.GetRotation().Inverse() * Entlang).Rotator());
+  }
  }
 
- // Am rechten Arm statt an der Kamera: sonst haengt die Waffe in dritter
- // Person freischwebend im Raum, ganz ohne erkennbaren Traeger. Die Position
- // folgt dem Arm (relativ zum Griffpunkt), die Drehung bleibt bewusst an
- // die Blickrichtung der Figur gebunden statt an den Armwinkel - sonst
- // muesste jede Armhaltung exakt zur Muendungsrichtung passen.
+ // Am Arm statt an der Kamera: sonst haengt die Waffe in dritter Person
+ // freischwebend im Raum, ganz ohne erkennbaren Traeger. Der Griffpunkt
+ // sitzt am Ende des Unterarms und zeigt mit +X den Arm entlang (siehe
+ // oben) - die Waffe uebernimmt ihn unveraendert, Lage und Muendungs-
+ // richtung kommen damit beide aus der Armhaltung. Frueher wurde die
+ // Drehung stattdessen einmalig auf die Blickrichtung der Figur gesetzt;
+ // das stammt aus der Zeit, als die Waffe am unsichtbaren Kasten-Arm hing
+ // und ihre Haltung ohnehin zu nichts Sichtbarem passen musste.
  FActorSpawnParameters Params; Params.Owner = this; Params.Instigator = this;
  Waffe = GetWorld()->SpawnActor<ALaLaBergWaffe>(GetActorLocation(), GetActorRotation(), Params);
  if (Waffe) {
   Waffe->AttachToComponent(WaffenHalter, FAttachmentTransformRules::KeepRelativeTransform);
-  // Position relativ zum Griffpunkt (klein, am Ende des Arms) - die Drehung
-  // dagegen bewusst in Weltkoordinaten nach dem Anheften gesetzt, nicht
-  // relativ: sie soll der Blickrichtung der Figur folgen, nicht dem
-  // Armwinkel, sonst muesste jede Armhaltung exakt zur Muendung passen.
   Waffe->SetActorRelativeLocation(FVector(2, 0, 0));
-  Waffe->SetActorRotation(GetActorRotation());
+  Waffe->SetActorRelativeRotation(FRotator::ZeroRotator);
  }
 }
 
@@ -332,7 +368,11 @@ void ALaLaBergCharacter::Tick(float DeltaSeconds) {
   const bool bLaeuftJetzt = Faktor > 0.05f;
   if (bLaeuftJetzt != bLaeuftGerade) {
    bLaeuftGerade = bLaeuftJetzt;
-   const TCHAR* AnimName = bLaeuftGerade ? TEXT("Walk") : TEXT("Idle_Neutral");
+   // Waffenhaltung statt neutraler Pose: die Spielfigur traegt immer eine
+   // Waffe (siehe Waffe unten), mit "Idle_Neutral"/"Walk" hingen die Arme
+   // daneben und die Waffe am Ende des Arms wirkte angeklebt statt
+   // gehalten. Das Figurenpaket bringt fuer beides eine passende Pose mit.
+   const TCHAR* AnimName = bLaeuftGerade ? TEXT("Run_Shoot") : TEXT("Idle_Gun");
    const FString Pfad = FigurTyp == 0
     ? TEXT("/Game/Art/People/Animations/Anim_HumansCharacterArmature_") + FString(AnimName) + TEXT(".Anim_HumansCharacterArmature_") + FString(AnimName)
     : EinzelAnimPfad(EINZEL_FIGUREN[FigurTyp - 1].Name, AnimName);
@@ -389,6 +429,16 @@ void ALaLaBergCharacter::SetupPlayerInputComponent(UInputComponent* Input) {
 }
 // Schuss aus Blickrichtung, ein Stueck vor der Kamera - sonst trifft die
 // Kugel im selben Bild die eigene Kapsel.
+bool ALaLaBergCharacter::HoleWaffenabstand(float& AusAbstandCm) const {
+ if (!Waffe || !bSkelettGenutzt || !SkelettKoerper) return false;
+ const int32 Ellbogen = SkelettKoerper->GetBoneIndex(TEXT("LowerArm_R"));
+ if (Ellbogen == INDEX_NONE) return false;
+ const FVector EllbogenOrt = SkelettKoerper->GetBoneLocation(TEXT("LowerArm_R"));
+ const FVector Arm = EllbogenOrt - SkelettKoerper->GetBoneLocation(TEXT("UpperArm_R"));
+ AusAbstandCm = FVector::Dist(Waffe->GetActorLocation(), EllbogenOrt + Arm);
+ return true;
+}
+
 void ALaLaBergCharacter::Feuern() {
  if (!Waffe) return;
  Waffe->Feuern(Kamera->GetComponentLocation() + Kamera->GetForwardVector() * 70.0f, Kamera->GetForwardVector());
@@ -432,6 +482,7 @@ void ALaLaBergCharacter::Einsteigen() {
  ALaLaBergWagen* Naechster = nullptr;
  float Beste = 800.0f;
  for (TActorIterator<ALaLaBergWagen> It(GetWorld()); It; ++It) {
+  if (It->GetController()) continue;
   const float Abstand = FVector::Dist(It->GetActorLocation(), GetActorLocation());
   if (Abstand < Beste) { Beste = Abstand; Naechster = *It; }
  }
@@ -447,11 +498,17 @@ void ALaLaBergCharacter::Einsteigen() {
    if (Naechster) { Beste = BesteKI; NaechstesKI->Destroy(); }
   }
  }
- if (!Naechster) return;
+ if (!Naechster) {
+  if (auto* HUD = Cast<ALaLaBergHUD>(PC->GetHUD()))
+   HUD->ZeigeRueckmeldung(TEXT("Kein freies Fahrzeug in Reichweite. Bitte naeher herangehen."));
+  return;
+ }
  Naechster->SetzeFahrer(this);
  SetActorHiddenInGame(true);
  SetActorEnableCollision(false);
  GetCharacterMovement()->SetMovementMode(MOVE_None);
  PC->Possess(Naechster);
+ if (auto* HUD = Cast<ALaLaBergHUD>(PC->GetHUD()))
+  HUD->ZeigeRueckmeldung(TEXT("Eingestiegen - W/S fahren, Leertaste bremsen, E aussteigen."));
  UE_LOG(LogTemp,Display,TEXT("LALABERG_EINGESTIEGEN abstand=%.0f"),Beste);
 }
