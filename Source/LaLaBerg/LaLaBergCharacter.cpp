@@ -33,6 +33,9 @@ namespace {
  // voll qualifiziert aufgerufen.
  const FLinearColor JACKE(0.20f, 0.22f, 0.25f), HOSE(0.15f, 0.16f, 0.18f), HAUT(0.79f, 0.63f, 0.51f);
  constexpr float HUEFT_GRAD = 22.0f, KNIE_GRAD = 38.0f, SCHULTER_GRAD = 16.0f;
+ // Handflaeche hinter dem Unterarmende (das Rig hat keinen Hand-Knochen,
+ // siehe BeginPlay) - dorthin kommt der Griff der Waffe.
+ constexpr float HANDFLAECHE = 8.0f;
  // Grundrichtung des rechten Arms (Kamera-Pitch=0): schraeg nach vorn-rechts-
  // unten, als wuerde die Figur die Waffe waagerecht vor sich halten. Der
  // Pitch (in Grad, positiv = nach oben zielen) kippt diese Richtung um die
@@ -67,6 +70,14 @@ namespace {
  const int32 EINZEL_FIGUREN_ANZAHL = UE_ARRAY_COUNT(EINZEL_FIGUREN);
  FString EinzelAnimPfad(const TCHAR* Figur, const TCHAR* Anim) {
   return FString::Printf(TEXT("/Game/Art/People/%s/SK_%sCharacterArmature_%s.SK_%sCharacterArmature_%s"), Figur, Figur, Anim, Figur, Anim);
+ }
+ // Standpose der Spielfigur. Per -LaLaBergPose=<Name> austauschbar, um die
+ // Posen des Figurenpakets (Idle_Gun, Idle_Gun_Pointing, ...) im Bild zu
+ // vergleichen, ohne jedes Mal neu zu bauen - siehe -LaLaBergKoerperFoto.
+ FString StehPose() {
+  FString Pose = TEXT("Idle_Gun_Pointing");
+  FParse::Value(FCommandLine::Get(), TEXT("LaLaBergPose="), Pose);
+  return Pose;
  }
 }
 
@@ -259,7 +270,7 @@ void ALaLaBergCharacter::BeginPlay() {
      Teil->SetVisibility(true);
      FaerbeSkelett(Teil, JACKE);
     }
-    if (auto* Anim = LoadObject<UAnimSequence>(nullptr, TEXT("/Game/Art/People/Animations/Anim_HumansCharacterArmature_Idle_Gun.Anim_HumansCharacterArmature_Idle_Gun")))
+    if (auto* Anim = LoadObject<UAnimSequence>(nullptr, *FString::Printf(TEXT("/Game/Art/People/Animations/Anim_HumansCharacterArmature_%s.Anim_HumansCharacterArmature_%s"), *StehPose(), *StehPose())))
      SkelettKoerper->PlayAnimation(Anim, true);
    }
   } else {
@@ -271,7 +282,7 @@ void ALaLaBergCharacter::BeginPlay() {
     SkelettKoerper->SetSkeletalMesh(NeuesMesh);
     SkelettKoerper->SetVisibility(true);
     FaerbeSkelett(SkelettKoerper, JACKE);
-    if (auto* Anim = LoadObject<UAnimSequence>(nullptr, *EinzelAnimPfad(Name, TEXT("Idle_Gun"))))
+    if (auto* Anim = LoadObject<UAnimSequence>(nullptr, *EinzelAnimPfad(Name, *StehPose())))
      SkelettKoerper->PlayAnimation(Anim, true);
    }
   }
@@ -312,8 +323,14 @@ void ALaLaBergCharacter::BeginPlay() {
    // in LaLaBergWaffe.cpp). Ueber die Armrichtung statt ueber die lokalen
    // Achsen des Knochens: welche davon den Arm entlang zeigt, haengt am
    // Export der Figur und waere geraten.
-   const FQuat Entlang = FRotationMatrix::MakeFromX(Arm.GetSafeNormal()).ToQuat();
+   // Dazu "oben" festlegen: MakeFromX allein laesst die Drehung um die
+   // Laengsachse offen - der Griff zeigte dann seitlich weg statt nach unten
+   // (im -LaLaBergKoerperFoto-Seitenbild: nur ein Rohr, kein Griff zu sehen).
+   const FQuat Entlang = FRotationMatrix::MakeFromXZ(Arm.GetSafeNormal(), GetActorUpVector()).ToQuat();
    WaffenHalter->SetRelativeRotation((Knochen.GetRotation().Inverse() * Entlang).Rotator());
+   // Die Unterarm-Richtung im Knochenraum merken: RichteWaffeAus richtet
+   // die Waffe damit jedes Bild neu auf (siehe dort).
+   UnterarmAchse = Knochen.InverseTransformVectorNoScale(Arm).GetSafeNormal();
   }
  }
 
@@ -329,8 +346,8 @@ void ALaLaBergCharacter::BeginPlay() {
  Waffe = GetWorld()->SpawnActor<ALaLaBergWaffe>(GetActorLocation(), GetActorRotation(), Params);
  if (Waffe) {
   Waffe->AttachToComponent(WaffenHalter, FAttachmentTransformRules::KeepRelativeTransform);
-  Waffe->SetActorRelativeLocation(FVector(2, 0, 0));
   Waffe->SetActorRelativeRotation(FRotator::ZeroRotator);
+  RichteWaffeAus();
  }
 }
 
@@ -361,6 +378,7 @@ void ALaLaBergCharacter::Tick(float DeltaSeconds) {
   const float Pitch = FMath::Clamp(FRotator::NormalizeAxis(Controller->GetControlRotation().Pitch), -50.0f, 70.0f);
   Schulter[0]->SetRelativeRotation(ArmDrehungFuerPitch(Pitch).Rotator());
  }
+ RichteWaffeAus();
 
  if (bSkelettGenutzt) {
   // Wie bei LaLaBergPassantKI::Tick: nur beim Wechsel zwischen Stehen und
@@ -369,13 +387,14 @@ void ALaLaBergCharacter::Tick(float DeltaSeconds) {
   if (bLaeuftJetzt != bLaeuftGerade) {
    bLaeuftGerade = bLaeuftJetzt;
    // Waffenhaltung statt neutraler Pose: die Spielfigur traegt immer eine
-   // Waffe (siehe Waffe unten), mit "Idle_Neutral"/"Walk" hingen die Arme
-   // daneben und die Waffe am Ende des Arms wirkte angeklebt statt
-   // gehalten. Das Figurenpaket bringt fuer beides eine passende Pose mit.
-   const TCHAR* AnimName = bLaeuftGerade ? TEXT("Run_Shoot") : TEXT("Idle_Gun");
+   // Waffe (siehe Waffe unten). Im Stand "Idle_Gun_Pointing" (Arm nach vorn,
+   // Waffe in Blickrichtung) - per -LaLaBergKoerperFoto mit -LaLaBergPose
+   // verglichen: "Idle_Gun" laesst den Arm haengen, die Waffe zeigte zu
+   // Boden; "Idle_Gun_Shoot" hat dauernd Rueckstoss.
+   const FString AnimName = bLaeuftGerade ? FString(TEXT("Run_Shoot")) : StehPose();
    const FString Pfad = FigurTyp == 0
     ? TEXT("/Game/Art/People/Animations/Anim_HumansCharacterArmature_") + FString(AnimName) + TEXT(".Anim_HumansCharacterArmature_") + FString(AnimName)
-    : EinzelAnimPfad(EINZEL_FIGUREN[FigurTyp - 1].Name, AnimName);
+    : EinzelAnimPfad(EINZEL_FIGUREN[FigurTyp - 1].Name, *AnimName);
    if (auto* Anim = LoadObject<UAnimSequence>(nullptr, *Pfad)) SkelettKoerper->PlayAnimation(Anim, true);
   }
  }
@@ -429,13 +448,35 @@ void ALaLaBergCharacter::SetupPlayerInputComponent(UInputComponent* Input) {
 }
 // Schuss aus Blickrichtung, ein Stueck vor der Kamera - sonst trifft die
 // Kugel im selben Bild die eigene Kapsel.
+// Setzt die Waffe so, dass ihr Griff (siehe ALaLaBergWaffe::GriffOrt) in
+// der Handflaeche liegt - jedes Bild, weil der Griff je Waffenart woanders
+// sitzt und die Art per 1-4 wechselt.
+void ALaLaBergCharacter::RichteWaffeAus() {
+ if (Waffe) Waffe->SetActorRelativeLocation(FVector(HANDFLAECHE, 0, 0) - Waffe->GriffOrt());
+ // Aufrecht halten: Laufrichtung entlang des aktuellen Unterarms, "oben"
+ // aber immer Welt-oben. Nur beim Anheften in der Ruhepose ausgerichtet,
+ // drehte die Zeige-Animation den Unterarm um seine Laengsachse mit - der
+ // Griff zeigte zur Seite, der Werfer umschloss den Arm (im Seitenbild
+ // von -LaLaBergKoerperFoto gesehen).
+ if (bSkelettGenutzt && !UnterarmAchse.IsNearlyZero()) {
+  const int32 Ellbogen = SkelettKoerper->GetBoneIndex(TEXT("LowerArm_R"));
+  if (Ellbogen != INDEX_NONE) {
+   const FVector Richtung = SkelettKoerper->GetBoneTransform(Ellbogen).TransformVectorNoScale(UnterarmAchse);
+   WaffenHalter->SetWorldRotation(FRotationMatrix::MakeFromXZ(Richtung, FVector::UpVector).Rotator());
+  }
+ }
+}
+
 bool ALaLaBergCharacter::HoleWaffenabstand(float& AusAbstandCm) const {
  if (!Waffe || !bSkelettGenutzt || !SkelettKoerper) return false;
  const int32 Ellbogen = SkelettKoerper->GetBoneIndex(TEXT("LowerArm_R"));
  if (Ellbogen == INDEX_NONE) return false;
  const FVector EllbogenOrt = SkelettKoerper->GetBoneLocation(TEXT("LowerArm_R"));
  const FVector Arm = EllbogenOrt - SkelettKoerper->GetBoneLocation(TEXT("UpperArm_R"));
- AusAbstandCm = FVector::Dist(Waffe->GetActorLocation(), EllbogenOrt + Arm);
+ // Griff der Waffe gegen die Handflaeche: HANDFLAECHE hinter dem Ende des
+ // Unterarms, dort wo RichteWaffeAus den Griff hinsetzt.
+ const FVector Handflaeche = EllbogenOrt + Arm + Arm.GetSafeNormal() * HANDFLAECHE;
+ AusAbstandCm = FVector::Dist(Waffe->GetActorTransform().TransformPosition(Waffe->GriffOrt()), Handflaeche);
  return true;
 }
 

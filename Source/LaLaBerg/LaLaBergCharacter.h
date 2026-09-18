@@ -28,11 +28,13 @@ public:
  // Fuer den Waffentest: Schuss ohne Tastatur aus Blickrichtung.
  void Feuern();
  class ALaLaBergWaffe* HoleWaffe() const { return Waffe; }
- // Abstand der Waffe vom Handpunkt am Ende des Unterarms (siehe BeginPlay),
- // in Zentimetern. Fuer -LaLaBergKoerperFoto: ob die Waffe tatsaechlich
- // gehalten wird oder wie zuvor neben der Figur schwebt, laesst sich sonst
- // nur am Bild erkennen. Liefert false ohne Skelettfigur oder ohne Waffe.
+ // Abstand des Waffengriffs von der Handflaeche am Ende des Unterarms
+ // (siehe BeginPlay/RichteWaffeAus), in Zentimetern. Fuer
+ // -LaLaBergKoerperFoto: ob die Waffe tatsaechlich gehalten wird oder wie
+ // zuvor neben der Figur schwebt. Liefert false ohne Skelettfigur oder Waffe.
  bool HoleWaffenabstand(float& AusAbstandCm) const;
+ // Griff der Waffe in die Handflaeche setzen - siehe .cpp.
+ void RichteWaffeAus();
 
 private:
  UPROPERTY() TObjectPtr<class USpringArmComponent> Ausleger = nullptr;
@@ -52,15 +54,16 @@ private:
  UPROPERTY() TObjectPtr<class USceneComponent> Schulter[2] = {};
  UPROPERTY() TObjectPtr<class UProceduralMeshComponent> Oberarm[2] = {};
  UPROPERTY() TObjectPtr<class USceneComponent> WaffenHalter = nullptr;
+ // Richtung des Unterarms im Raum des Knochens LowerArm_R (siehe BeginPlay).
+ FVector UnterarmAchse = FVector::ZeroVector;
  float BeinL = 0.0f, OberschenkelL = 0.0f, UnterschenkelL = 0.0f, OberarmL = 0.0f;
  float Gehphase = 0.0f;
 
  // Bevorzugt: dasselbe echte, lizenzierte Skeletal Mesh wie bei den
  // KI-Passanten (CC0, Quaternius - siehe LaLaBergPassantKI) statt des von
  // Hand gebauten Kasten-Rigs oben. Der Kasten-Rig bleibt trotzdem bestehen
- // (nur unsichtbar) - WaffenHalter haengt an Oberarm[0] und braucht dessen
- // feste, nicht mitschwingende Position weiterhin als Aufhaengepunkt, ganz
- // ohne einen Handknochen des Skeletts erraten zu muessen.
+ // (nur unsichtbar); WaffenHalter wird in BeginPlay an den Unterarm des
+ // Skeletts (LowerArm_R) umgehaengt.
  UPROPERTY() TObjectPtr<class USkeletalMeshComponent> SkelettKoerper = nullptr;
  UPROPERTY() TObjectPtr<class USkeletalMeshComponent> SkelettKopf = nullptr;
  UPROPERTY() TObjectPtr<class USkeletalMeshComponent> SkelettFuesse = nullptr;

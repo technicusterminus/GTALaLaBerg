@@ -26,6 +26,8 @@ private:
  FTimerHandle FahrtUhr;
  // Wartet im Fahrtest auf den Stillstand, bevor die Figur aussteigt.
  FTimerHandle BremsUhr;
+ // Laesst die Figur im -LaLaBergKoerperFoto ein paar Schritte laufen.
+ FTimerHandle Laufen;
  // Bildratenmessung waehrend des Fahrtests
  uint64 FahrtBilder=0, FahrtLetzteBilder=0;
  double FahrtZeit=0, FahrtLetzteUhr=0;

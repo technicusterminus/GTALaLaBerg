@@ -107,22 +107,32 @@ namespace {
   FVector Versatz;
   FRotator Drehung;
   float Skalierung;
+  // Wo die Hand die Waffe haelt, in Koordinaten des Waffen-Actors (nach
+  // Versatz, Drehung und Skalierung). Die Figur setzt die Waffe so, dass
+  // dieser Punkt in ihrer Handflaeche liegt (siehe ALaLaBergCharacter::
+  // Tick). Abgeleitet aus den gemessenen Bounding Boxes der Rohmeshes
+  // (Tools/pruefe_waffenmasse.py, z.B. Pistole X -68..11, Z -12.7..35.5):
+  // Griff im hinteren Viertel, unterhalb des Laufs - per
+  // -LaLaBergKoerperFoto im Bild nachkontrolliert. Die Versatz-Werte oben
+  // stammen noch aus der Zeit, als die Waffe vor der Kamera schwebte; ohne
+  // diesen Griffpunkt lag die Pistole 23 bis 54 cm vor der Hand.
+  FVector Griff;
  };
  const FModell& ModellInfo(ELaLaBergWaffenArt Art) {
   static const FModell M[] = {
    /* Pistole       */ { TEXT("/Game/Art/Waffen/Pistol/StaticMeshes/SM_Pistole.SM_Pistole"),
-                          FVector(27.0f, 0, -1.0f), FRotator(0, 180, 0), 0.40f },
+                          FVector(27.0f, 0, -1.0f), FRotator(0, 180, 0), 0.40f, FVector(29.0f, 0, 2.0f) },
    /* Maschine      */ { TEXT("/Game/Art/Waffen/Smg/StaticMeshes/SM_Maschine.SM_Maschine"),
-                          FVector(40.0f, 0, -6.0f), FRotator(0, 180, 0), 0.40f },
+                          FVector(40.0f, 0, -6.0f), FRotator(0, 180, 0), 0.40f, FVector(48.0f, 0, -6.0f) },
    /* Schrotflinte  */ { TEXT("/Game/Art/Waffen/Shotgun/StaticMeshes/SM_Schrotflinte.SM_Schrotflinte"),
-                          FVector(48.0f, 0, -4.0f), FRotator(0, 180, 0), 0.40f },
+                          FVector(48.0f, 0, -4.0f), FRotator(0, 180, 0), 0.40f, FVector(51.5f, 0, -6.0f) },
    // Deutlich weiter vorn als die anderen drei: die Rohmesh-Bounding-Box
    // (siehe Tools/pruefe_waffenmasse.py) ist mit Y=46.9/Z=74.6 fast viermal
    // so breit wie die Pistole - bei gleichem Versatz fuellte die Muendung,
    // fast am Kameraclip, den ganzen Bildschirm mit einer einzelnen grauen
    // Flaeche (im Test bestaetigt: LALABERG_WAFFENTEST-Screenshot).
    /* Raketenwerfer */ { TEXT("/Game/Art/Waffen/RocketLauncher/StaticMeshes/SM_Raketenwerfer.SM_Raketenwerfer"),
-                          FVector(75.0f, 14.0f, -22.0f), FRotator(0, 180, 0), 0.40f },
+                          FVector(75.0f, 14.0f, -22.0f), FRotator(0, 180, 0), 0.40f, FVector(80.0f, 14.0f, -22.0f) },
   };
   return M[static_cast<uint8>(Art)];
  }
@@ -163,6 +173,18 @@ void ALaLaBergWaffe::SetzeArt(ELaLaBergWaffenArt Neu) {
  if (Art == Neu && bSchonGebaut) return;
  Art = Neu;
  if (HasActorBegunPlay()) BaueModell();
+}
+
+FVector ALaLaBergWaffe::GriffOrt() const {
+ if (NetzEcht && NetzEcht->IsVisible()) return ModellInfo(Art).Griff;
+ // Kasten-Fallback: dieselben Griffkaesten wie in BaueModell unten.
+ switch (Art) {
+  case ELaLaBergWaffenArt::Pistole:       return FVector(-6.5f, 0, -6.0f);
+  case ELaLaBergWaffenArt::Maschine:      return FVector(-2.5f, 0, -6.2f);
+  case ELaLaBergWaffenArt::Schrotflinte:  return FVector(-8.0f, 0, -5.8f);
+  case ELaLaBergWaffenArt::Raketenwerfer: return FVector(-9.0f, 0, -3.5f);
+ }
+ return FVector::ZeroVector;
 }
 
 // Bevorzugt das lizenzierte GLB-Modell (siehe ModellInfo) - nur wenn das

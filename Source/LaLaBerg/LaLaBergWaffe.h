@@ -29,6 +29,10 @@ public:
  // tatsaechlichem Schuss - fuer den Waffentest.
  bool Feuern(const FVector& Ort, const FVector& Richtung);
  int32 Schuesse() const { return SchussZahl; }
+ // Wo die Hand diese Waffe haelt, in Actor-Koordinaten - haengt von der
+ // aktuellen Waffenart und davon ab, ob das echte Modell oder der
+ // Kasten-Fallback sichtbar ist.
+ FVector GriffOrt() const;
 
 protected:
  virtual void BeginPlay() override;

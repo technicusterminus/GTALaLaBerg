@@ -615,8 +615,57 @@ void ALaLaBergGameMode::BeginPlay() {
       Waffenabstand<25.0f?TEXT("PASS"):TEXT("FAIL"),Waffenabstand));
    PC->ConsoleCommand(TEXT("HighResShot 1600x900"));
   },4.0f,false);
+  // Zweites Bild von der Seite: von hinten laesst sich nicht erkennen, ob
+  // die Waffe nach vorn zeigt oder zu Boden haengt. Die Figur dreht sich
+  // sonst mit der Kamera mit (bUseControllerRotationYaw) - fuer das Bild
+  // bleibt sie stehen, und nur die Kamera schwenkt um 90 Grad.
+  FTimerHandle Seite;
+  GetWorldTimerManager().SetTimer(Seite,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   if(!PC) return;
+   if(APawn* Held=PC->GetPawn()) { Held->bUseControllerRotationYaw=false; Held->SetActorRotation(FRotator(0,0,0)); }
+   PC->SetControlRotation(FRotator(-5,-90,0));   // rechte Seite: dort sitzt die Waffe
+  },5.0f,false);
+  // Von der Seite jede der vier Waffen einmal: jede sitzt mit ihrem eigenen
+  // Griffpunkt in der Hand (siehe ALaLaBergWaffe::GriffOrt), ein Bild nur
+  // von der Pistole sagte ueber die anderen drei nichts. Je Waffe ein Bild
+  // und die gemessene Griff-Hand-Distanz.
+  for(int32 i=0;i<4;i++) {
+   FTimerHandle Wechsel;
+   GetWorldTimerManager().SetTimer(Wechsel,[this,i]() {
+    auto* PC=GetWorld()->GetFirstPlayerController();
+    auto* Held=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr;
+    if(Held && Held->HoleWaffe()) Held->HoleWaffe()->SetzeArt(static_cast<ELaLaBergWaffenArt>(i));
+   },5.5f+i*1.5f,false);
+   FTimerHandle Bild2;
+   GetWorldTimerManager().SetTimer(Bild2,[this]() {
+    auto* PC=GetWorld()->GetFirstPlayerController();
+    if(!PC) return;
+    auto* Held=Cast<ALaLaBergCharacter>(PC->GetPawn());
+    float Abstand=0.0f;
+    if(Held && Held->HoleWaffe() && Held->HoleWaffenabstand(Abstand))
+     Beleg(FString::Printf(TEXT("LALABERG_WAFFE_GEHALTEN %s abstand=%.0fcm waffe=%s"),
+      Abstand<25.0f?TEXT("PASS"):TEXT("FAIL"),Abstand,*Held->HoleWaffe()->ArtName()));
+    PC->ConsoleCommand(TEXT("HighResShot 1600x900"));
+   },6.3f+i*1.5f,false);
+  }
+  // Zuletzt ein paar Schritte laufen und von der Seite fotografieren: im
+  // Stand ist nur die Standpose zu sehen, die Laufpose (Run_Shoot) sonst
+  // nie. Die Kamera steht noch seitlich (siehe oben), die Figur laeuft
+  // quer durchs Bild.
+  GetWorldTimerManager().SetTimer(Laufen,[this]() {
+   if(auto* PC=GetWorld()->GetFirstPlayerController())
+    if(APawn* Held=PC->GetPawn()) Held->AddMovementInput(FVector::ForwardVector,1.0f);
+  },0.016f,true,12.0f);
+  FTimerHandle BildLauf;
+  GetWorldTimerManager().SetTimer(BildLauf,[this]() {
+   if(auto* PC=GetWorld()->GetFirstPlayerController()) PC->ConsoleCommand(TEXT("HighResShot 1600x900"));
+  },13.6f,false);
   FTimerHandle Ende;
-  GetWorldTimerManager().SetTimer(Ende,[]() { FPlatformMisc::RequestExitWithStatus(false,0); },7.0f,false);
+  GetWorldTimerManager().SetTimer(Ende,[this]() {
+   GetWorldTimerManager().ClearTimer(Laufen);
+   FPlatformMisc::RequestExitWithStatus(false,0);
+  },15.0f,false);
  }
  // Fahrtest: Wagen uebernehmen, vier Sekunden Gas geben, Weg messen. Ohne
  // diesen Test waere "der Wagen faehrt" eine Behauptung.

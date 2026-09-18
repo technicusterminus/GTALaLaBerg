@@ -126,7 +126,8 @@ Die Spielfigur wird aus einer Third-Person-Kamera gesteuert.
 - Zufällige Farbvarianten für Kleidung und Körpergröße
 - KI-Passanten verwenden dieselben Varianten
 - Fallback auf ein selbstgebautes, animiertes Gelenk-Rig, falls die Skeletal Assets nicht verfügbar sind
-- Die Spielfigur hält die Waffe in der rechten Hand und nimmt die Waffenhaltung des Figurenpakets ein (`Idle_Gun` im Stand, `Run_Shoot` in Bewegung). Das Rig endet beim Unterarm (`LowerArm_R`), einen Hand-Knochen gibt es nicht - der Griffpunkt sitzt deshalb am äußeren Unterarmende, Lage und Ausrichtung aus dem Skelett selbst berechnet. Geprüft über `-LaLaBergKoerperFoto` (`LALABERG_WAFFE_GEHALTEN`, 6 cm vom Handpunkt). Zuvor hing die Waffe am unsichtbaren Kasten-Arm des Fallback-Rigs und schwebte neben der Figur; dazu kam, dass die Knochen den Maßstab 100 tragen, den der Griffpunkt nicht erben darf - sonst wird die Waffe hundertfach so groß und hängt 2 m daneben.
+- Die Spielfigur hält die Waffe in der rechten Hand und zielt damit nach vorn (`Idle_Gun_Pointing` im Stand, `Run_Shoot` in Bewegung). Das Rig endet beim Unterarm (`LowerArm_R`), einen Hand-Knochen gibt es nicht - die Handfläche liegt deshalb 8 cm hinter dem Unterarmende. Jede Waffe hat einen eigenen Griffpunkt (`ALaLaBergWaffe::GriffOrt`), der in diese Handfläche gesetzt wird, und wird jedes Bild aufrecht entlang des Unterarms ausgerichtet. Geprüft über `-LaLaBergKoerperFoto`: je Waffe `LALABERG_WAFFE_GEHALTEN` samt Seitenansicht, dazu ein Bild im Laufen. Mit `-LaLaBergPose=<Name>` lassen sich die Standposen des Figurenpakets im Bild vergleichen.
+- Der Weg dorthin, weil jeder Schritt einzeln sichtbar falsch war: Zuerst hing die Waffe am unsichtbaren Kasten-Arm und schwebte neben der Figur. Am Unterarm erbte sie dann den Maßstab 100 der Knochen und hing 2 m daneben. `Idle_Gun` ließ den Arm hängen, die Waffe zeigte zu Boden. Die Waffenmodelle lagen durch ihren alten Kameraversatz 23 bis 54 cm vor der Hand. Und nur einmal in der Ruhepose ausgerichtet, drehte die Zeige-Animation den Unterarm mit - der Griff zeigte zur Seite, der Werfer umschloss den Arm.
 
 ### Paintball-Waffen
 
@@ -477,7 +478,7 @@ Saved/Screenshots/WindowsEditor
 | `-LaLaBergWaffentest` | Alle Waffen plus Treffer auf Fahrzeug und Wand | `LALABERG_WAFFENTEST PASS` |
 | `-LaLaBergVerkehrFoto` | Screenshot von erstem KI-Auto und KI-Passanten | `LALABERG_VERKEHRFOTO PASS autos=70 passanten=90` |
 | `-LaLaBergLechFoto` | Luftaufnahme über dem Lech | Prüft `M_Lech` |
-| `-LaLaBergKoerperFoto` | Prüft Figur, Arm und Waffenhaltung | Screenshot und `LALABERG_WAFFE_GEHALTEN PASS` (Waffe unter 25 cm vom Handpunkt) |
+| `-LaLaBergKoerperFoto` | Prüft Figur, Arm und Waffenhaltung: Bild von hinten, je Waffe ein Seitenbild, ein Bild im Laufen | `LALABERG_WAFFE_GEHALTEN PASS` je Waffe (Griff unter 25 cm von der Handfläche) |
 | `-LaLaBergAmpelTest` | Prüft Ampelkonflikte über vollen Zyklus | `LALABERG_AMPELTEST PASS verstoesse=0 ampeln=44` |
 
 ### Beispiel: Fahrtest mit GPU-Profiling
