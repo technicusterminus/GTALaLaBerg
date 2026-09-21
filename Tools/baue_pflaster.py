@@ -16,5 +16,5 @@ quelle = open(os.path.join(unreal.Paths.project_dir(), "Tools", "baue_materialie
 # Nur die Werkzeuge uebernehmen, nicht die Liste, die alles neu baut
 exec(quelle.split("\ngebaut = [")[0])
 
-pfad = baue("M_Pflaster", "T_Pflaster_D", 260.0, 0.90, 0.24, 1.0)
+pfad = baue("M_Pflaster", "T_Pflaster_D", 300.0, 0.90, 0.24, 1.0)
 unreal.log("LALABERG_MATERIALIEN " + pfad)

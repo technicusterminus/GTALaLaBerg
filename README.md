@@ -65,7 +65,7 @@ Enthalten sind unter anderem:
 - Hauptplatz, Rathaus, Marienbrunnen, Schmalzturm und Klinikum-Campus
 - in etwa 11,5-m-Abschnitte aufgeteilte Häuserzeilen für eine glaubwürdigere Fassadenstruktur
 
-Farbe und Oberflächen (überarbeitet 2026-09-21, weil die Stadt im Spiel blass und wie aus Pappe wirkte): Die Farbe jedes Gebäudes kommt weiter aus den Scheitelfarben (amtliche Daten plus Altstadtpalette), die Detailtexturen aus `Tools/baue_texturen.py` modulieren sie. Deren Ausschläge lagen früher bei ±7–10 % und waren im Spiel unsichtbar; jetzt: Biberschwanzdeckung mit einzeln gebrannten Ziegeln (wärmer und dunkler – Terrakotta statt Lachsrosa), sichtbarer Kalkputz mit Schmutzfahnen unter den Fensterbänken und Gesimsschatten, weiße Fensterstöcke, Wiese mit trockenen Stellen, auf Plätzen Kleinpflaster in Segmentbögen (`T_Pflaster_D`, jeder Granitstein etwas anders) statt einfarbigem Grau. `Tools/baue_materialien.py` hebt die Sättigung von Fassaden (×1,5) und Dächern (×1,15) und baut die Materialien an Ort und Stelle neu, damit die Stadt-Meshes ihre Verweise behalten. Dazu Himmelslicht 1,6 → 1,2, Sättigung im Post-Process 1,04 → rund 1,1, Kontrast 1,05 → 1,10, Umgebungsverdeckung 0,55 → 0,70. Offen: Die Putzpalette der Ausleitung selbst ist pastellig; kräftigere Grundtöne (Ocker, Altrosa, Türkis wie am Hauptplatz) bräuchten eine neue Ausleitung aller Sektoren.
+Farbe und Oberflächen (überarbeitet 2026-09-21, weil die Stadt im Spiel blass und wie aus Pappe wirkte): Die Farbe jedes Gebäudes kommt weiter aus den Scheitelfarben (amtliche Daten plus Altstadtpalette), die Detailtexturen aus `Tools/baue_texturen.py` modulieren sie. Deren Ausschläge lagen früher bei ±7–10 % und waren im Spiel unsichtbar; jetzt: Biberschwanzdeckung mit einzeln gebrannten Ziegeln (wärmer und dunkler – Terrakotta statt Lachsrosa), sichtbarer Kalkputz mit Schmutzfahnen unter den Fensterbänken und Gesimsschatten, weiße Fensterstöcke, Wiese mit trockenen Stellen, auf Plätzen Kleinpflaster in Segmentbögen (`T_Pflaster_D`, jeder Granitstein etwas anders) statt einfarbigem Grau. Seit dem 2026-09-21 abends kommen Dach, Pflaster, Wiese und Putzkorn aus CC0-Fotomaterialien (siehe Lizenzen, `Tools/baue_fototexturen.py`); die Fotos bringen ihren Farbton nur anteilig ein (Dach 25 %, Pflaster 35 %, Wiese 30 %), weil die Scheitelfarbe ihn schon mitbringt – mit halbem Anteil wurden die Dächer orange und die Wiese giftgrün. `Tools/baue_materialien.py` hebt die Sättigung von Fassaden (×1,5) und Dächern (×1,15) und baut die Materialien an Ort und Stelle neu, damit die Stadt-Meshes ihre Verweise behalten. Dazu Himmelslicht 1,6 → 1,2, Sättigung im Post-Process 1,04 → rund 1,1, Kontrast 1,05 → 1,10, Umgebungsverdeckung 0,55 → 0,70. Offen: Die Putzpalette der Ausleitung selbst ist pastellig; kräftigere Grundtöne (Ocker, Altrosa, Türkis wie am Hauptplatz) bräuchten eine neue Ausleitung aller Sektoren.
 
 ### Verkehrs- und Stadtleben
 
@@ -777,6 +777,10 @@ Die 13 zusätzlichen Fahrzeugtypen stammen aus Epics kostenlosem Fab-Paket **Cit
 - Nicht Bestandteil dieses Repositories
 - Kein freies Weitergeben der Rohassets
 - Bei fehlendem Ordner `Content/CitySampleVehicles` wird automatisch CarConcept als Fallback verwendet
+
+### Fototexturen (ambientCG)
+
+Dächer, Plätze, Wiesen und das Putzkorn der Fassaden stammen aus Fotomaterialien von [ambientCG](https://ambientcg.com) unter **CC0 1.0** (gemeinfrei, keine Namensnennung nötig): `RoofingTiles011A`, `PavingStones051`, `Grass004`, `PaintedPlaster017`, jeweils 1K-JPG. Im Repo liegen nur die daraus abgeleiteten Modulatoren (`Tools/Texturen/T_*_D.png`, erzeugt von `Tools/baue_fototexturen.py`), nicht die Originalpakete.
 
 ### Waffenmodelle
 
