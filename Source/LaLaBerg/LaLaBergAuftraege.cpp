@@ -1,5 +1,6 @@
 #include "LaLaBergAuftraege.h"
 #include "LaLaBergHUD.h"
+#include "LaLaBergKonto.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
@@ -152,6 +153,16 @@ void ALaLaBergAuftraege::SetzeStartOrt(const FVector& Ort) {
  UE_LOG(LogTemp, Display, TEXT("LALABERG_AUFTRAG angebot %s"), *StartOrt.ToString());
 }
 
+int32 ALaLaBergAuftraege::HoleGeld() const {
+ const ULaLaBergKonto* Konto = ULaLaBergKonto::Hole(this);
+ return Konto ? Konto->HoleGeld() : 0;
+}
+
+int32 ALaLaBergAuftraege::Strafe(int32 Betrag) {
+ ULaLaBergKonto* Konto = ULaLaBergKonto::Hole(this);
+ return Konto ? Konto->Strafe(Betrag) : 0;
+}
+
 float ALaLaBergAuftraege::HoleRestzeit() const {
  return bUnterwegs ? FMath::Max(0.0f, static_cast<float>(Frist - GetWorld()->GetTimeSeconds())) : 0.0f;
 }
@@ -186,7 +197,8 @@ void ALaLaBergAuftraege::NimmAn() {
 }
 
 void ALaLaBergAuftraege::Erledige() {
- Geld += Lohn;
+ ULaLaBergKonto* Konto = ULaLaBergKonto::Hole(this);
+ if (Konto) { Konto->Gutschrift(Lohn); Konto->ZaehleAuftrag(); }
  Erledigt++;
  bUnterwegs = false;
  const FZiel Hier = Ziele[AktZiel];
@@ -205,7 +217,7 @@ void ALaLaBergAuftraege::Erledige() {
  bAngebot = true;
  Zeige(true, true, StartOrt);
  Melde(FString::Printf(TEXT("Geliefert! +%d € – nächster Auftrag an der blauen Säule"), Lohn));
- UE_LOG(LogTemp, Display, TEXT("LALABERG_AUFTRAG erledigt ziel=%s geld=%d naechster=%s"), *Hier.N, Geld,
+ UE_LOG(LogTemp, Display, TEXT("LALABERG_AUFTRAG erledigt ziel=%s geld=%d naechster=%s"), *Hier.N, HoleGeld(),
         StartZiel != INDEX_NONE ? *Ziele[StartZiel].N : TEXT("-"));
  AktZiel = INDEX_NONE;
 }

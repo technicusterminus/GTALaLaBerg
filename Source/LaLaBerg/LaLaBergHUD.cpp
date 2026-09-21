@@ -6,6 +6,8 @@
 #include "LaLaBergMenueSteuerung.h"
 #include "LaLaBergAuftraege.h"
 #include "LaLaBergPolizei.h"
+#include "LaLaBergLaeden.h"
+#include "LaLaBergKonto.h"
 #include "ImageUtils.h"
 #include "Engine/Texture2D.h"
 #include "InputCoreTypes.h"
@@ -101,6 +103,7 @@ void ALaLaBergHUD::DrawHUD() {
   Minikarte();
   Auftrag();
   Fahndung();
+  Laden();
  }
  if (auto* Wagen = Cast<ALaLaBergWagen>(Figur)) {
   Tacho(Wagen);
@@ -268,6 +271,15 @@ void ALaLaBergHUD::Minikarte() {
   Tafel(P.X - 7 * S, P.Y - 7 * S, 14 * S, 14 * S, FLinearColor(0.02f, 0.02f, 0.03f, 1.0f));
   Tafel(P.X - 5 * S, P.Y - 5 * S, 10 * S, 10 * S, A->IstUnterwegs() ? GELB_MARKE : BLAU_MARKE);
  }
+ // Laeden: gruen, nur wenn im Ausschnitt - man sucht sie auf der Vollkarte.
+ if (const ALaLaBergLaeden* L = ALaLaBergLaeden::Instanz.Get())
+  for (const auto& Laden : L->HoleLaeden()) {
+   if (!Laden.bAufgestellt) continue;
+   const FVector2D P = Bildort(Laden.Ort);
+   if (P.X < X || P.Y < Y || P.X > X + G || P.Y > Y + G) continue;
+   Tafel(P.X - 6 * S, P.Y - 6 * S, 12 * S, 12 * S, FLinearColor(0.02f, 0.02f, 0.03f, 1.0f));
+   Tafel(P.X - 4 * S, P.Y - 4 * S, 8 * S, 8 * S, FLinearColor(0.1f, 0.85f, 0.35f));
+  }
  if (const ALaLaBergPolizei* Pol = ALaLaBergPolizei::Instanz.Get()) {
   TArray<FVector> Orte; Pol->HoleStreifen(Orte);
   const bool bRot = FMath::Frac(GetWorld()->GetRealTimeSeconds() * 2.5f) < 0.5f;
@@ -308,6 +320,14 @@ void ALaLaBergHUD::Vollkarte() {
   const FString Name = A->IstUnterwegs() ? A->HoleZielName() : FString(TEXT("Auftrag"));
   Schrift(Name, P.X + 12 * S, P.Y - 10 * S, 14, Weiss, true);
  }
+ if (const ALaLaBergLaeden* L = ALaLaBergLaeden::Instanz.Get())
+  for (const auto& Laden : L->HoleLaeden()) {
+   if (!Laden.bAufgestellt) continue;
+   const FVector2D P = Bildort(Laden.Ort);
+   Tafel(P.X - 7 * S, P.Y - 7 * S, 14 * S, 14 * S, FLinearColor(0.02f, 0.02f, 0.03f, 1.0f));
+   Tafel(P.X - 5 * S, P.Y - 5 * S, 10 * S, 10 * S, FLinearColor(0.1f, 0.85f, 0.35f));
+   Schrift(Laden.Name, P.X + 11 * S, P.Y - 9 * S, 12, Weiss, true);
+  }
  if (const ALaLaBergPolizei* Pol = ALaLaBergPolizei::Instanz.Get()) {
   TArray<FVector> Orte; Pol->HoleStreifen(Orte);
   for (const FVector& O : Orte) {
@@ -355,6 +375,47 @@ void ALaLaBergHUD::Fahndung() {
   Tafel(X + 14 * S, Y + 36 * S, B - 28 * S, 6 * S, FLinearColor(1, 1, 1, 0.18f));
   Tafel(X + 14 * S, Y + 36 * S, (B - 28 * S) * FMath::Clamp(Anteil, 0.0f, 1.0f), 6 * S, FLinearColor(1.0f, 0.35f, 0.3f));
  }
+}
+
+// Mitte links: der Laden, in dem man steht. Die Liste sagt selbst, was
+// geht - gekauft, zu teuer oder zu haben - und unten, mit welchen Tasten.
+void ALaLaBergHUD::Laden() {
+ const ALaLaBergLaeden* L = ALaLaBergLaeden::Instanz.Get();
+ const ULaLaBergKonto* Konto = ULaLaBergKonto::Hole(this);
+ if (!L || !Konto || L->HoleOffen() == INDEX_NONE) return;
+ const auto& Laden = L->HoleLaeden()[L->HoleOffen()];
+ const float S = Massstab;
+ const float Zeile = 38 * S, B = 420 * S;
+ const float H = 86 * S + Laden.Waren.Num() * Zeile + 44 * S;
+ const float X = 60 * S, Y = (Canvas->ClipY - H) * 0.42f;
+ Tafel(X, Y, B, H, FLinearColor(0.02f, 0.025f, 0.035f, 0.88f));
+ Tafel(X, Y, 5 * S, H, FLinearColor(0.1f, 0.85f, 0.35f));
+ Schrift(Laden.Name, X + 24 * S, Y + 16 * S, 22, Weiss, true);
+ const FString Stand = FString::Printf(TEXT("Konto %d €"), Konto->HoleGeld());
+ Schrift(Stand, X + B - 20 * S - Breite(Stand, 14, true), Y + 24 * S, 14, Leise, true);
+ float ZY = Y + 70 * S;
+ for (int32 i = 0; i < Laden.Waren.Num(); i++) {
+  const auto& Ware = Laden.Waren[i];
+  const bool bGewaehlt = i == L->HoleAuswahl();
+  const bool bSchon = L->HatSchon(Ware);
+  const bool bZuTeuer = !bSchon && Ware.Preis > Konto->HoleGeld();
+  if (bGewaehlt) Tafel(X + 12 * S, ZY - 4 * S, B - 24 * S, Zeile - 2 * S, FLinearColor(1, 1, 1, 0.12f));
+  float TX = X + 24 * S;
+  if (Ware.Art == ALaLaBergLaeden::EArt::Lack) {
+   // Farbfeld vor dem Namen - man kauft eine Farbe, nicht ein Wort.
+   Tafel(TX, ZY + 4 * S, 22 * S, 22 * S, FLinearColor(0.6f, 0.6f, 0.6f, 1.0f));
+   Tafel(TX + 2 * S, ZY + 6 * S, 18 * S, 18 * S, Ware.Farbe);
+   TX += 32 * S;
+  }
+  const FLinearColor Farbe = bSchon || bZuTeuer ? Leise : Weiss;
+  Schrift(Ware.Name, TX, ZY + 4 * S, 17, Farbe, bGewaehlt);
+  const FString Preis = bSchon ? (Ware.Art == ALaLaBergLaeden::EArt::Waffe ? FString(TEXT("gekauft")) : FString(TEXT("aktuell")))
+                               : FString::Printf(TEXT("%d €"), Ware.Preis);
+  Schrift(Preis, X + B - 24 * S - Breite(Preis, 16, true), ZY + 5 * S, 16,
+          bZuTeuer ? FLinearColor(1.0f, 0.42f, 0.32f) : Farbe, true);
+  ZY += Zeile;
+ }
+ Schrift(TEXT("Pfeil hoch/runter  wählen      Enter  kaufen      hinausgehen  schließen"), X + 24 * S, Y + H - 32 * S, 12, Leise);
 }
 
 void ALaLaBergHUD::Auftrag() {

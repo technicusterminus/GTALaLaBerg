@@ -25,7 +25,10 @@ public:
  // Farbe der Karosserie, bevor das Netz gebaut wird
  // Der Lack kann auch nach dem Erscheinen gesetzt werden; dann wird die
  // Karosserie neu aufgebaut. Sonst blieb jeder Wagen silbern.
- void SetzeLack(const FLinearColor& Farbe) { Lack = Farbe; if (bGebaut) BaueKarosserie(); }
+ // bModell: auch das echte Fahrzeugmodell umlackieren (Lackiererei,
+ // gespeicherter Lack) - sonst gilt die Farbe nur fuer die Ersatzform, und
+ // jedes Modell behaelt seine eigene Lackierung wie bisher.
+ void SetzeLack(const FLinearColor& Farbe, bool bModell = false);
  // Wer eingestiegen ist, steigt auch wieder aus - der Wagen haelt die Figur.
  void SetzeFahrer(class ACharacter* Figur);
  // Fuer den Fahrtest: Gas und Lenkung ohne Tastatur setzen.
@@ -68,6 +71,9 @@ private:
  UPROPERTY() TObjectPtr<class USceneComponent> Karosseriepunkt = nullptr;
  UPROPERTY() TObjectPtr<class UProceduralMeshComponent> Netz = nullptr;
  UPROPERTY() TArray<TObjectPtr<class UStaticMeshComponent>> CarConceptTeile;
+ // Lack auf die Lackteile des Modells - siehe SetzeLack.
+ bool bModellLack = false;
+ void FaerbeModell();
  // Fahrzeugvielfalt (siehe LaLaBergWagenTypen, LaLaBergVerkehrsauto): -2 =
  // noch nicht gewuerfelt, -1 = CarConcept, 0..TYPEN_ANZAHL-1 = CitySample-Typ.
  // Einmal in BaueKarosserie gewaehlt und behalten - SetzeLack faerbt das

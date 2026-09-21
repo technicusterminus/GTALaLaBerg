@@ -36,6 +36,8 @@
 #include "LaLaBergWagen.h"
 #include "LaLaBergAuftraege.h"
 #include "LaLaBergPolizei.h"
+#include "LaLaBergLaeden.h"
+#include "LaLaBergKonto.h"
 #include "LaLaBergHUD.h"
 #include "LaLaBergWaffe.h"
 #include "LaLaBergVerkehrsauto.h"
@@ -370,7 +372,11 @@ void ALaLaBergGameMode::InitGame(const FString& MapName,const FString& Options,F
    const FTransform Platz=SucheFahrbahn(WagenOrt,bFrei);
    auto* Wagen=GetWorld()->SpawnActor<ALaLaBergWagen>(Platz.GetLocation(),Platz.Rotator());
    if(Wagen) {
-    Wagen->SetzeLack(FLinearColor(0.16f,0.22f,0.34f));
+    // Einmal in der Lackiererei gewesen, behaelt der Wagen seine Farbe.
+    FLinearColor Lack(0.16f,0.22f,0.34f);
+    const ULaLaBergKonto* Konto=ULaLaBergKonto::Hole(this);
+    const bool bGespeichert=Konto&&Konto->HatLack(Lack);
+    Wagen->SetzeLack(Lack,bGespeichert);
     UE_LOG(LogTemp,Display,TEXT("LALABERG_WAGEN %s gier=%.0f frei=%d"),*Platz.GetLocation().ToString(),Platz.Rotator().Yaw,bFrei?1:0);
    }
   },2.0f,false);
@@ -386,6 +392,14 @@ void ALaLaBergGameMode::InitGame(const FString& MapName,const FString& Options,F
    auto* Auftraege=GetWorld()->SpawnActor<ALaLaBergAuftraege>();
    bool bFrei=false;
    if(Auftraege) Auftraege->SetzeStartOrt(SucheFahrbahn(Mitte,bFrei).GetLocation());
+   // Laeden: die Lackiererei nah am Start, damit man sie mit dem ersten
+   // Wagen gleich findet; der Paintball-Laden am Weg in die Stadt, beim
+   // Bahnhof. Beides auf einer Fahrbahn, wie die Auftragssaeulen - Hoehe
+   // Fahrbahn, nicht die Absetzhoehe eines Wagens (SucheFahrbahn: +92 cm).
+   if(auto* Laeden=GetWorld()->SpawnActor<ALaLaBergLaeden>()) {
+    Laeden->Stelle(ALaLaBergLaeden::LACKIEREREI,SucheFahrbahn(FVector(-150000.0f,12000.0f,Mitte.Z),bFrei).GetLocation()-FVector(0,0,92.0f));
+    Laeden->Stelle(ALaLaBergLaeden::PAINTBALL,SucheFahrbahn(FVector(-37630.0f,26000.0f,Mitte.Z),bFrei).GetLocation()-FVector(0,0,92.0f));
+   }
   },2.5f,false);
  }
  // KI-Verkehr und Passanten, aus demselben Grund erst verzoegert wie der
@@ -492,7 +506,8 @@ void ALaLaBergGameMode::BeginPlay() {
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergUeberholTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergAbbiegeTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergAuftragTest")) ||
-                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergPolizeiTest"));
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergPolizeiTest")) ||
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergLadenTest"));
  if(bAutomatisch) Beleg(FString::Printf(TEXT("LALABERG_SPIELBEGINN nach %.1fs Programmlaufzeit, %d Gebaeude"),FPlatformTime::Seconds()-GStartTime,BuildingCount));
  if(!bAutomatisch) {
   if(UGameInstance* Spiel=GetGameInstance()) {
@@ -1182,6 +1197,67 @@ void ALaLaBergGameMode::BeginPlay() {
     FPlatformMisc::RequestExitWithStatus(false,bPass?0:1);
    }
   },0.25f,true);
+ }
+ // -LaLaBergLadenTest: 2000 € aufs Konto, im Paintball-Laden die MP
+ // kaufen, in den Wagen, zwei Sterne, in der Lackiererei ungesehen neu
+ // lackieren - die Fahndung muss weg sein. Zum Schluss den Spielstand frisch
+ // von der Platte lesen: Geld, Waffe und Lack muessen drinstehen.
+ if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergLadenTest"))) {
+  static bool bMp=false, bLack=false;
+  auto Foto=[this]() { if(auto* PC=GetWorld()->GetFirstPlayerController()) PC->ConsoleCommand(TEXT("HighResShot 1600x900")); };
+  struct FSchritt { float Zeit; TFunction<void()> Tu; };
+  TArray<FSchritt> Plan={
+   {3.0f,[this]() { if(auto* K=ULaLaBergKonto::Hole(this)) K->Gutschrift(2000); }},
+   {4.5f,[this]() {
+     auto* L=ALaLaBergLaeden::Instanz.Get(); auto* PC=GetWorld()->GetFirstPlayerController();
+     if(!L||!PC||!PC->GetPawn()) return;
+     const FVector Ort=L->HoleLaeden()[ALaLaBergLaeden::PAINTBALL].Ort;
+     PC->GetPawn()->SetActorLocation(Ort+FVector(0,0,110),false,nullptr,ETeleportType::TeleportPhysics);
+     PC->SetControlRotation(FRotator(-10,30,0));
+     if(auto* HUD=Cast<ALaLaBergHUD>(PC->GetHUD())) HUD->OrtSofort(); }},
+   {5.6f,Foto},
+   {6.2f,[this]() {
+     auto* L=ALaLaBergLaeden::Instanz.Get(); auto* K=ULaLaBergKonto::Hole(this);
+     bMp=L&&L->HoleOffen()==ALaLaBergLaeden::PAINTBALL&&L->Kaufe(0)&&K&&K->HatWaffe(1)&&K->HoleGeld()==1700;
+     Beleg(FString::Printf(TEXT("LALABERG_LADENTEST mp=%d geld=%d"),bMp?1:0,K?K->HoleGeld():-1)); }},
+   {7.0f,[this]() {
+     auto* PC=GetWorld()->GetFirstPlayerController();
+     auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr;
+     for(TActorIterator<ALaLaBergWagen> It(GetWorld());It&&Figur;++It) {
+      Figur->SetActorLocation(It->GetActorLocation()-It->GetActorRightVector()*300.0f+FVector(0,0,60),false,nullptr,ETeleportType::TeleportPhysics);
+      break;
+     } }},
+   {7.6f,[this]() {
+     auto* PC=GetWorld()->GetFirstPlayerController();
+     if(auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr) Figur->Einsteigen(); }},
+   {8.6f,[this]() {
+     auto* L=ALaLaBergLaeden::Instanz.Get(); auto* PC=GetWorld()->GetFirstPlayerController();
+     auto* Wagen=PC?Cast<ALaLaBergWagen>(PC->GetPawn()):nullptr;
+     if(!L||!Wagen) { Beleg(TEXT("LALABERG_LADENTEST kein Wagen")); return; }
+     const FVector Ort=L->HoleLaeden()[ALaLaBergLaeden::LACKIEREREI].Ort;
+     Wagen->SetActorLocationAndRotation(Ort+FVector(0,0,90),FRotator(0,PC->GetControlRotation().Yaw,0),false,nullptr,ETeleportType::TeleportPhysics); }},
+   // Erst hier gesucht: die Streifen setzen 250 m entfernt ein, ausser Sicht -
+   // sonst entscheidet der Zufall des Einsatzorts, ob die Polizei zusieht.
+   {9.8f,[this]() { if(auto* P=ALaLaBergPolizei::Instanz.Get()) P->TestSetzeSterne(2); }},
+   {10.0f,Foto},
+   {10.3f,[this]() {
+     auto* L=ALaLaBergLaeden::Instanz.Get(); auto* K=ULaLaBergKonto::Hole(this); auto* P=ALaLaBergPolizei::Instanz.Get();
+     const bool bOffen=L&&L->HoleOffen()==ALaLaBergLaeden::LACKIEREREI;
+     const bool bGekauft=bOffen&&L->Kaufe(3);
+     FLinearColor Farbe;
+     bLack=bGekauft&&K&&K->HatLack(Farbe)&&P&&P->HoleSterne()==0&&K->HoleGeld()==1550;
+     Beleg(FString::Printf(TEXT("LALABERG_LADENTEST lack=%d offen=%d sterne=%d geld=%d"),bLack?1:0,bOffen?1:0,P?P->HoleSterne():-1,K?K->HoleGeld():-1)); }},
+   {11.4f,Foto},
+   {12.0f,[this]() {
+     auto* K=ULaLaBergKonto::Hole(this);
+     const ULaLaBergSpielstand* Platte=K?K->LadeVonPlatte():nullptr;
+     const bool bGespeichert=Platte&&Platte->Geld==1550&&(Platte->Waffen&2)&&Platte->bHatLack;
+     const bool bPass=bMp&&bLack&&bGespeichert;
+     Beleg(FString::Printf(TEXT("LALABERG_LADENTEST %s mp=%d lack=%d gespeichert=%d slot=%s platte_geld=%d"),bPass?TEXT("PASS"):TEXT("FAIL"),
+      bMp?1:0,bLack?1:0,bGespeichert?1:0,K?*K->HoleSlot():TEXT("-"),Platte?Platte->Geld:-1));
+     FPlatformMisc::RequestExitWithStatus(false,bPass?0:1); }},
+  };
+  for(const FSchritt& S:Plan) { FTimerHandle H; TFunction<void()> Tu=S.Tu; GetWorldTimerManager().SetTimer(H,MoveTemp(Tu),S.Zeit,false); }
  }
  if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergAbbiegeTest"))) {
   static TMap<ALaLaBergVerkehrsauto*,float> LetzteGier, GierSumme;

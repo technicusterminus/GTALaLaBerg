@@ -1,5 +1,6 @@
 #include "LaLaBergCharacter.h"
 #include "LaLaBergPolizei.h"
+#include "LaLaBergKonto.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -520,9 +521,19 @@ void ALaLaBergCharacter::Feuern() {
  Waffe->Feuern(Kamera->GetComponentLocation() + Kamera->GetForwardVector() * 70.0f, Kamera->GetForwardVector());
 }
 void ALaLaBergCharacter::Waffe1() { if (Waffe) Waffe->SetzeArt(ELaLaBergWaffenArt::Pistole); }
-void ALaLaBergCharacter::Waffe2() { if (Waffe) Waffe->SetzeArt(ELaLaBergWaffenArt::Maschine); }
-void ALaLaBergCharacter::Waffe3() { if (Waffe) Waffe->SetzeArt(ELaLaBergWaffenArt::Schrotflinte); }
-void ALaLaBergCharacter::Waffe4() { if (Waffe) Waffe->SetzeArt(ELaLaBergWaffenArt::Raketenwerfer); }
+// Nur die Pistole hat man von Anfang an; die anderen gibt es im
+// Paintball-Laden (siehe ALaLaBergLaeden, gespeichert im Konto).
+static bool Besitzt(const ALaLaBergCharacter* Figur, ELaLaBergWaffenArt Art, const TCHAR* Name) {
+ const ULaLaBergKonto* Konto = ULaLaBergKonto::Hole(Figur);
+ if (!Konto || Konto->HatWaffe(static_cast<uint8>(Art))) return true;
+ if (const auto* PC = Cast<APlayerController>(Figur->GetController()))
+  if (auto* HUD = Cast<ALaLaBergHUD>(PC->GetHUD()))
+   HUD->ZeigeRueckmeldung(FString::Printf(TEXT("%s gibt es im Paintball-Laden – grüne Marke auf der Karte (M)"), Name));
+ return false;
+}
+void ALaLaBergCharacter::Waffe2() { if (Waffe && Besitzt(this, ELaLaBergWaffenArt::Maschine, TEXT("Die Paintball-MP"))) Waffe->SetzeArt(ELaLaBergWaffenArt::Maschine); }
+void ALaLaBergCharacter::Waffe3() { if (Waffe && Besitzt(this, ELaLaBergWaffenArt::Schrotflinte, TEXT("Die Paintball-Schrotflinte"))) Waffe->SetzeArt(ELaLaBergWaffenArt::Schrotflinte); }
+void ALaLaBergCharacter::Waffe4() { if (Waffe && Besitzt(this, ELaLaBergWaffenArt::Raketenwerfer, TEXT("Den Paintball-Werfer"))) Waffe->SetzeArt(ELaLaBergWaffenArt::Raketenwerfer); }
 void ALaLaBergCharacter::Forward(float Value) {
  if (Controller) AddMovementInput(FRotationMatrix(FRotator(0,Controller->GetControlRotation().Yaw,0)).GetUnitAxis(EAxis::X),Value);
 }

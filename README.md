@@ -162,6 +162,14 @@ Die erste Aufgabe im Spiel. Neben dem Startpunkt am Klinikum steht eine **blaue 
 
 Bewusst noch nicht dabei: Speicherstand (das Konto gilt für eine Sitzung), Fracht oder Fahrgäste als Figuren, Schadenabzug, eine Karte mit Route.
 
+### Spielstand, Paintball-Laden und Lackiererei
+
+- **Spielstand**: Kontostand, gekaufte Waffen, Lack des eigenen Wagens und die Zahl erledigter Aufträge überdauern das Spielende (Unreal-SaveGame, Slot `LaLaBerg`, in `Saved/SaveGames`). Gespeichert wird nach jeder Änderung – Auftrag, Strafe, Kauf – und beim Beenden. Läuft das Spiel mit einem `-LaLaBerg…`-Schalter (Prüfläufe, Fotomodus), beginnt das Konto leer und schreibt in den Slot `LaLaBergTest`; der echte Spielstand bleibt unberührt.
+- **Paintball-Laden** (grüne Marke beim Bahnhof, zu Fuß hineingehen): Am Anfang hat man nur die Paintball-Pistole. MP 300 €, Schrotflinte 600 €, Werfer 1500 €. Die Tasten 2–4 sagen bis zum Kauf, wo es die Waffe gibt.
+- **Lackiererei** (grüne Marke nahe dem Start, mit dem Wagen hineinfahren): sechs Farben zu je 150 €; der eigene Wagen behält die Farbe auch beim nächsten Spielstart. Wie in GTA: Wer gesucht wird und dabei von keiner Streife gesehen wird, ist die Fahndung los.
+- Im Laden: Pfeil hoch/runter wählen, Enter kauft, hinausgehen schließt. Die Liste zeigt Preis, „gekauft“/„aktuell“ und in Rot, was zu teuer ist.
+- Umlackieren der echten Fahrzeugmodelle: Die Lackslots stammen aus einem Editor-Skript über alle Modelle (City Sample `veh_carPaint`/`veh_paint`, CarConcept `Paint_1/2_Carmine`). Der City-Sample-Lack holt seine Farbe je Instanz aus einer Palettentextur (statischer Schalter „Paint Variation“) – deshalb gibt es `Content/Art/Materials/MI_Lack_Einfarbig`, denselben Lack ohne Variation, dessen `BaseColor` die Lackiererei setzt. Beim allerersten Umlackieren kompiliert der Editor diese Shader-Variante; bis dahin erscheint der Lack kurz grau.
+
 ### Karte
 
 - **Minikarte** unten links, Norden oben, der Spieler als Pfeil in der Mitte. Zu Fuß 300 m im Blick, im Wagen 500 m. Die Auftragssäule (blau bzw. gelb) bleibt am Rand stehen, wenn sie außerhalb liegt; Streifenwagen blinken rot-weiß.
@@ -191,6 +199,7 @@ Das HUD enthält:
 - Steuerungshinweise
 - Ortsanzeige mit Straße, Platz oder Wahrzeichen
 - Auftragstafel mit Richtungspfeil, Restzeit und Kontostand
+- Ladenliste mit Preisen und Farbfeldern
 - Minikarte, Vollkarte (`M`)
 - Fahndungssterne, Suchbalken beim Abhängen, Festnahmebalken
 - Ortsteil und Stadt
@@ -522,6 +531,7 @@ Saved/Screenshots/WindowsEditor
 | `-LaLaBergKoerperFoto` | Prüft Figur, Arm und Waffenhaltung: Bild von hinten, je Waffe ein Seitenbild, ein Bild im Laufen | `LALABERG_WAFFE_GEHALTEN PASS` je Waffe (Griff unter 25 cm von der Handfläche) |
 | `-LaLaBergAuftragTest` | Ganzer Lieferauftrag ohne Tastatur: vor die blaue Säule (Bild), hinein (Bild Richtung Ziel), vor das Ziel (Bild), hinein, dann in die nächste blaue Säule und die Frist ablaufen lassen | `LALABERG_AUFTRAGTEST PASS` mit `erledigt=1 gescheitert=1`, Geld > 0 und mindestens 10 Zielen |
 | `-LaLaBergPolizeiTest` | Zwei echte Taten (Passant, Streifenwagen) ergeben zwei Sterne; die Figur bleibt stehen, die Streifen fahren heran und nehmen fest (Bild beim Eintreffen, Bild der Vollkarte). Danach ein Stern, die Figur wird 1,1 km weit versetzt und muss die Fahndung abschütteln | `LALABERG_POLIZEITEST PASS festnahmen=1` mit `abgehaengt_nach` |
+| `-LaLaBergLadenTest` | 2000 € aufs Konto, im Paintball-Laden die MP kaufen, in den Wagen, in der Lackiererei zwei Sterne bekommen und ungesehen umlackieren; danach den Spielstand frisch von der Platte lesen | `LALABERG_LADENTEST PASS mp=1 lack=1 gespeichert=1` |
 | `-LaLaBergAmpelTest` | Prüft Ampelkonflikte über vollen Zyklus | `LALABERG_AMPELTEST PASS verstoesse=0 ampeln=44` |
 
 ### Beispiel: Fahrtest mit GPU-Profiling
@@ -680,7 +690,7 @@ Die Verkehrslogik priorisiert skalierbares, glaubwürdiges Verhalten gegenüber 
 
 ### Aufgaben
 
-Es gibt eine Art Aufgabe: Lieferaufträge, dazu Polizei und Fahndung (siehe oben). Kein Quest- oder Persistenzsystem; das Geld gilt nur für die laufende Sitzung und geht nur durch Strafen wieder weg.
+Es gibt eine Art Aufgabe: Lieferaufträge, dazu Polizei und Fahndung (siehe oben). Das Geld wird gespeichert und lässt sich für Waffen und Lack ausgeben; Fahrzeuge kaufen, Garagen oder weitere Läden gibt es noch nicht. Ort, Fahndung und laufender Auftrag beginnen bei jedem Start neu.
 
 ### Bildrate am Startpunkt
 
@@ -834,7 +844,7 @@ Mögliche nächste Ausbaustufen:
 - weichere Fußgängeranimationen und Verhaltenszustände
 - weitere Stadtmöblierung und Interaktionen
 - Profiling auf RTX- und Gaming-Hardware
-- weitere Auftragsarten, Speicherstand und etwas, wofür man das Geld ausgibt
+- weitere Auftragsarten und Läden, Fahrzeuge kaufen
 
 ***
 

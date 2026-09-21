@@ -10,6 +10,7 @@
 #include "Camera/CameraComponent.h"
 #include "Engine/World.h"
 #include "Materials/MaterialInterface.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -284,6 +285,50 @@ void ALaLaBergWagen::ErhalteFarbe(const FLinearColor& Farbe, const FVector& AusR
  if (Rumpf && Rumpf->IsSimulatingPhysics()) Rumpf->AddImpulse(AusRichtung.GetSafeNormal() * 1800.0f * Rumpf->GetMass());
 }
 
+void ALaLaBergWagen::SetzeLack(const FLinearColor& Farbe, bool bModell) {
+ Lack = Farbe;
+ bModellLack |= bModell;
+ if (!bGebaut) return;
+ if (CarConceptTeile.IsEmpty()) BaueKarosserie();
+ else if (bModellLack) FaerbeModell();
+}
+
+// Welche Slots Lack tragen und wie der Farbparameter heisst, per Editor-
+// Skript aus allen Fahrzeugmodellen gelesen (2026-09-21): City-Sample-Typen
+// "veh_carPaint"/"veh_paint" mit "BaseColor", CarConcept "Paint_1_Carmine"/
+// "Paint_2_Carmine" mit "BaseColorFactor". Staub, Grundierung, Metallflitter
+// usw. derselben Materialien bleiben, wie sie sind.
+void ALaLaBergWagen::FaerbeModell() {
+ int32 Slots = 0;
+ for (UStaticMeshComponent* Teil : CarConceptTeile) {
+  if (!Teil) continue;
+  const TArray<FName> SlotNamen = Teil->GetMaterialSlotNames();
+  for (int32 i = 0; i < SlotNamen.Num(); i++) {
+   const FString Slot = SlotNamen[i].ToString();
+   const bool bCitySample = Slot == TEXT("veh_carPaint") || Slot == TEXT("veh_paint");
+   const bool bCarConcept = Slot.StartsWith(TEXT("Paint_"));
+   if (!bCitySample && !bCarConcept) continue;
+   const int32 Index = Teil->GetMaterialIndex(SlotNamen[i]);
+   UMaterialInstanceDynamic* MID = nullptr;
+   if (bCitySample) {
+    // Der City-Sample-Lack holt seine Farbe je Instanz aus einer
+    // Palettentextur (Schalter "Paint Variation", Custom Primitive Data
+    // "Paint Var Lookup") - BaseColor allein aenderte nichts. Schalter lassen
+    // sich zur Laufzeit nicht umlegen, deshalb derselbe Lack als eigene
+    // Instanz ohne Variation (Tools: MI_Lack_Einfarbig, siehe README).
+    UMaterialInterface* Einfarbig = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Art/Materials/MI_Lack_Einfarbig.MI_Lack_Einfarbig"));
+    if (Einfarbig) MID = Teil->CreateDynamicMaterialInstance(Index, Einfarbig);
+    if (MID) MID->SetVectorParameterValue(TEXT("BaseColor"), Lack);
+   } else if ((MID = Teil->CreateDynamicMaterialInstance(Index))) {
+    MID->SetVectorParameterValue(TEXT("BaseColorFactor"), Lack);
+   }
+   if (!MID) continue;
+   Slots++;
+  }
+ }
+ UE_LOG(LogTemp, Display, TEXT("LALABERG_LACK typ=%d lackslots=%d"), FahrzeugTyp, Slots);
+}
+
 void ALaLaBergWagen::BaueKarosserie() {
  if (!CarConceptTeile.IsEmpty()) return;  // schon gebaut - faerbt sich nicht per SetzeLack um
  // Fahrzeugvielfalt wie bei den KI-Autos (siehe LaLaBergVerkehrsauto): einmal
@@ -295,6 +340,7 @@ void ALaLaBergWagen::BaueKarosserie() {
   Karosseriepunkt->SetRelativeRotation(FRotator::ZeroRotator);
   Netz->SetVisibility(false);
   Netz->ClearAllMeshSections();
+  if (bModellLack) FaerbeModell();
   return;
  }
  // Bevorzugt das lizenzierte CarConcept-Fahrzeug (CC BY 4.0, siehe
@@ -308,6 +354,7 @@ void ALaLaBergWagen::BaueKarosserie() {
   Karosseriepunkt->SetRelativeRotation(FRotator(0, -90, 0));
   Netz->SetVisibility(false);
   Netz->ClearAllMeshSections();
+  if (bModellLack) FaerbeModell();
   return;
  }
  if (BaueAusVorlage()) return;

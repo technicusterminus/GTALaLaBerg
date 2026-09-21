@@ -54,6 +54,8 @@ private:
  void Vollkarte();
  // Sterne oben rechts, Suchbalken, Festnahmebalken.
  void Fahndung();
+ // Im Laden: Warenliste mit Preisen, Auswahl, Kontostand.
+ void Laden();
  float Massstab = 1.0f;
  UPROPERTY() TObjectPtr<class UFont> Roboto = nullptr;
 

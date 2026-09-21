@@ -30,7 +30,8 @@ public:
  FVector HoleWegpunkt() const { return bUnterwegs ? Ziele[AktZiel].Ort : StartOrt; }
  FString HoleZielName() const { return bUnterwegs ? Ziele[AktZiel].N : FString(); }
  float HoleRestzeit() const;
- int32 HoleGeld() const { return Geld; }
+ // Das Geld liegt im Konto (ULaLaBergKonto) und ueberdauert das Spielende.
+ int32 HoleGeld() const;
  int32 HoleLohn() const { return Lohn; }
  int32 HoleErledigt() const { return Erledigt; }
  int32 HoleGescheitert() const { return Gescheitert; }
@@ -40,7 +41,7 @@ public:
  // weg, die blaue Saeule bleibt. Strafe zieht hoechstens ab, was da ist, und
  // liefert den tatsaechlich abgezogenen Betrag.
  void Abbrechen();
- int32 Strafe(int32 Betrag) { const int32 Ab = FMath::Clamp(Betrag, 0, Geld); Geld -= Ab; return Ab; }
+ int32 Strafe(int32 Betrag);
 
  // Fuer -LaLaBergAuftragTest: die Frist sofort ablaufen lassen.
  void TestAblaufen() { Frist = GetWorld()->GetTimeSeconds() - 0.01; }
@@ -60,7 +61,7 @@ private:
  int32 AktZiel = INDEX_NONE;
  bool bAngebot = false, bUnterwegs = false, bErstHinaus = false;
  double Frist = 0.0;
- int32 Lohn = 0, Geld = 0, Erledigt = 0, Gescheitert = 0;
+ int32 Lohn = 0, Erledigt = 0, Gescheitert = 0;
 
  // Je Marke ein flacher Ring am Boden und eine hohe Saeule, die man ueber
  // die Daecher sieht.

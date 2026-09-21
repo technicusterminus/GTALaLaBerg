@@ -39,6 +39,9 @@ public:
  int32 HoleFestnahmen() const { return Festnahmen; }
  // Aktive Streifenwagen - fuer die Karte.
  void HoleStreifen(TArray<FVector>& Orte) const;
+ // Neu lackiert und dabei ungesehen (siehe ALaLaBergLaeden): die Fahndung
+ // endet, die Streifen fahren ab.
+ void Verwische() { if (Sterne > 0) Einstellen(TEXT("lackiert")); }
  // Fuer -LaLaBergPolizeiTest.
  void TestSetzeSterne(int32 Anzahl);
  float NaechsteStreifeCm() const;
