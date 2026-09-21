@@ -510,7 +510,8 @@ void ALaLaBergGameMode::BeginPlay() {
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergAbbiegeTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergAuftragTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergPolizeiTest")) ||
-                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergLadenTest"));
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergLadenTest")) ||
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergAntriebTest"));
  if(bAutomatisch) Beleg(FString::Printf(TEXT("LALABERG_SPIELBEGINN nach %.1fs Programmlaufzeit, %d Gebaeude"),FPlatformTime::Seconds()-GStartTime,BuildingCount));
  if(!bAutomatisch) {
   if(UGameInstance* Spiel=GetGameInstance()) {
@@ -1261,6 +1262,46 @@ void ALaLaBergGameMode::BeginPlay() {
      FPlatformMisc::RequestExitWithStatus(false,bPass?0:1); }},
   };
   for(const FSchritt& S:Plan) { FTimerHandle H; TFunction<void()> Tu=S.Tu; GetWorldTimerManager().SetTimer(H,MoveTemp(Tu),S.Zeit,false); }
+ }
+ // -LaLaBergAntriebTest [-LaLaBergDrehmoment=<Nm>]: einsteigen, Vollgas,
+ // halbsekuendlich Karosseriemasse, Motor und Raeder ins Log. Klaert, warum
+ // der Antrieb das Hundertfache des realen Moments braucht (siehe
+ // Docs/ChaosVehicle-ForumAnfrage.md). Kein PASS/FAIL - ein Befund.
+ if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergAntriebTest"))) {
+  FTimerHandle Hin;
+  GetWorldTimerManager().SetTimer(Hin,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr;
+   for(TActorIterator<ALaLaBergWagen> It(GetWorld());It&&Figur;++It) {
+    Figur->SetActorLocation(It->GetActorLocation()-It->GetActorRightVector()*300.0f+FVector(0,0,60),false,nullptr,ETeleportType::TeleportPhysics);
+    break;
+   }
+  },4.6f,false);
+  FTimerHandle Los;
+  GetWorldTimerManager().SetTimer(Los,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   if(auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr) Figur->Einsteigen();
+   auto* Wagen=PC?Cast<ALaLaBergWagen>(PC->GetPawn()):nullptr;
+   if(!Wagen) { Beleg(TEXT("LALABERG_ANTRIEB kein Wagen")); return; }
+   float Nm=0.0f;
+   if(FParse::Value(FCommandLine::Get(),TEXT("LaLaBergDrehmoment="),Nm)&&Nm>0.0f) Wagen->SetzeTestDrehmoment(Nm);
+   Beleg(TEXT("LALABERG_ANTRIEB stand ")+Wagen->Antriebsbefund());
+   // -LaLaBergSchub: statt Motor eine von Halbsekunde zu Halbsekunde
+   // wachsende Schubkraft - rollt der Wagen bei realistischer Kraft nicht,
+   // haelt ihn etwas ausserhalb des Antriebs fest.
+   if(!FParse::Param(FCommandLine::Get(),TEXT("LaLaBergSchub"))) Wagen->TestSteuerung(1.0f,0.0f);
+  },6.0f,false);
+  FTimerHandle Takt;
+  GetWorldTimerManager().SetTimer(Takt,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   if(auto* Wagen=PC?Cast<ALaLaBergWagen>(PC->GetPawn()):nullptr) {
+    static float Schub=0.0f;
+    if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergSchub"))) { Schub+=1000.0f; Wagen->TestSchub(Schub); }
+    Beleg(TEXT("LALABERG_ANTRIEB ")+Wagen->Antriebsbefund());
+   }
+  },0.5f,true,6.5f);
+  FTimerHandle Ende;
+  GetWorldTimerManager().SetTimer(Ende,[]() { FPlatformMisc::RequestExitWithStatus(false,0); },12.0f,false);
  }
  if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergAbbiegeTest"))) {
   static TMap<ALaLaBergVerkehrsauto*,float> LetzteGier, GierSumme;

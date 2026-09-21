@@ -42,6 +42,12 @@ public:
  // Tempo in Fahrtrichtung, rueckwaerts negativ - fuer den Tacho.
  float TempoKmh() const { return FVector::DotProduct(GetVelocity(), GetActorForwardVector()) * 0.036f; }
  bool BremstGerade() const { return bBremse; }
+ // Fuer -LaLaBergAntriebTest: Karosseriemasse, Motor und Raeder in einer
+ // Zeile - um zu klaeren, warum der Antrieb das Hundertfache braucht.
+ FString Antriebsbefund() const;
+ void SetzeTestDrehmoment(float Nm);
+ // Schubkraft in Newton, jedes Bild nach vorn auf den Rumpf - ohne Motor.
+ void TestSchub(float Newton) { SchubNewton = Newton; }
 
 protected:
  virtual void BeginPlay() override;
@@ -95,5 +101,6 @@ private:
  bool bGebaut = false;
  int32 LetzteRaeder = 0;
  bool bTest = false;
+ float SchubNewton = 0.0f;
  float EinstiegZeit = -10.0f;
 };

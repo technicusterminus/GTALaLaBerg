@@ -196,17 +196,14 @@ ALaLaBergWagen::ALaLaBergWagen() {
  Bewegung->ChassisHeight = 110.0f;
  Bewegung->DragCoefficient = 0.35f;
 
- // 320 Nm waere ein realistischer Wert fuer diesen Wagen - hundertfach hoeher,
- // weil der Wagen sonst nicht faehrt: alle Rad-Werte (Kontakt, Federweg,
- // Reibung, Antriebsmoment) sahen per -LaLaBergFahrtest korrekt aus, die
- // Karosserie beschleunigte trotzdem nie; das Zehnfache reichte nicht, erst
- // das Hundertfache bewegt ihn. Die Ursache ist offen. Die frueher hier
- // stehende Erklaerung (Zentimeter-/Meter-Fehler bei DriveTorque / Re in
- // WheelSystem.cpp) war falsch: ChaosWheeledVehicleMovementComponent.cpp
- // rechnet das Moment vorher mit TorqueMToCm um, und die Bremse - die dieselbe
- // Rechnung durchlaeuft - braucht den Faktor nachweislich nicht (siehe
- // LaLaBergWagenRad.cpp und Docs/ChaosVehicle-ForumAnfrage.md).
- Bewegung->EngineSetup.MaxTorque = 32000.0f;
+ // Realistische 320 Nm. Bis 2026-09-21 standen hier 32000 - der Wagen fuhr
+ // sonst nicht. Ursache (per -LaLaBergAntriebTest gemessen): Chaos' Constraint-
+ // Federung blieb voll eingefedert, die Rumpf-Kollisionsbox lag auf der
+ // Fahrbahn und schleifte; nur mit durchdrehenden Raedern kam der Wagen gegen
+ // diese Gleitreibung an. Mit kraftbasierter Federung (Config/DefaultEngine.ini,
+ // p.Vehicle.DisableConstraintSuspension) haengt die Box 20 cm ueber der
+ // Strasse, und 320 Nm bringen den Wagen in 5 s auf 67 km/h.
+ Bewegung->EngineSetup.MaxTorque = 320.0f;
  Bewegung->EngineSetup.MaxRPM = 5500.0f;
  // Ohne eigene Kurve bleibt TorqueCurve leer - FillEngineSetup() teilt dann
  // durch den leeren Wertebereich (0) und liefert NaN-Drehmoment.
@@ -283,6 +280,34 @@ bool ALaLaBergWagen::BaueAusVorlage() { return LaLaBergWagenForm::BaueNetz(Netz,
 // Wagen behaelt seinen eigenen Lack, ein Treffer faerbt nicht das ganze Auto um.
 void ALaLaBergWagen::ErhalteFarbe(const FLinearColor& Farbe, const FVector& AusRichtung) {
  if (Rumpf && Rumpf->IsSimulatingPhysics()) Rumpf->AddImpulse(AusRichtung.GetSafeNormal() * 1800.0f * Rumpf->GetMass());
+}
+
+FString ALaLaBergWagen::Antriebsbefund() const {
+ FString Raeder;
+ for (int32 i = 0; i < Bewegung->GetNumWheels(); i++) {
+  const FWheelStatus& W = Bewegung->GetWheelState(i);
+  Raeder += FString::Printf(TEXT(" r%d[kontakt=%d federweg=%.2f feder=%.0f antrieb=%.0f bremse=%.0f schlupf=%.2f]"), i, W.bInContact ? 1 : 0,
+                            W.NormalizedSuspensionLength, W.SpringForce, W.DriveTorque, W.BrakeTorque, W.SlipMagnitude);
+ }
+ const FBodyInstance* Koerper = Rumpf ? Rumpf->GetBodyInstance() : nullptr;
+ // Abstand der Kastenunterkante zur Fahrbahn: schleift der unsichtbare Rumpf?
+ float Abstand = -1.0f;
+ if (Rumpf) {
+  FHitResult Boden;
+  FCollisionQueryParams Q(TEXT("Antriebsbefund"), true, this);
+  const FVector Mitte = Rumpf->Bounds.Origin;
+  if (GetWorld()->LineTraceSingleByChannel(Boden, Mitte, Mitte - FVector(0, 0, 500), ECC_Visibility, Q))
+   Abstand = (Mitte.Z - Rumpf->Bounds.BoxExtent.Z) - Boden.ImpactPoint.Z;
+ }
+ return FString::Printf(TEXT("bodenabstand=%.0fcm schub=%.0fN masse=%.0fkg koerpermasse=%.0fkg vorgabe=%.0fkg tempo=%.1fkmh motor=%.0fU/min gang=%d gas=%.2f maxmoment=%.0f%s"),
+                        Abstand, SchubNewton, Rumpf ? Rumpf->GetMass() : -1.0f, Koerper ? Koerper->GetBodyMass() : -1.0f, Bewegung->Mass,
+                        Bewegung->GetForwardSpeed() * 0.036f, Bewegung->GetEngineRotationSpeed(), Bewegung->GetCurrentGear(),
+                        Bewegung->GetThrottleInput(), Bewegung->EngineSetup.MaxTorque, *Raeder);
+}
+
+void ALaLaBergWagen::SetzeTestDrehmoment(float Nm) {
+ Bewegung->EngineSetup.MaxTorque = Nm;
+ Bewegung->SetMaxEngineTorque(Nm);
 }
 
 void ALaLaBergWagen::SetzeLack(const FLinearColor& Farbe, bool bModell) {
@@ -480,6 +505,7 @@ void ALaLaBergWagen::Aussteigen() {
 
 void ALaLaBergWagen::Tick(float Zeit) {
  Super::Tick(Zeit);
+ if (SchubNewton > 0.0f && Rumpf) Rumpf->AddForce(GetActorForwardVector() * SchubNewton * 100.0f);   // N -> kg*cm/s^2
  if (!Bewegung || !Rumpf || !Rumpf->IsSimulatingPhysics()) return;
 
  // Lenkung nachziehen, nicht schlagartig setzen

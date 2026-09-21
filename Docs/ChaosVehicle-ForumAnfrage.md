@@ -1,5 +1,15 @@
 # Forum-Beitrag: Chaos Vehicle - drive force never reaches chassis (non-skeletal setup, UE 5.8)
 
+> **Geloest am 2026-09-21 - nicht mehr posten.** Die Antriebskraft kam an; der
+> Wagen lag nur auf seiner Kollisionsbox. `-LaLaBergAntriebTest` zeigte:
+> Federweg 0,00 an allen Raedern (Constraint-Federung voll eingefedert),
+> Kastenunterkante 3 cm in der Fahrbahn, und ein reiner Schubtest ohne Motor
+> brauchte ~12.000 N, bis sich der Wagen bewegte - Gleitreibung eines
+> 1250-kg-Blocks. Mit `p.Vehicle.DisableConstraintSuspension=1`
+> (Config/DefaultEngine.ini) haengt die Box 18-22 cm ueber der Strasse und
+> realistische 320 Nm fahren den Wagen in 5 s auf 67 km/h. Der Text unten ist
+> nur noch Verlauf.
+
 **Umgangen, Ursache offen.** Der Wagen faehrt, seit `EngineSetup.MaxTorque`
 hundertfach ueberhoeht ist (32.000 statt 320 Nm, siehe `LaLaBergWagen.cpp`);
 das Zehnfache reichte nicht. Das ist gemessen, nicht erklaert.
