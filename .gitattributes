@@ -3,5 +3,6 @@
 *.umap filter=lfs diff=lfs merge=lfs -text
 Content/SourceData/**/*.json filter=lfs diff=lfs merge=lfs -text
 Content/SourceData/*.json filter=lfs diff=lfs merge=lfs -text
+Content/SourceData/**/*.png filter=lfs diff=lfs merge=lfs -text
 *.glb filter=lfs diff=lfs merge=lfs -text
 *.fbx filter=lfs diff=lfs merge=lfs -text

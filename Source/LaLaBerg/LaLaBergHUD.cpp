@@ -5,6 +5,10 @@
 #include "LaLaBergCharacter.h"
 #include "LaLaBergMenueSteuerung.h"
 #include "LaLaBergAuftraege.h"
+#include "LaLaBergPolizei.h"
+#include "ImageUtils.h"
+#include "Engine/Texture2D.h"
+#include "InputCoreTypes.h"
 #include "Engine/Canvas.h"
 #include "Camera/PlayerCameraManager.h"
 #include "RenderUtils.h"
@@ -91,11 +95,16 @@ void ALaLaBergHUD::DrawHUD() {
   const float Jetzt = GetWorld()->GetTimeSeconds();
   if (Jetzt - OrtGeprueft > 0.5f) { OrtGeprueft = Jetzt; BestimmeOrt(Figur->GetActorLocation()); }
   Ortsanzeige();
+  if (!bKarteGeladen) LadeKarte();
+  if (PlayerOwner->WasInputKeyJustPressed(EKeys::M)) bVollkarte = !bVollkarte;
+  if (bVollkarte) { Vollkarte(); return; }
+  Minikarte();
   Auftrag();
+  Fahndung();
  }
  if (auto* Wagen = Cast<ALaLaBergWagen>(Figur)) {
   Tacho(Wagen);
-  Tastenleiste(TEXT("W/S  Gas / Rückwärts      A/D  Lenken      Leertaste  Bremse      Maus  Umsehen      E  Aussteigen      Esc  Menü"));
+  Tastenleiste(TEXT("W/S  Gas / Rückwärts      A/D  Lenken      Leertaste  Bremse      Maus  Umsehen      E  Aussteigen      M  Karte      Esc  Menü"));
   return;
  }
  if (!Figur) return;
@@ -115,7 +124,7 @@ void ALaLaBergHUD::DrawHUD() {
  }
  if (bWagenNah) Hinweis(TEXT("E"), TEXT("Einsteigen"));
  if (auto* Held = Cast<ALaLaBergCharacter>(Figur)) Fadenkreuz(Held->HoleWaffe());
- Tastenleiste(TEXT("WASD  Gehen      Maus  Umsehen      Leertaste  Springen      Maus links  Feuern      1-4  Waffe      E  Einsteigen      Esc  Menü"));
+ Tastenleiste(TEXT("WASD  Gehen      Maus  Umsehen      Leertaste  Springen      Maus links  Feuern      1-4  Waffe      E  Einsteigen      M  Karte      Esc  Menü"));
 }
 
 // Bildmitte: ein kleines Kreuz, darunter der Name der Waffe und wie oft
@@ -173,6 +182,181 @@ void ALaLaBergHUD::Hinweis(const FString& Taste, const FString& Text) {
  Schrift(Text, X + Rand + K + 14 * S, Y + Rand + 3 * S, 20, Weiss);
 }
 
+void ALaLaBergHUD::Pfeil(const FVector2D& M, float WinkelGrad, float R, const FLinearColor& Farbe) {
+ const float Winkel = FMath::DegreesToRadians(WinkelGrad);
+ const FVector2D Vor(FMath::Sin(Winkel), -FMath::Cos(Winkel));
+ const FVector2D Quer(-Vor.Y, Vor.X);
+ // Zwei Dreiecke von der Spitze zur Kerbe - ein Pfeil mit Einschnitt hinten.
+ const FVector2D Spitze = M + Vor * R, Kerbe = M - Vor * R * 0.3f;
+ for (const float Seite : { 1.0f, -1.0f }) {
+  FCanvasTriangleItem Haelfte(Spitze, M - Vor * R * 0.6f + Quer * R * 0.62f * Seite, Kerbe, GWhiteTexture);
+  Haelfte.SetColor(Farbe);
+  Canvas->DrawItem(Haelfte);
+ }
+}
+
+void ALaLaBergHUD::Stern(const FVector2D& M, float R, const FLinearColor& Farbe) {
+ FVector2D P[10];
+ for (int32 i = 0; i < 10; i++) {
+  const float W = FMath::DegreesToRadians(-90.0f + i * 36.0f);
+  P[i] = M + FVector2D(FMath::Cos(W), FMath::Sin(W)) * (i % 2 ? R * 0.45f : R);
+ }
+ for (int32 i = 0; i < 10; i++) {
+  FCanvasTriangleItem Teil(M, P[i], P[(i + 1) % 10], GWhiteTexture);
+  Teil.SetColor(Farbe);
+  Canvas->DrawItem(Teil);
+ }
+}
+
+void ALaLaBergHUD::LadeKarte() {
+ bKarteGeladen = true;
+ FString Text;
+ TSharedPtr<FJsonObject> Info;
+ const FString Ordner = FPaths::ProjectContentDir() / TEXT("SourceData/Karte");
+ if (!FFileHelper::LoadFileToString(Text, *(Ordner / TEXT("karte.json"))) ||
+     !FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Info) || !Info.IsValid()) {
+  UE_LOG(LogTemp, Warning, TEXT("LALABERG_KARTE fehlt: %s"), *Ordner);
+  return;
+ }
+ const double Cm = Info->GetNumberField(TEXT("cmProPixel"));
+ KarteUrsprung = FVector2D(Info->GetNumberField(TEXT("x0")), Info->GetNumberField(TEXT("y0")));
+ KarteMass = FVector2D(Info->GetNumberField(TEXT("breite")), Info->GetNumberField(TEXT("hoehe"))) * Cm;
+ auto Lade = [&](const TCHAR* Datei) -> UTexture2D* {
+  UTexture2D* Bild = FImageUtils::ImportFileAsTexture2D(Ordner / Datei);
+  if (!Bild) return nullptr;
+  // Am Rand nicht wiederholen: die Minikarte schaut am Stadtrand ueber das
+  // Bild hinaus.
+  Bild->AddressX = TA_Clamp; Bild->AddressY = TA_Clamp;
+  Bild->UpdateResource();
+  return Bild;
+ };
+ KarteBild = Lade(TEXT("karte.png"));
+ KarteKlein = Lade(TEXT("karte-klein.png"));
+ UE_LOG(LogTemp, Display, TEXT("LALABERG_KARTE gross=%d klein=%d"), KarteBild != nullptr, KarteKlein != nullptr);
+}
+
+namespace {
+ const FLinearColor BLAU_MARKE(0.25f, 0.6f, 1.0f), GELB_MARKE(1.0f, 0.78f, 0.05f);
+}
+
+// Unten links ueber der Ortsanzeige, Norden oben, der Spieler in der Mitte.
+// Zu Fuss 300 m im Blick, im Wagen 500 m.
+void ALaLaBergHUD::Minikarte() {
+ APawn* Figur = PlayerOwner->GetPawn();
+ if (!KarteBild || !Figur) return;
+ const float S = Massstab;
+ const float G = 250 * S;
+ const float X = 44 * S, Y = Canvas->ClipY - 138 * S - 26 * S - G;
+ const FVector Wo = Figur->GetActorLocation();
+ const float Halb = Cast<ALaLaBergCharacter>(Figur) ? 15000.0f : 25000.0f;
+ const FVector2D Mitte = (FVector2D(Wo) - KarteUrsprung) / KarteMass;
+ const FVector2D Spanne = FVector2D(Halb, Halb) / KarteMass;
+ Tafel(X - 3 * S, Y - 3 * S, G + 6 * S, G + 6 * S, FLinearColor(0.02f, 0.025f, 0.035f, 0.85f));
+ FCanvasTileItem Bild(FVector2D(X, Y), KarteBild->GetResource(), FVector2D(G, G), Mitte - Spanne, Mitte + Spanne, FLinearColor::White);
+ Bild.BlendMode = SE_BLEND_Opaque;
+ Canvas->DrawItem(Bild);
+
+ const FVector2D Zentrum(X + G * 0.5f, Y + G * 0.5f);
+ auto Bildort = [&](const FVector& W) { return Zentrum + (FVector2D(W) - FVector2D(Wo)) / (2.0f * Halb) * G; };
+ auto Eingesperrt = [&](FVector2D P, float Rand) {
+  return FVector2D(FMath::Clamp(P.X, X + Rand, X + G - Rand), FMath::Clamp(P.Y, Y + Rand, Y + G - Rand));
+ };
+ // Auftrag: ausserhalb des Ausschnitts am Rand festgehalten - man sieht, in
+ // welcher Richtung es weitergeht.
+ if (const ALaLaBergAuftraege* A = ALaLaBergAuftraege::Instanz.Get(); A && (A->IstUnterwegs() || A->HatAngebot())) {
+  const FVector2D P = Eingesperrt(Bildort(A->HoleWegpunkt()), 8 * S);
+  Tafel(P.X - 7 * S, P.Y - 7 * S, 14 * S, 14 * S, FLinearColor(0.02f, 0.02f, 0.03f, 1.0f));
+  Tafel(P.X - 5 * S, P.Y - 5 * S, 10 * S, 10 * S, A->IstUnterwegs() ? GELB_MARKE : BLAU_MARKE);
+ }
+ if (const ALaLaBergPolizei* Pol = ALaLaBergPolizei::Instanz.Get()) {
+  TArray<FVector> Orte; Pol->HoleStreifen(Orte);
+  const bool bRot = FMath::Frac(GetWorld()->GetRealTimeSeconds() * 2.5f) < 0.5f;
+  for (const FVector& O : Orte) {
+   const FVector2D P = Bildort(O);
+   if (P.X < X || P.Y < Y || P.X > X + G || P.Y > Y + G) continue;
+   // Rot und Weiss im Wechsel - Blau ist schon die Auftragsfarbe.
+   Tafel(P.X - 6 * S, P.Y - 6 * S, 12 * S, 12 * S, FLinearColor(0.02f, 0.02f, 0.03f, 1.0f));
+   Tafel(P.X - 4 * S, P.Y - 4 * S, 8 * S, 8 * S, bRot ? FLinearColor(1.0f, 0.2f, 0.2f) : FLinearColor(1.0f, 1.0f, 1.0f));
+  }
+ }
+ // Blickrichtung der Figur bzw. Fahrtrichtung: Gier 0 zeigt nach Osten,
+ // also rechts - im Pfeilwinkel (0 = oben) 90 Grad.
+ Pfeil(Zentrum + FVector2D(1, 1) * S, Figur->GetActorRotation().Yaw + 90.0f, 11 * S, FLinearColor(0, 0, 0, 0.6f));
+ Pfeil(Zentrum, Figur->GetActorRotation().Yaw + 90.0f, 11 * S, Weiss);
+ Schrift(TEXT("N"), X + G * 0.5f, Y + 4 * S, 12, Weiss, true, true);
+}
+
+// Taste M: die ganze Stadt, abgedunkelter Hintergrund, Auftrag und Streifen.
+void ALaLaBergHUD::Vollkarte() {
+ APawn* Figur = PlayerOwner->GetPawn();
+ if (!KarteKlein || !Figur) return;
+ const float S = Massstab;
+ Tafel(0, 0, Canvas->ClipX, Canvas->ClipY, FLinearColor(0.0f, 0.0f, 0.0f, 0.72f));
+ const float H = Canvas->ClipY - 150 * S;
+ const float B = H * KarteMass.X / KarteMass.Y;
+ const float X = (Canvas->ClipX - B) * 0.5f, Y = 70 * S;
+ FCanvasTileItem Bild(FVector2D(X, Y), KarteKlein->GetResource(), FVector2D(B, H), FLinearColor::White);
+ Bild.BlendMode = SE_BLEND_Opaque;
+ Canvas->DrawItem(Bild);
+ auto Bildort = [&](const FVector& W) { return FVector2D(X, Y) + (FVector2D(W) - KarteUrsprung) / KarteMass * FVector2D(B, H); };
+ Schrift(Stadt.IsEmpty() ? FString(TEXT("Stadtplan")) : Stadt, Canvas->ClipX * 0.5f, 22 * S, 24, Weiss, true, true);
+ if (const ALaLaBergAuftraege* A = ALaLaBergAuftraege::Instanz.Get(); A && (A->IstUnterwegs() || A->HatAngebot())) {
+  const FVector2D P = Bildort(A->HoleWegpunkt());
+  const FLinearColor F = A->IstUnterwegs() ? GELB_MARKE : BLAU_MARKE;
+  Tafel(P.X - 8 * S, P.Y - 8 * S, 16 * S, 16 * S, FLinearColor(0.02f, 0.02f, 0.03f, 1.0f));
+  Tafel(P.X - 6 * S, P.Y - 6 * S, 12 * S, 12 * S, F);
+  const FString Name = A->IstUnterwegs() ? A->HoleZielName() : FString(TEXT("Auftrag"));
+  Schrift(Name, P.X + 12 * S, P.Y - 10 * S, 14, Weiss, true);
+ }
+ if (const ALaLaBergPolizei* Pol = ALaLaBergPolizei::Instanz.Get()) {
+  TArray<FVector> Orte; Pol->HoleStreifen(Orte);
+  for (const FVector& O : Orte) {
+   const FVector2D P = Bildort(O);
+   Tafel(P.X - 5 * S, P.Y - 5 * S, 10 * S, 10 * S, FLinearColor(1.0f, 0.2f, 0.2f));
+  }
+ }
+ const FVector2D Ich = Bildort(Figur->GetActorLocation());
+ Pfeil(Ich + FVector2D(1, 1) * S, Figur->GetActorRotation().Yaw + 90.0f, 13 * S, FLinearColor(0, 0, 0, 0.7f));
+ Pfeil(Ich, Figur->GetActorRotation().Yaw + 90.0f, 13 * S, Weiss);
+ Tastenleiste(TEXT("M  Karte schließen"));
+}
+
+void ALaLaBergHUD::Fahndung() {
+ const ALaLaBergPolizei* Pol = ALaLaBergPolizei::Instanz.Get();
+ if (!Pol) return;
+ const float S = Massstab;
+ const int32 Sterne = Pol->HoleSterne();
+ if (Sterne > 0) {
+  const ALaLaBergAuftraege* A = ALaLaBergAuftraege::Instanz.Get();
+  const bool bTafel = A && (A->IstUnterwegs() || A->HatAngebot());
+  const float Y = (bTafel ? 40 + 104 + 14 : 40) * S;
+  const float R = 14 * S, Abstand = 33 * S;
+  const float Rechts = Canvas->ClipX - 40 * S;
+  // Ungesehen blinken die Sterne - wie lange noch, zeigt der Balken darunter.
+  const float Deckung = Pol->WirdGesehen() ? 1.0f : 0.35f + 0.65f * FMath::Abs(FMath::Sin(GetWorld()->GetRealTimeSeconds() * 4.0f));
+  for (int32 i = 0; i < 5; i++) {
+   const FVector2D M(Rechts - R - (4 - i) * Abstand, Y + R);
+   Stern(M + FVector2D(1.5f, 1.5f) * S, R, FLinearColor(0, 0, 0, 0.55f));
+   Stern(M, R, i < Sterne ? FLinearColor(1.0f, 0.95f, 0.85f, Deckung) : FLinearColor(0.3f, 0.3f, 0.3f, 0.6f));
+  }
+  if (!Pol->WirdGesehen()) {
+   const float BB = 4 * Abstand + 2 * R, BX = Rechts - BB, BY = Y + 2 * R + 8 * S;
+   Tafel(BX, BY, BB, 4 * S, FLinearColor(1, 1, 1, 0.18f));
+   Tafel(BX, BY, BB * Pol->HoleSuchAnteil(), 4 * S, FLinearColor(0.35f, 0.85f, 0.55f));
+   const FString Text = TEXT("Ungesehen – abhängen");
+   Schrift(Text, Rechts - Breite(Text, 11, false), BY + 8 * S, 11, Leise);
+  }
+ }
+ const float Anteil = Pol->HoleFestnahmeAnteil();
+ if (Anteil > 0.0f) {
+  const float B = 360 * S, X = (Canvas->ClipX - B) * 0.5f, Y = Canvas->ClipY * 0.62f;
+  Tafel(X, Y, B, 52 * S, Tinte);
+  Schrift(TEXT("Festnahme – weiterfahren oder wegrennen!"), Canvas->ClipX * 0.5f, Y + 8 * S, 15, Weiss, true, true);
+  Tafel(X + 14 * S, Y + 36 * S, B - 28 * S, 6 * S, FLinearColor(1, 1, 1, 0.18f));
+  Tafel(X + 14 * S, Y + 36 * S, (B - 28 * S) * FMath::Clamp(Anteil, 0.0f, 1.0f), 6 * S, FLinearColor(1.0f, 0.35f, 0.3f));
+ }
+}
+
 void ALaLaBergHUD::Auftrag() {
  const ALaLaBergAuftraege* A = ALaLaBergAuftraege::Instanz.Get();
  APawn* Figur = PlayerOwner->GetPawn();
@@ -196,17 +380,7 @@ void ALaLaBergHUD::Auftrag() {
  const float PX = X + 52 * S, PY = Y + H * 0.5f, R = 30 * S;
  const float Kamera = PlayerOwner->PlayerCameraManager ? PlayerOwner->PlayerCameraManager->GetCameraRotation().Yaw
                                                         : PlayerOwner->GetControlRotation().Yaw;
- const float Winkel = FMath::DegreesToRadians((Ziel - Wo).Rotation().Yaw - Kamera);
- const FVector2D Vor(FMath::Sin(Winkel), -FMath::Cos(Winkel));
- const FVector2D Quer(-Vor.Y, Vor.X);
- const FVector2D M(PX, PY);
- // Zwei Dreiecke von der Spitze zur Kerbe - ein Pfeil mit Einschnitt hinten.
- const FVector2D Spitze = M + Vor * R, Kerbe = M - Vor * R * 0.3f;
- for (const float Seite : { 1.0f, -1.0f }) {
-  FCanvasTriangleItem Haelfte(Spitze, M - Vor * R * 0.6f + Quer * R * 0.62f * Seite, Kerbe, GWhiteTexture);
-  Haelfte.SetColor(Farbe);
-  Canvas->DrawItem(Haelfte);
- }
+ Pfeil(FVector2D(PX, PY), (Ziel - Wo).Rotation().Yaw - Kamera, R, Farbe);
 
  const float TX = X + 100 * S;
  Schrift(bUnterwegs ? TEXT("LIEFERUNG NACH") : TEXT("AUFTRAG VERFÜGBAR"), TX, Y + 12 * S, 11, Leise, true);

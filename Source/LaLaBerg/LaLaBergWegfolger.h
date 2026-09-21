@@ -22,6 +22,9 @@ struct FLaLaBergWegfolger {
  // bleiben - genau das prueft -LaLaBergAbbiegeTest, sonst waere "kein Wenden
  // mehr" nur eine Behauptung ueber den Code statt ueber das Verhalten.
  int32 Wenden = 0;
+ // Am letzten Wegpunkt stehen bleiben statt umzukehren - fuer die Polizei,
+ // deren Route beim Spieler endet und laufend neu geplant wird.
+ bool bHalten = false;
 
  bool Gueltig() const { return Route.Num() >= 2; }
  FVector Start() const { return Gueltig() ? Route[0] : FVector::ZeroVector; }
@@ -47,6 +50,7 @@ struct FLaLaBergWegfolger {
     // Wegpunkt erreicht: naechsten ansteuern, am Ende umkehren - oder auf
     // einem Rundkurs vorn wieder anfangen (siehe bRund).
     if (Index + Richtung < 0 || Index + Richtung >= Route.Num()) {
+     if (bHalten && !bRund) break;
      if (bRund) Index = (Index + Richtung + Route.Num()) % Route.Num();
      else { Richtung = -Richtung; Wenden++; }
     }

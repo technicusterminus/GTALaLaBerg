@@ -224,6 +224,17 @@ void ALaLaBergAuftraege::Scheitere() {
  AktZiel = INDEX_NONE;
 }
 
+void ALaLaBergAuftraege::Abbrechen() {
+ if (!bUnterwegs) return;
+ bUnterwegs = false;
+ Zeige(false, false, Ziele[AktZiel].Ort);
+ UE_LOG(LogTemp, Display, TEXT("LALABERG_AUFTRAG abgebrochen ziel=%s"), *Ziele[AktZiel].N);
+ AktZiel = INDEX_NONE;
+ bAngebot = true;
+ bErstHinaus = true;
+ Zeige(true, true, StartOrt);
+}
+
 void ALaLaBergAuftraege::Tick(float DeltaSeconds) {
  Super::Tick(DeltaSeconds);
  auto* PC = GetWorld()->GetFirstPlayerController();

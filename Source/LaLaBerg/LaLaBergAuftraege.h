@@ -36,6 +36,12 @@ public:
  int32 HoleGescheitert() const { return Gescheitert; }
  int32 HoleZielzahl() const { return Ziele.Num(); }
 
+ // Nach einer Festnahme (siehe ALaLaBergPolizei): laufender Auftrag faellt
+ // weg, die blaue Saeule bleibt. Strafe zieht hoechstens ab, was da ist, und
+ // liefert den tatsaechlich abgezogenen Betrag.
+ void Abbrechen();
+ int32 Strafe(int32 Betrag) { const int32 Ab = FMath::Clamp(Betrag, 0, Geld); Geld -= Ab; return Ab; }
+
  // Fuer -LaLaBergAuftragTest: die Frist sofort ablaufen lassen.
  void TestAblaufen() { Frist = GetWorld()->GetTimeSeconds() - 0.01; }
 

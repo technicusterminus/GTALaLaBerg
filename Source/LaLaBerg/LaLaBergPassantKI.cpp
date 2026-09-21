@@ -11,6 +11,8 @@
 #include "Kismet/GameplayStatics.h"
 #include "GameFramework/Pawn.h"
 #include "LaLaBergKoerperTeile.h"
+#include "LaLaBergPolizei.h"
+#include "GameFramework/Character.h"
 
 namespace {
  // Kein "using namespace" hier: anonyme Namespaces sind pro Uebersetzungs-
@@ -319,6 +321,15 @@ void ALaLaBergPassantKI::EndPlay(const EEndPlayReason::Type Grund) {
 void ALaLaBergPassantKI::Tick(float Zeit) {
  Super::Tick(Zeit);
  if (!Weg.Gueltig()) return;
+ // Angefahren: der Spieler sitzt in einem Wagen (kein Character) und ist
+ // schneller als Schritttempo bis auf Stossstangenbreite heran.
+ if (const APawn* Spieler = UGameplayStatics::GetPlayerPawn(GetWorld(), 0); Spieler && !Spieler->IsA<ACharacter>()
+     && GetWorld()->GetTimeSeconds() >= StolpertBis && Spieler->GetVelocity().Size() > 400.0f
+     && FVector::Dist2D(Spieler->GetActorLocation(), GetActorLocation()) < 260.0f
+     && FMath::Abs(Spieler->GetActorLocation().Z - GetActorLocation().Z) < 250.0f) {
+  StolpertBis = GetWorld()->GetTimeSeconds() + 2.5f;
+  ALaLaBergPolizei::Melde(ELaLaBergTat::PassantAngefahren);
+ }
  const bool bStolpert = GetWorld()->GetTimeSeconds() < StolpertBis;
  FVector Ort = GetActorLocation() - LetzterAusweichOffset;
  const FVector Vorwaerts = GetActorForwardVector();
@@ -374,4 +385,5 @@ void ALaLaBergPassantKI::Tick(float Zeit) {
 // Treffer faerbt sie nicht um.
 void ALaLaBergPassantKI::ErhalteFarbe(const FLinearColor& Farbe, const FVector& AusRichtung) {
  StolpertBis = GetWorld()->GetTimeSeconds() + 1.6f;
+ ALaLaBergPolizei::Melde(ELaLaBergTat::PassantBeschossen);
 }

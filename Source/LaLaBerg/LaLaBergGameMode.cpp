@@ -35,6 +35,7 @@
 #include "LaLaBergMenueSteuerung.h"
 #include "LaLaBergWagen.h"
 #include "LaLaBergAuftraege.h"
+#include "LaLaBergPolizei.h"
 #include "LaLaBergHUD.h"
 #include "LaLaBergWaffe.h"
 #include "LaLaBergVerkehrsauto.h"
@@ -380,6 +381,8 @@ void ALaLaBergGameMode::InitGame(const FString& MapName,const FString& Options,F
   FTimerHandle H;
   const FVector Mitte((-167210.0-158830.0)*0.5,(14530.0+20580.0)*0.5,StartOrt.Z);
   GetWorldTimerManager().SetTimer(H,[this,Mitte]() {
+   // Die Polizei gleich mit - sie braucht keinen Ort, nur das Strassennetz.
+   GetWorld()->SpawnActor<ALaLaBergPolizei>();
    auto* Auftraege=GetWorld()->SpawnActor<ALaLaBergAuftraege>();
    bool bFrei=false;
    if(Auftraege) Auftraege->SetzeStartOrt(SucheFahrbahn(Mitte,bFrei).GetLocation());
@@ -488,7 +491,8 @@ void ALaLaBergGameMode::BeginPlay() {
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergAmpelTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergUeberholTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergAbbiegeTest")) ||
-                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergAuftragTest"));
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergAuftragTest")) ||
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergPolizeiTest"));
  if(bAutomatisch) Beleg(FString::Printf(TEXT("LALABERG_SPIELBEGINN nach %.1fs Programmlaufzeit, %d Gebaeude"),FPlatformTime::Seconds()-GStartTime,BuildingCount));
  if(!bAutomatisch) {
   if(UGameInstance* Spiel=GetGameInstance()) {
@@ -1013,10 +1017,18 @@ void ALaLaBergGameMode::BeginPlay() {
   ALaLaBergVerkehrsauto* Hinten=GetWorld()->SpawnActor<ALaLaBergVerkehrsauto>(RouteHinten[0],FRotator::ZeroRotator);
   if(Vorne) { Vorne->SetzeRoute(RouteVorne,3.0f); Vorne->SetzeStrassenbreite(7.0f); }
   if(Hinten) { Hinten->SetzeRoute(RouteHinten,30.0f); Hinten->SetzeStrassenbreite(7.0f); }
+  // Seit die Autos ihr Tempo wirklich fahren (2026-09-18), ist der
+  // Ueberholvorgang nach wenigen Sekunden vorbei - geprueft wird deshalb, ob
+  // er stattfand und der hintere Wagen danach vorn liegt, nicht ob er zu
+  // einem festen Zeitpunkt gerade laeuft.
+  static bool bHatUeberholt=false;
+  FTimerHandle Takt;
+  GetWorldTimerManager().SetTimer(Takt,[Hinten]() { if(Hinten&&Hinten->IstAmUeberholen()) bHatUeberholt=true; },0.1f,true);
   FTimerHandle Ende;
-  GetWorldTimerManager().SetTimer(Ende,[this,Hinten]() {
-   const bool bPass=Hinten && Hinten->IstAmUeberholen();
-   Beleg(FString::Printf(TEXT("LALABERG_UEBERHOLTEST %s"),bPass?TEXT("PASS"):TEXT("FAIL")));
+  GetWorldTimerManager().SetTimer(Ende,[this,Hinten,Vorne]() {
+   const float Vorsprung=Hinten&&Vorne?(Hinten->GetActorLocation().X-Vorne->GetActorLocation().X)/100.0f:0.0f;
+   const bool bPass=bHatUeberholt&&Vorsprung>5.0f;
+   Beleg(FString::Printf(TEXT("LALABERG_UEBERHOLTEST %s ueberholt=%d vorsprung=%.1fm"),bPass?TEXT("PASS"):TEXT("FAIL"),bHatUeberholt?1:0,Vorsprung));
    FPlatformMisc::RequestExitWithStatus(false,bPass?0:1);
   },10.0f,false);
  }
@@ -1075,6 +1087,101 @@ void ALaLaBergGameMode::BeginPlay() {
    }},
   };
   for(const FSchritt& S:Plan) { FTimerHandle H; TFunction<void()> Tu=S.Tu; GetWorldTimerManager().SetTimer(H,MoveTemp(Tu),S.Zeit,false); }
+ }
+ // -LaLaBergPolizeiTest: zwei echte Taten (Passant beschossen, Streife
+ // beschossen) ergeben zwei Sterne. Die Figur bleibt stehen; die Streifen
+ // muessen ueber das Strassennetz heranfahren und sie festnehmen (Bild beim
+ // Eintreffen, Bild der Vollkarte). Danach ein Stern an der Inspektion, die
+ // Figur wird 1,5 km weit weggesetzt und muss die Fahndung abschuetteln.
+ if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergPolizeiTest"))) {
+  static double FestnahmeZeit=-1.0, AbhaengStart=-1.0;
+  static bool bBildGemacht=false, bAbhaengen=false, bNahbild=false;
+  static FVector InspektionOrt=FVector::ZeroVector;
+  FTimerHandle Tat;
+  GetWorldTimerManager().SetTimer(Tat,[this]() {
+   ALaLaBergPolizei::Melde(ELaLaBergTat::PassantBeschossen);
+   ALaLaBergPolizei::Melde(ELaLaBergTat::PolizeiBeschossen);
+   const auto* P=ALaLaBergPolizei::Instanz.Get();
+   Beleg(FString::Printf(TEXT("LALABERG_POLIZEITEST taten sterne=%d"),P?P->HoleSterne():-1));
+  },3.5f,false);
+  FTimerHandle Karte;
+  GetWorldTimerManager().SetTimer(Karte,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   if(auto* HUD=PC?Cast<ALaLaBergHUD>(PC->GetHUD()):nullptr) HUD->ZeigeVollkarte(true);
+   FTimerHandle Bild; GetWorldTimerManager().SetTimer(Bild,[this]() {
+    auto* PC=GetWorld()->GetFirstPlayerController();
+    if(PC) PC->ConsoleCommand(TEXT("HighResShot 1600x900"));
+    FTimerHandle Zu; GetWorldTimerManager().SetTimer(Zu,[this]() {
+     auto* PC=GetWorld()->GetFirstPlayerController();
+     if(auto* HUD=PC?Cast<ALaLaBergHUD>(PC->GetHUD()):nullptr) HUD->ZeigeVollkarte(false);
+    },0.6f,false);
+   },0.8f,false);
+  },10.0f,false);
+  FTimerHandle Takt;
+  GetWorldTimerManager().SetTimer(Takt,[this]() {
+   auto* P=ALaLaBergPolizei::Instanz.Get();
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   APawn* Figur=PC?PC->GetPawn():nullptr;
+   if(!P||!Figur) return;
+   const double Jetzt=GetWorld()->GetTimeSeconds();
+   // Alle 5 s Spielzeit: wie nah die naechste Streife ist - sonst bleibt bei
+   // einem FAIL offen, ob sie feststeckte oder nur zu langsam war.
+   static double LetzterStand=0.0;
+   if(P->HoleSterne()>0&&Jetzt-LetzterStand>5.0) {
+    LetzterStand=Jetzt;
+    TArray<FVector> Orte; P->HoleStreifen(Orte);
+    FString Liste; for(const FVector& O:Orte) Liste+=FString::Printf(TEXT(" %.0f,%.0f"),O.X,O.Y);
+    Beleg(FString::Printf(TEXT("LALABERG_POLIZEITEST stand t=%.0fs naechste=%.0fm gesehen=%d streifen=%s"),Jetzt,
+     FMath::Min(P->NaechsteStreifeCm()/100.0f,99999.0f),P->WirdGesehen()?1:0,*Liste));
+   }
+   // Eintreffen der ersten Streife: Blick hin, Bild.
+   if(!bBildGemacht&&P->HoleSterne()>0&&P->NaechsteStreifeCm()<3000.0f) {
+    bBildGemacht=true;
+    TArray<FVector> Orte; P->HoleStreifen(Orte);
+    FVector Naechste=Orte.Num()?Orte[0]:Figur->GetActorLocation();
+    for(const FVector& O:Orte) if(FVector::Dist(O,Figur->GetActorLocation())<FVector::Dist(Naechste,Figur->GetActorLocation())) Naechste=O;
+    PC->SetControlRotation(FRotator(-10.0f,(Naechste-Figur->GetActorLocation()).Rotation().Yaw,0));
+    Beleg(FString::Printf(TEXT("LALABERG_POLIZEITEST streife_da nach=%.1fs abstand=%.0fm"),Jetzt,P->NaechsteStreifeCm()/100.0f));
+    // Erst im naechsten Bild dreht die Kamera - das Foto etwas spaeter.
+    FTimerHandle Bild; GetWorldTimerManager().SetTimer(Bild,[this]() {
+     if(auto* PC=GetWorld()->GetFirstPlayerController()) PC->ConsoleCommand(TEXT("HighResShot 1600x900"));
+    },0.5f,false);
+   }
+   // Naher Blick auf den Streifenwagen: Blaulicht sichtbar?
+   if(bBildGemacht&&!bNahbild&&P->HoleSterne()>0&&P->NaechsteStreifeCm()<1500.0f) {
+    bNahbild=true;
+    TArray<FVector> Orte; P->HoleStreifen(Orte);
+    FVector Naechste=Orte.Num()?Orte[0]:Figur->GetActorLocation();
+    for(const FVector& O:Orte) if(FVector::Dist(O,Figur->GetActorLocation())<FVector::Dist(Naechste,Figur->GetActorLocation())) Naechste=O;
+    PC->SetControlRotation(FRotator(-30.0f,(Naechste-Figur->GetActorLocation()).Rotation().Yaw,0));
+    FTimerHandle Bild; GetWorldTimerManager().SetTimer(Bild,[this]() {
+     if(auto* PC=GetWorld()->GetFirstPlayerController()) PC->ConsoleCommand(TEXT("HighResShot 1600x900"));
+    },0.3f,false);
+   }
+   if(FestnahmeZeit<0.0&&P->HoleFestnahmen()>=1) {
+    FestnahmeZeit=Jetzt;
+    InspektionOrt=Figur->GetActorLocation();
+    Beleg(FString::Printf(TEXT("LALABERG_POLIZEITEST festnahme nach=%.1fs ort=%s"),Jetzt,*InspektionOrt.ToString()));
+   }
+   // Phase 2: an der Inspektion ein Stern, dann weit weg.
+   if(FestnahmeZeit>0.0&&!bAbhaengen&&Jetzt>FestnahmeZeit+2.0) {
+    bAbhaengen=true; AbhaengStart=Jetzt;
+    P->TestSetzeSterne(1);
+    bool bFrei=false;
+    const FTransform Weit=SucheFahrbahn(FVector(-153670,12480,InspektionOrt.Z),bFrei);
+    Figur->SetActorLocation(Weit.GetLocation()+FVector(0,0,20),false,nullptr,ETeleportType::TeleportPhysics);
+    Beleg(FString::Printf(TEXT("LALABERG_POLIZEITEST abhaengen von=%s nach=%s weite=%.0fm"),*InspektionOrt.ToString(),
+     *Weit.GetLocation().ToString(),FVector::Dist2D(InspektionOrt,Weit.GetLocation())/100.0f));
+   }
+   const bool bFertig=bAbhaengen&&P->HoleSterne()==0;
+   const bool bZeitUm=Jetzt>150.0||(bAbhaengen&&Jetzt>AbhaengStart+30.0);
+   if(bFertig||bZeitUm) {
+    const bool bPass=bFertig&&P->HoleFestnahmen()==1&&bBildGemacht;
+    Beleg(FString::Printf(TEXT("LALABERG_POLIZEITEST %s festnahmen=%d abgehaengt_nach=%.1fs bild=%d"),bPass?TEXT("PASS"):TEXT("FAIL"),
+     P->HoleFestnahmen(),bAbhaengen?Jetzt-AbhaengStart:-1.0,bBildGemacht?1:0));
+    FPlatformMisc::RequestExitWithStatus(false,bPass?0:1);
+   }
+  },0.25f,true);
  }
  if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergAbbiegeTest"))) {
   static TMap<ALaLaBergVerkehrsauto*,float> LetzteGier, GierSumme;

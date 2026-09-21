@@ -1,4 +1,11 @@
 #include "LaLaBergVerkehrsauto.h"
+#include "LaLaBergPolizei.h"
+#include "LaLaBergWagen.h"
+#include "Components/PrimitiveComponent.h"
+#include "Components/PointLightComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Components/BoxComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -251,7 +258,12 @@ void ALaLaBergVerkehrsauto::SetzeSpurdaten(const TArray<float>& BreitenM, const 
 
 void ALaLaBergVerkehrsauto::SetzeRoute(const TArray<FVector>& Punkte, float TempoKmh) {
  Weg.Route = Punkte;
- Tempo = TempoKmh / 3.6f;
+ // km/h in cm/s - wie bei den Passanten. Bis 2026-09-18 fehlte hier der
+ // Faktor 100: die Autos kamen auf ihrer Route nur mit Zentimetern je
+ // Sekunde voran und bewegten sich vor allem durch den aufsummierten
+ // Seitversatz (siehe Tick).
+ Tempo = TempoKmh / 3.6f * 100.0f;
+ Versatz = FVector::ZeroVector;
  if (Weg.Gueltig()) {
   SetActorLocation(Weg.Start());
   // Nur fahrende Autos brauchen sich gegenseitig zu bremsen (siehe
@@ -260,6 +272,33 @@ void ALaLaBergVerkehrsauto::SetzeRoute(const TArray<FVector>& Punkte, float Temp
   // Abstandspruefungen pro Bild (19 statt 26 fps im Fahrtest gemessen).
   Alle.Add(this);
  }
+}
+
+void ALaLaBergVerkehrsauto::FolgeWeg(const TArray<FVector>& Punkte, float TempoKmh) {
+ Weg.Route = Punkte;
+ Weg.Index = 0;
+ Weg.Richtung = 1;
+ Weg.bRund = false;
+ Weg.bHalten = true;
+ // km/h in cm/s - wie bei den Passanten. Bis 2026-09-18 fehlte hier der
+ // Faktor 100: die Autos kamen auf ihrer Route nur mit Zentimetern je
+ // Sekunde voran und bewegten sich vor allem durch den aufsummierten
+ // Seitversatz (siehe Tick).
+ Tempo = TempoKmh / 3.6f * 100.0f;
+ // Die Spurdaten der alten Route passen nicht mehr - zurueck auf die
+ // einheitliche Breite (SetzeStrassenbreite).
+ BreiteJeWegpunkt.Reset();
+ KlasseJeWegpunkt.Reset();
+ Alle.AddUnique(this);
+}
+
+void ALaLaBergVerkehrsauto::Parke() {
+ Weg.Route.Reset();
+ Ueberholt = nullptr;
+ Seitversatz = 0.0f;
+ Versatz = FVector::ZeroVector;
+ SetActorLocation(FVector(0, 0, -400000.0f));
+ Alle.RemoveSingleSwap(this);
 }
 
 void ALaLaBergVerkehrsauto::BeginPlay() {
@@ -273,12 +312,76 @@ void ALaLaBergVerkehrsauto::BeginPlay() {
  // gleichzeitig sind es nicht.
  LaLaBergWagenForm::BaueNetz(Netz, Lack);
  bNetzGebaut = true;
+ if (bPolizei) {
+  // Dachbalken: zwei flache Leuchten links und rechts, darueber ein
+  // Punktlicht, das im selben Takt blau blitzt und die Strasse anstrahlt.
+  for (int32 i = 0; i < 2; i++) {
+   auto* Leuchte = NewObject<UStaticMeshComponent>(this);
+   // Beweglich, sonst bleibt die Leuchte am Einsatzort stehen, waehrend der
+   // Wagen wegfaehrt - ein neues StaticMeshComponent ist von Haus aus statisch.
+   Leuchte->SetMobility(EComponentMobility::Movable);
+   Leuchte->SetupAttachment(GetRootComponent());
+   Leuchte->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube")));
+   Leuchte->SetMaterial(0, LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial")));
+   Leuchte->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+   Leuchte->SetCastShadow(false);
+   // Das CarConcept ist gemessen 1,15 m hoch und reicht von -2,1 bis
+   // +2,5 m: der Balken liegt ueber der Mitte, knapp auf der Karosserie.
+   Leuchte->SetRelativeLocation(FVector(20.0f, i == 0 ? -40.0f : 40.0f, 124.0f));
+   Leuchte->SetRelativeScale3D(FVector(0.35f, 0.75f, 0.18f));
+   Leuchte->RegisterComponent();
+   BlauMaterial[i] = Leuchte->CreateDynamicMaterialInstance(0);
+   Blaulicht[i] = Leuchte;
+  }
+  Blitz = NewObject<UPointLightComponent>(this);
+  Blitz->SetMobility(EComponentMobility::Movable);
+  Blitz->SetupAttachment(GetRootComponent());
+  Blitz->SetRelativeLocation(FVector(20.0f, 0, 150.0f));
+  Blitz->SetLightColor(FLinearColor(0.1f, 0.25f, 1.0f));
+  Blitz->SetAttenuationRadius(1800.0f);
+  Blitz->SetCastShadows(false);
+  Blitz->RegisterComponent();
+  // Eigene Karosserie aus den CarConcept-Teilen statt einer Instanz im
+  // gemeinsamen Pool: Streifenwagen kommen erst waehrend des Spiels dazu,
+  // und so spaet hinzugefuegte Instanzen zeichnete der hierarchische Pool
+  // nicht - uebrig blieb ein schwebender Blaulichtbalken ohne Wagen.
+  for (int32 i = 0; i < LaLaBergWagenForm::CARCONCEPT_TEILE_ANZAHL; i++) {
+   UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, *LaLaBergWagenForm::CarConceptPfad(LaLaBergWagenForm::CARCONCEPT_TEILE[i]));
+   if (!Mesh) continue;
+   auto* Teil = NewObject<UStaticMeshComponent>(this);
+   Teil->SetMobility(EComponentMobility::Movable);
+   Teil->SetupAttachment(GetRootComponent());
+   Teil->SetStaticMesh(Mesh);
+   // Nur Lackteile ersetzen: Glas, Reifen, Lampen und Chrom behalten ihre Materialien.
+   const FString Teilname(LaLaBergWagenForm::CARCONCEPT_TEILE[i]);
+   const bool bBlau = Teilname.Contains(TEXT("Color2"));
+   const bool bSilber = Teilname.Contains(TEXT("Color1")) || Teilname == TEXT("BodyHood")
+    || Teilname == TEXT("BodyRoofPanel") || Teilname == TEXT("BodyPillars")
+    || Teilname == TEXT("BodyTaillightsPanels");
+   if (bBlau || bSilber) {
+    auto* Basis = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+    if (Basis) for (int32 Slot = 0; Slot < Teil->GetNumMaterials(); ++Slot) {
+     auto* Lackmaterial = UMaterialInstanceDynamic::Create(Basis, this);
+     Lackmaterial->SetVectorParameterValue(TEXT("Color"), bBlau
+      ? FLinearColor(0.015f, 0.09f, 0.48f) : FLinearColor(0.62f, 0.66f, 0.70f));
+     Teil->SetMaterial(Slot, Lackmaterial);
+    }
+   }
+
+   Teil->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+   // Wie im Pool (siehe Tick): das Modell schaut nach +Y.
+   Teil->SetRelativeRotation(FRotator(0, -90.0f, 0));
+   Teil->RegisterComponent();
+  }
+  Netz->SetVisibility(false);
+  return;
+ }
  if (!ALaLaBergAutoPool::Instanz || !ALaLaBergAutoPool::Instanz->Gueltig()) return;
 
  // Zufaellig entweder das bisherige CarConcept (-1) oder einer der
  // realistischen City-Sample-Typen (siehe LaLaBergWagenTypen) - fuer
  // Fahrzeugvielfalt statt eines einzigen Modells fuer jedes KI-Auto.
- FahrzeugTyp = FMath::RandRange(-1, LaLaBergWagenTypen::TYPEN_ANZAHL - 1);
+ FahrzeugTyp = WunschTyp >= -1 ? WunschTyp : FMath::RandRange(-1, LaLaBergWagenTypen::TYPEN_ANZAHL - 1);
  if (FahrzeugTyp >= 0 && ALaLaBergAutoPool::Instanz->TypGueltig(FahrzeugTyp)) {
   const FTransform Versteckt(FVector(0, 0, -500000.0f));
   TypPoolIndizes = ALaLaBergAutoPool::Instanz->FuegeTypHinzu(FahrzeugTyp, Versteckt);
@@ -323,13 +426,17 @@ void ALaLaBergVerkehrsauto::Tick(float Zeit) {
   // Nach einem Treffer kurz fast stehen bleiben, dann wieder auf Tempo -
   // sonst waere ein Treffer nur eine Farbe, kein Ereignis.
   const bool bGestoert = GetWorld()->GetTimeSeconds() < StoerungBis;
-  FVector Ort = GetActorLocation();
+  // Die Route bestimmt den Ort ohne Seitversatz; der kommt erst am Ende des
+  // Bilds dazu. Frueher wurde er auf die schon versetzte Lage jedes Bild
+  // erneut addiert - der Wagen wanderte dadurch quer von seiner Route weg.
+  FVector Ort = GetActorLocation() - Versatz;
   const FVector Vorwaerts = GetActorForwardVector();
 
   float BremseAndauto = 1.0f;
   ALaLaBergVerkehrsauto* Voraus = NaechstesAutoVoraus(this, Ort, Vorwaerts, BremseAndauto);
-  const float BremseAmpel = BremseVorAmpel(Ort, Vorwaerts);
-  const float BremseKreuzung = BremseVorKreuzung(this, Ort, Vorwaerts, HoleKlasse(), MeineKreuzungen);
+  // Mit Blaulicht gelten weder Rot noch Vorfahrt.
+  const float BremseAmpel = bPolizei ? 1.0f : BremseVorAmpel(Ort, Vorwaerts);
+  const float BremseKreuzung = bPolizei ? 1.0f : BremseVorKreuzung(this, Ort, Vorwaerts, HoleKlasse(), MeineKreuzungen);
   const float BremseKurve = BremseInKurve(Weg);
 
   // Ueberholen starten: ein spuerbar langsameres oder stehendes Auto direkt
@@ -355,7 +462,32 @@ void ALaLaBergVerkehrsauto::Tick(float Zeit) {
   // Waehrend des Ueberholens nicht mehr fuer das ueberholte Auto selbst
   // bremsen - sonst kaeme der Wagen trotz Ausscheren kaum naeher heran.
   const bool bUeberholtGerade = Ueberholt.IsValid() && Ueberholt.Get() == Voraus;
-  const float BremseObjekt = FMath::Min(bUeberholtGerade ? 1.0f : BremseAndauto, BremseVorSpieler(GetWorld(), Ort, Vorwaerts));
+  APawn* Ziel = UGameplayStatics::GetPlayerPawn(GetWorld(), 0);
+  const auto* Fahndung = ALaLaBergPolizei::Instanz.Get();
+  const bool bKontaktEinsatz = bPolizei && Fahndung && Fahndung->HoleSterne() >= 3
+   && Fahndung->WirdGesehen() && Cast<ALaLaBergWagen>(Ziel);
+  float SpielerBremse = BremseVorSpieler(GetWorld(), Ort, Vorwaerts);
+  if (bKontaktEinsatz) {
+   const FVector Abstand = Ziel->GetActorLocation() - GetActorLocation();
+   const float Distanz = Abstand.Size2D();
+   const bool bVoraus = FVector::DotProduct(Abstand.GetSafeNormal2D(), Vorwaerts) > 0.65f;
+   FHitResult Sicht;
+   FCollisionQueryParams Fragen(TEXT("PolizeiKontakt"), false, this);
+   const bool bTreffer = GetWorld()->LineTraceSingleByChannel(Sicht, GetActorLocation() + FVector(0,0,60),
+    Ziel->GetActorLocation(), ECC_Visibility, Fragen);
+   if (bVoraus && bTreffer && Sicht.GetActor() == Ziel) {
+    // Begrenztes Andruecken, kein ungebremstes Durchfahren des Spielerwagens.
+    SpielerBremse = Distanz > 460.0f ? FMath::Min(1.0f, 600.0f / FMath::Max(Tempo, 1.0f)) : 0.0f;
+    if (Distanz < 480.0f && GetWorld()->GetTimeSeconds() >= NaechsterPolizeiKontakt) {
+     if (auto* Koerper = Cast<UPrimitiveComponent>(Ziel->GetRootComponent()); Koerper && Koerper->IsSimulatingPhysics()) {
+      Koerper->AddImpulse(Abstand.GetSafeNormal2D() * Koerper->GetMass() * 120.0f);
+      NaechsterPolizeiKontakt = GetWorld()->GetTimeSeconds() + 2.5;
+      UE_LOG(LogTemp, Display, TEXT("LALABERG_POLIZEI kontakt impuls_dv=120cm/s"));
+     }
+    }
+   }
+  }
+  const float BremseObjekt = FMath::Min(bUeberholtGerade ? 1.0f : BremseAndauto, SpielerBremse);
   const float Bremse = FMath::Min(FMath::Min(BremseObjekt, BremseAmpel), FMath::Min(BremseKreuzung, BremseKurve));
   const FVector Richtung = Weg.Bewege(Ort, Tempo * Zeit * (bGestoert ? 0.08f : 1.0f) * Bremse);
   SetActorLocation(Ort);
@@ -380,7 +512,20 @@ void ALaLaBergVerkehrsauto::Tick(float Zeit) {
    ? FMath::Clamp(-SpurVersatz, -Rand, Rand)
    : FMath::Min(SpurVersatz + (BremseObjekt < 0.9f ? MAX_SEITVERSATZ : 0.0f), Rand);
   Seitversatz = FMath::FInterpTo(Seitversatz, SeitZiel, Zeit, 0.7f);
-  if (FMath::Abs(Seitversatz) > 0.5f) SetActorLocation(GetActorLocation() + GetActorRightVector() * Seitversatz);
+  Versatz = FMath::Abs(Seitversatz) > 0.5f ? GetActorRightVector() * Seitversatz : FVector::ZeroVector;
+  SetActorLocation(Ort + Versatz);
+ }
+
+ if (bPolizei && Blitz) {
+  // Wechselblinken, 2,5 Takte je Sekunde; geparkt dunkel.
+  const bool bLinks = FMath::Frac(GetWorld()->GetTimeSeconds() * 2.5f) < 0.5f;
+  const bool bAn = Weg.Gueltig();
+  for (int32 i = 0; i < 2; i++)
+   if (BlauMaterial[i]) BlauMaterial[i]->SetVectorParameterValue(TEXT("Color"),
+    // Grundfarbe, nicht Leuchtfarbe: ueber 1 wird sie weiss statt heller.
+    bAn && (i == 0) == bLinks ? FLinearColor(0.03f, 0.2f, 1.0f) : FLinearColor(0.02f, 0.03f, 0.08f));
+  Blitz->SetIntensity(bAn ? 9000.0f : 0.0f);
+  Blitz->SetRelativeLocation(FVector(20.0f, bLinks ? -40.0f : 40.0f, 150.0f));
  }
 
  // Sichtweiten-LOD: das Detailmodell (Pool-Instanz) nur nah am Spieler, sonst
@@ -431,5 +576,6 @@ void ALaLaBergVerkehrsauto::Tick(float Zeit) {
 // ILaLaBergFarbbar: nur kurz abbremsen. Der Klecks ist schon das Decal der
 // Kugel - der Wagen behaelt seinen Lack, ein Treffer faerbt ihn nicht um.
 void ALaLaBergVerkehrsauto::ErhalteFarbe(const FLinearColor& Farbe, const FVector& AusRichtung) {
+ if (bPolizei) { ALaLaBergPolizei::Melde(ELaLaBergTat::PolizeiBeschossen); return; }
  StoerungBis = GetWorld()->GetTimeSeconds() + 1.4f;
 }

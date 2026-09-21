@@ -1,4 +1,5 @@
 #include "LaLaBergCharacter.h"
+#include "LaLaBergPolizei.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -570,7 +571,15 @@ void ALaLaBergCharacter::Einsteigen() {
   }
   if (NaechstesKI) {
    Naechster = GetWorld()->SpawnActor<ALaLaBergWagen>(NaechstesKI->GetActorLocation(), NaechstesKI->GetActorRotation());
-   if (Naechster) { Beste = BesteKI; NaechstesKI->Destroy(); }
+   if (Naechster) {
+    Beste = BesteKI;
+    // Wer ein fahrendes Auto uebernimmt, stiehlt es - und ein Streifenwagen
+    // wiegt doppelt.
+    const bool bStreife = NaechstesKI->bPolizei;
+    NaechstesKI->Destroy();
+    ALaLaBergPolizei::Melde(ELaLaBergTat::AutoGestohlen);
+    if (bStreife) ALaLaBergPolizei::Melde(ELaLaBergTat::PolizeiBeschossen);
+   }
   }
  }
  if (!Naechster) {

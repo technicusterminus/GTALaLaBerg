@@ -82,6 +82,28 @@ public:
  // gerade ein anderes ueberholt (siehe Ueberholt unten und Tick in der .cpp).
  bool IstAmUeberholen() const { return Ueberholt.IsValid(); }
 
+ // Streifenwagen (siehe ALaLaBergPolizei): vor FinishSpawning setzen. Faehrt
+ // bei Rot und ohne Vorfahrt, traegt einen Blaulichtbalken und meldet einen
+ // Paintball-Treffer als Tat.
+ bool bPolizei = false;
+ // -2 = zufaellig wie bisher, -1 = CarConcept, sonst ein Typ aus
+ // LaLaBergWagenTypen - vor FinishSpawning setzen. Ein Streifenwagen soll
+ // kein Bus sein.
+ int32 WunschTyp = -2;
+ // Neue Route mitten in der Fahrt (Polizei): ab dem ersten Punkt, am Ende
+ // stehen bleiben statt umkehren. Aufnahme in Alle, falls noch nicht drin.
+ void FolgeWeg(const TArray<FVector>& Punkte, float TempoKmh);
+ // Streifenwagen ausser Dienst: Route weg, weit unter die Stadt, raus aus
+ // Alle. Nicht zerstoert - die Pool-Instanzen werden nie zurueckgegeben
+ // (siehe EndPlay), ein Wagen je Einsatz liefe sonst voll.
+ void Parke();
+ bool IstGeparkt() const { return !Weg.Gueltig(); }
+ // Lage auf der Route, ohne den Seitversatz der eigenen Spur.
+ FVector HoleRoutenOrt() const { return GetActorLocation() - Versatz; }
+ // Welcher Wegpunkt gerade angesteuert wird (Index in der Route).
+ int32 HoleWegIndex() const { return Weg.Index; }
+ bool AmZiel() const { return Weg.Gueltig() && Weg.Index == Weg.Route.Num() - 1 && FVector::Dist(GetActorLocation(), Weg.Route.Last()) < 50.0f; }
+
 protected:
  virtual void BeginPlay() override;
  virtual void EndPlay(const EEndPlayReason::Type Grund) override;
@@ -96,6 +118,7 @@ private:
  // Autos zu teuer (Glas/Chrom-Material, viele Dreiecke) - deshalb zusaetzlich
  // ein einfaches Sichtweiten-LOD: nur Autos nah am Spieler zeigen das
  // Detailmodell, weiter entfernte den leichten Kasten aus wagen.json.
+ double NaechsterPolizeiKontakt = 0.0;
  TArray<int32> PoolIndizes;
  bool bPoolGenutzt = false;
  bool bDetailliert = false;
@@ -105,12 +128,19 @@ private:
  // Seitlicher Versatz zum Ausweichen vor einem Hindernis (siehe Tick) -
  // weicht sanft aus und wieder zurueck, statt starr auf der Route zu bremsen.
  float Seitversatz = 0.0f;
+ // Der davon tatsaechlich angewandte Versatz in Weltkoordinaten - die
+ // Route arbeitet mit der Lage ohne ihn (siehe Tick, HoleRoutenOrt).
+ FVector Versatz = FVector::ZeroVector;
  // Waehrend eines Ueberholvorgangs das ueberholte Auto (siehe Tick) - leer,
  // solange kein Ueberholen laeuft. TWeakObjectPtr, weil das ueberholte Auto
  // unterwegs verschwinden kann (siehe ALaLaBergAutoPool-Verstecken/Zerstoeren).
  TWeakObjectPtr<class ALaLaBergVerkehrsauto> Ueberholt;
  FLinearColor Lack = FLinearColor(0.6f, 0.6f, 0.6f);
  bool bNetzGebaut = false;
+ // Blaulicht (nur bPolizei): zwei Leuchten auf dem Dach, im Wechsel.
+ UPROPERTY() TObjectPtr<class UStaticMeshComponent> Blaulicht[2] = {};
+ UPROPERTY() TObjectPtr<class UPointLightComponent> Blitz = nullptr;
+ UPROPERTY() TObjectPtr<class UMaterialInstanceDynamic> BlauMaterial[2] = {};
  // Nur fuer geparkte Autos (siehe SetzeLack): der Kasten kommt dann aus
  // ALaLaBergKastenPool statt aus einem eigenen Netz - siehe dort fuer den
  // Grund (1078 einzelne Draw-Calls druckten die Bildrate auf 17 fps).

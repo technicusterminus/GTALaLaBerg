@@ -19,6 +19,8 @@ public:
  // Nach einem Versetzen der Figur: Ort im naechsten Bild neu bestimmen und
  // ohne Einblenden zeigen - sonst stand im Foto noch der vorige Ort.
  void OrtSofort() { OrtGeprueft = -10.0f; bOrtSofort = true; }
+ // Vollkarte (Taste M) - oeffentlich fuer den Polizeitest.
+ void ZeigeVollkarte(bool bAn) { bVollkarte = bAn; }
 
 private:
  // Schrift in echter Punktgroesse statt hochskalierter Bitmap - sonst wird
@@ -35,6 +37,23 @@ private:
  // Lieferauftrag oben rechts: Ziel, Entfernung, Restzeit, Geld und ein Pfeil
  // dorthin, bezogen auf die Blickrichtung der Kamera.
  void Auftrag();
+ // Pfeil mit Kerbe; Winkel in Grad, 0 = nach oben, im Uhrzeigersinn.
+ void Pfeil(const FVector2D& M, float WinkelGrad, float R, const FLinearColor& Farbe);
+ void Stern(const FVector2D& M, float R, const FLinearColor& Farbe);
+
+ // Stadtplan aus Tools/Export/prepare-karte.py: das grosse Bild (1 m je
+ // Pixel) fuer die Minikarte, ein verkleinertes fuer die Vollkarte.
+ UPROPERTY() TObjectPtr<class UTexture2D> KarteBild = nullptr;
+ UPROPERTY() TObjectPtr<class UTexture2D> KarteKlein = nullptr;
+ FVector2D KarteUrsprung = FVector2D::ZeroVector;   // Unreal-cm der linken oberen Ecke
+ FVector2D KarteMass = FVector2D(1, 1);             // Ausdehnung in Unreal-cm
+ bool bKarteGeladen = false;
+ bool bVollkarte = false;
+ void LadeKarte();
+ void Minikarte();
+ void Vollkarte();
+ // Sterne oben rechts, Suchbalken, Festnahmebalken.
+ void Fahndung();
  float Massstab = 1.0f;
  UPROPERTY() TObjectPtr<class UFont> Roboto = nullptr;
 

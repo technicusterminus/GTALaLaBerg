@@ -162,6 +162,23 @@ Die erste Aufgabe im Spiel. Neben dem Startpunkt am Klinikum steht eine **blaue 
 
 Bewusst noch nicht dabei: Speicherstand (das Konto gilt für eine Sitzung), Fracht oder Fahrgäste als Figuren, Schadenabzug, eine Karte mit Route.
 
+### Karte
+
+- **Minikarte** unten links, Norden oben, der Spieler als Pfeil in der Mitte. Zu Fuß 300 m im Blick, im Wagen 500 m. Die Auftragssäule (blau bzw. gelb) bleibt am Rand stehen, wenn sie außerhalb liegt; Streifenwagen blinken rot-weiß.
+- **Vollkarte** mit `M`: die ganze Stadt, Auftrag mit Namen, alle Streifenwagen, der eigene Standort.
+- Beide zeigen einen einmal vorgerenderten Stadtplan (`Tools/Export/prepare-karte.py`, 1 Pixel je Meter, dieselben Quelldaten und Farben wie der Stadtplan im Webprojekt): Straßen nach Klasse, Gebäude, Lech, Parks, Wald, Plätze. Die Minikarte dreht sich nicht mit – eine drehende Karte bräuchte ein eigenes Maskenmaterial, das Bild auf dem Canvas würde sonst über den Rand ragen.
+
+### Polizei und Fahndung
+
+- **Taten** geben Punkte: Passant beschossen 1, Passant angefahren (schneller als Schritttempo im Wagen) 2, fahrendes oder geparktes Auto übernommen 2, Streifenwagen beschossen 4. Dieselbe Tat zählt höchstens einmal je Sekunde.
+- **Sterne** oben rechts: der n-te Stern ab n² Punkten, höchstens fünf. Je Stern ein Streifenwagen, mit jedem Stern schneller (58 bis 90 km/h).
+- **Streifenwagen** sind KI-Autos mit Blaulicht (zwei Leuchten auf der Karosserie im Wechsel und ein blau blitzendes Licht), die bei Rot und ohne Vorfahrt fahren. Sie tragen eigene CarConcept-Teile statt einer Instanz im gemeinsamen Autopool: erst während des Spiels hinzugefügte Instanzen zeichnete der hierarchische Pool nicht (es blieb ein schwebender Blaulichtbalken). Die Karosserie hat noch die rote Grundlackierung des CarConcept, keine Polizeifarben. Sie setzen 250–450 m entfernt ein und fahren über den Straßengraphen (`Tools/Export/prepare-netz.cjs`, 6023 Knoten, Einbahnregel, A*-Suche), die Route wird alle 1,5 s neu geplant – ab dem Knoten, den der Wagen gerade ansteuert (nach der Blickrichtung gewählt, kreiste ein Wagen in der Kurve im Test 50 s auf der Stelle). Das letzte Stück zum Spieler fahren sie querfeldein, wenn er abseits der Straße steht.
+- **Sehen**: auf 40 m immer, bis 150 m bei freier Sichtlinie. Wer gesehen wird, wird verfolgt; sonst fahren alle Streifen zum Ort, an dem der Spieler zuletzt gesehen wurde, und suchen dort die Straßen ab.
+- **Abhängen**: Solange keine Streife den Spieler sieht, blinken die Sterne und ein Balken läuft (6 s + 4 s je Stern). Im Suchgebiet um den letzten bekannten Ort (150 m + 50 m je Stern) läuft er dreimal langsamer.
+- **Festnahme**: Neben einem Streifenwagen (8 m) stehen bleiben, 2,5 s lang – ein roter Balken zeigt, wie lange noch; wer losfährt oder wegrennt, baut ihn wieder ab. Folgen: laufender Auftrag verfällt, 100 € plus 10 % des Kontos Strafe, weiter geht es zu Fuß an der Polizeiinspektion.
+
+Bewusst noch nicht dabei: Polizisten zu Fuß, Straßensperren, Rammen oder Schießen durch die Polizei, Sirene (es gibt noch keinen passenden Klang im Projekt), Hubschrauber ab vier Sternen.
+
 ### HUD und Menüs
 
 Das HUD enthält:
@@ -174,6 +191,8 @@ Das HUD enthält:
 - Steuerungshinweise
 - Ortsanzeige mit Straße, Platz oder Wahrzeichen
 - Auftragstafel mit Richtungspfeil, Restzeit und Kontostand
+- Minikarte, Vollkarte (`M`)
+- Fahndungssterne, Suchbalken beim Abhängen, Festnahmebalken
 - Ortsteil und Stadt
 
 Das Menü umfasst:
@@ -197,6 +216,7 @@ Das Menü umfasst:
 | Linke Maustaste halten – feuern | – |
 | `1`–`4` – Waffe wechseln | – |
 | `E` – einsteigen, bis 8 m Abstand | `E` oder `R` – aussteigen |
+| `M` – Karte | `M` – Karte |
 | `Esc` – Menü | `Esc` – Menü |
 
 ***
@@ -270,6 +290,12 @@ Tools/Export/prepare-wagen.cjs
 
 Tools/Export/prepare-verkehr.cjs
     → Content/SourceData/Verkehr/verkehr.json
+
+Tools/Export/prepare-netz.cjs
+    → Content/SourceData/Verkehr/netz.json      (Straßengraph für die Polizei)
+
+Tools/Export/prepare-karte.py
+    → Content/SourceData/Karte/karte.png, karte-klein.png, karte.json
 
 Tools/baue_farbklecks.py
     → M_Farbklecks
@@ -495,6 +521,7 @@ Saved/Screenshots/WindowsEditor
 | `-LaLaBergLechFoto` | Luftaufnahme über dem Lech | Prüft `M_Lech` |
 | `-LaLaBergKoerperFoto` | Prüft Figur, Arm und Waffenhaltung: Bild von hinten, je Waffe ein Seitenbild, ein Bild im Laufen | `LALABERG_WAFFE_GEHALTEN PASS` je Waffe (Griff unter 25 cm von der Handfläche) |
 | `-LaLaBergAuftragTest` | Ganzer Lieferauftrag ohne Tastatur: vor die blaue Säule (Bild), hinein (Bild Richtung Ziel), vor das Ziel (Bild), hinein, dann in die nächste blaue Säule und die Frist ablaufen lassen | `LALABERG_AUFTRAGTEST PASS` mit `erledigt=1 gescheitert=1`, Geld > 0 und mindestens 10 Zielen |
+| `-LaLaBergPolizeiTest` | Zwei echte Taten (Passant, Streifenwagen) ergeben zwei Sterne; die Figur bleibt stehen, die Streifen fahren heran und nehmen fest (Bild beim Eintreffen, Bild der Vollkarte). Danach ein Stern, die Figur wird 1,1 km weit versetzt und muss die Fahndung abschütteln | `LALABERG_POLIZEITEST PASS festnahmen=1` mit `abgehaengt_nach` |
 | `-LaLaBergAmpelTest` | Prüft Ampelkonflikte über vollen Zyklus | `LALABERG_AMPELTEST PASS verstoesse=0 ampeln=44` |
 
 ### Beispiel: Fahrtest mit GPU-Profiling
@@ -629,9 +656,11 @@ Der Fahrzeug-Detailgrad ist bewusst auf Echtzeit-Performance optimiert.
 
 Die Verkehrslogik priorisiert skalierbares, glaubwürdiges Verhalten gegenüber vollständiger Verkehrssimulation.
 
+- Behoben am 2026-09-18, gefunden beim Bau der Polizei: Die KI-Autos folgten ihrer Route bis dahin kaum. Das Tempo stand in m/s, wurde aber als cm/s gefahren (100-fach zu langsam), und der Spurversatz wurde jedes Bild erneut auf die schon versetzte Lage addiert - die Autos kamen vor allem durch dieses seitliche Wandern voran. Jetzt fährt jedes Auto sein Tempo in cm/s entlang der Route, der Spurversatz wird nur angezeigt (wie bei den Passanten). Die Bremsabstände, das Überholen und die Ampel-/Vorfahrtsregeln waren unter dem alten Verhalten kalibriert; die Prüfläufe dazu sind nach der Korrektur neu gelaufen: Ampeltest `verstoesse=0`, Abbiegetest `abgebogen=60 von=70 wenden=0` (vorher 70 von 70 - gemessen am alten, wandernden Verhalten), Überholtest nach Anpassung der Prüfung bestanden.
+
 - Der Spurversatz der KI-Autos richtet sich nach der echten Fahrbahnbreite an der jeweiligen Stelle (`verkehr.json`, Feld `bp`) statt nach einem für jede Straße gleichen Festwert - auf schmalen Straßen bleibt entsprechend weniger Platz zum Ausweichen, ohne über den Fahrbahnrand hinauszufahren. Die Breite wird je Wegpunkt über ein Raster aus der nächstgelegenen echten Straße übernommen (Median-Abstand 0,11 m, maximal 2,43 m, kein Wegpunkt ohne Treffer). Zwischenzeitlich stand dort nur der Mittelwert je Straßenklasse, weil der Straßengraph keine Breite trägt - eine schmale Hauptstraße (3,1 m) galt damit als 7,5 m breit.
 - Keine mehrspurige Fahrspurwahl - und dafür fehlt in Landsberg schlicht die Geometrie: Von 307 km Straßennetz sind **378 m** (0,12 %) mindestens 10 m breit, also überhaupt breit genug für zwei Spuren je Richtung, und das ist ein einzelner 16-m-Ausreißer. Die breiteste echte Hauptstraße misst 9,3 m, das sind zwei Spuren plus Parkstreifen. Ein Spurwahlmodell hätte hier fast keine Straße, auf der es wirken könnte.
-- Ein Auto überholt jetzt ein deutlich langsameres oder stehendes Auto direkt voraus, wenn die Straße breit genug ist (≥ 5,5 m), keine Ampel oder Vorfahrt unmittelbar ansteht und die Gegenspur über rund 18 m frei ist - danach schert es wieder ein. Da bei nur rund 70 verteilten Autos in der ganzen Stadt diese Konstellation im echten Spiel selten zusammentrifft, ist die Logik zusätzlich über einen synthetischen Testschalter (`-LaLaBergUeberholTest`) isoliert nachgewiesen, unabhängig vom Zufall im organischen Verkehr. Weiterhin keine echte mehrspurige Fahrspurwahl, kein gleichzeitiges Überholen mehrerer Autos an derselben Stelle, und der seitliche Schwenk ist ein einfacher Versatz statt einer echten Kurve.
+- Ein Auto überholt jetzt ein deutlich langsameres oder stehendes Auto direkt voraus, wenn die Straße breit genug ist (≥ 5,5 m), keine Ampel oder Vorfahrt unmittelbar ansteht und die Gegenspur über rund 18 m frei ist - danach schert es wieder ein. Da bei nur rund 70 verteilten Autos in der ganzen Stadt diese Konstellation im echten Spiel selten zusammentrifft, ist die Logik zusätzlich über einen synthetischen Testschalter (`-LaLaBergUeberholTest`) isoliert nachgewiesen, unabhängig vom Zufall im organischen Verkehr: seit der Tempokorrektur (siehe oben) muss der hintere Wagen überholt haben und nach 10 s vorn liegen (`LALABERG_UEBERHOLTEST PASS ueberholt=1 vorsprung=68.3m`). Weiterhin keine echte mehrspurige Fahrspurwahl, kein gleichzeitiges Überholen mehrerer Autos an derselben Stelle, und der seitliche Schwenk ist ein einfacher Versatz statt einer echten Kurve.
 - Kein explizites Queue-System pro Kreuzung als eigene Datenstruktur - Warteschlangen entstehen stattdessen implizit aus zwei bereits vorhandenen, jeden Frame neu ausgewerteten Mechanismen: Auto-folgt-Auto-Bremsen (siehe Überholen oben) sorgt für Einordnung hintereinander auf derselben Fahrspur, die Vorfahrtslogik an Kreuzungen (Distanz plus Rechts-vor-Links bei gleicher Straßenklasse) für die Reihenfolge zwischen den Armen. Für den ganz überwiegenden Regelfall (einzelne Autos, keine langen Rückstaus) ausreichend; bei mehreren gleichzeitig wartenden Autos an mehreren Armen ist die Reihenfolge nicht so austariert wie bei einer echten FIFO-Queue.
 - Der Anhalteabstand an einer Kreuzung richtet sich jetzt nach deren geschätzter tatsächlicher Breite (aus der Straßenklasse der wichtigsten angeschlossenen Straße, kalibriert an echten Breitendaten) statt nach einem für jede Kreuzung gleichen Festwert - an einer breiten oder mehrarmigen Kreuzung steht ein wartendes Auto entsprechend weiter vom Mittelpunkt entfernt.
 - KI-Autos fahren geschlossene Rundkurse über den Straßengraphen statt wie zuvor eine einzige zugewiesene Straße vor und zurück. Eine Zufallsfahrt (geradeaus wahrscheinlicher als Abbiegen, Hauptstraßen bevorzugt, Sackgassen gemieden) wird über den kürzesten gerichteten Rückweg zum Startknoten zu einem Ring geschlossen; im Median rund 1460 m mit 7 Abbiegungen, 35 berührten Kreuzungen und 3 verschiedenen Straßenklassen je Runde. Dadurch dreht kein Auto mehr am Routenende auf der Stelle um - der Wegfolger hängt hinter dem letzten Wegpunkt wieder den ersten an. Nachgewiesen über den Testschalter `-LaLaBergAbbiegeTest`, der im laufenden Spiel sowohl die Abbiegevorgänge als auch die Wendemanöver zählt (letztere müssen 0 sein).
@@ -651,7 +680,11 @@ Die Verkehrslogik priorisiert skalierbares, glaubwürdiges Verhalten gegenüber 
 
 ### Aufgaben
 
-Es gibt eine Art Aufgabe: Lieferaufträge (siehe oben). Kein Quest-, Polizei- oder Persistenzsystem; das Geld gilt nur für die laufende Sitzung und lässt sich noch für nichts ausgeben.
+Es gibt eine Art Aufgabe: Lieferaufträge, dazu Polizei und Fahndung (siehe oben). Kein Quest- oder Persistenzsystem; das Geld gilt nur für die laufende Sitzung und geht nur durch Strafen wieder weg.
+
+### Bildrate am Startpunkt
+
+Zu Fuß am Startpunkt beim Klinikum fällt die Bildrate auf dem Entwicklungsrechner (integrierte AMD-Radeon-PRO-Grafik) auf 2–3 fps; im Wagen und an anderen Orten der Stadt sind es 25–30 fps. Gemessen beim Polizeitest, unabhängig von Polizei und Karte (beides abgeschaltet: gleiche Bildrate). Die Ursache ist nicht untersucht; die Blickrichtung über das offene Feld auf die Stadt liegt nahe.
 
 ***
 
