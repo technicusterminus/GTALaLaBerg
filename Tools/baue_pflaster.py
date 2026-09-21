@@ -3,9 +3,11 @@
 #   UnrealEditor-Cmd.exe <uproject> -run=pythonscript -script="Tools/baue_pflaster.py"
 #
 # Pflaster lag bis dahin auf M_Asphalt (Rauheit 0,66). Gegen die Sonne
-# gesehen spiegelte der Hauptplatz davon fast weiss. baue_materialien.py
-# selbst laeuft hier nicht noch einmal: es loescht jedes Material vor dem
-# Neuanlegen, und an den bestehenden haengen alle Stadt-Meshes.
+# gesehen spiegelte der Hauptplatz davon fast weiss. Seit 2026-09-21 baut
+# baue_materialien.py an Ort und Stelle neu (die Stadt-Meshes behalten ihre
+# Verweise); dieses Skript bleibt, weil M_Pflaster nicht in dessen Liste
+# steht. Die Detailtextur ist Kleinpflaster in Segmentboegen (T_Pflaster_D,
+# baue_texturen.py) - vorher lag hier das fast einfarbige T_Asphalt_D.
 
 import os
 import unreal
@@ -14,5 +16,5 @@ quelle = open(os.path.join(unreal.Paths.project_dir(), "Tools", "baue_materialie
 # Nur die Werkzeuge uebernehmen, nicht die Liste, die alles neu baut
 exec(quelle.split("\ngebaut = [")[0])
 
-pfad = baue("M_Pflaster", "T_Asphalt_D", 260.0, 0.92, 0.22, 1.3)
+pfad = baue("M_Pflaster", "T_Pflaster_D", 260.0, 0.90, 0.24, 1.0)
 unreal.log("LALABERG_MATERIALIEN " + pfad)

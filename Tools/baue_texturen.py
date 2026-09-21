@@ -245,8 +245,57 @@ def fassade():
     return aus
 
 
+def pflaster():
+    """Kleinpflaster in Segmentboegen wie auf dem Hauptplatz: Granitwuerfel
+    um 9 cm, in flachen Boegen gesetzt, jeder Stein etwas anders (grau,
+    beige, ein Hauch Rot oder Blau), dazwischen dunkle Fugen. Eine Kachel
+    sind 2,60 m (Material M_Pflaster), also 2 Boegen zu 1,30 m."""
+    import random
+    zufall = random.Random(211)
+    korn = oktaven([128, 256], 223)
+    boegen = 2
+    bogen_b = GROESSE / boegen
+    stein = GROESSE / 29.0           # ~9 cm bei 2,60 m je Kachel
+    zeilen = 29
+    stich = stein * 2.2              # Bogenstich: Mitte liegt so weit hoeher
+    toene = {}
+    aus = []
+    for y in range(GROESSE):
+        zeile = []
+        for x in range(GROESSE):
+            b = int(x / bogen_b)
+            u = (x - (b + 0.5) * bogen_b) / (bogen_b * 0.5)     # -1..1 im Bogen
+            yy = y + stich * (1.0 - u * u)
+            r = int(yy / stein)
+            dy = (yy % stein) / stein
+            # Laengs des Bogens versetzt, damit keine Kreuzfugen entstehen.
+            laengs = x / stein + (r % 2) * 0.5
+            sp = int(laengs)
+            dx = laengs - sp
+            schluessel = (b, r % zeilen, sp)
+            if schluessel not in toene:
+                h = zufall.uniform(-1.0, 1.0)
+                toene[schluessel] = (h, zufall.choice((0, 0, 0, 1, 2)))
+            h, art = toene[schluessel]
+            v = 0.95 + h * 0.20 + (korn[y][x] - 0.5) * 0.18
+            fuge = min(dx, 1.0 - dx, dy, 1.0 - dy)
+            if fuge < 0.10:
+                v *= 0.45 + fuge * 4.0       # dunkle, leicht gerundete Fuge
+            if abs(u) > 0.985:
+                v *= 0.55                    # Bogenstoss
+            if art == 1:
+                zeile.append(farbig(v * 1.06, v * 0.98, v * 0.92))   # warm, roetlich
+            elif art == 2:
+                zeile.append(farbig(v * 0.97, v * 0.99, v * 1.02))   # kuehl, blaeulich
+            else:
+                zeile.append(farbig(v * 1.02, v * 1.0, v * 0.96))    # Granit, leicht beige
+        aus.append(zeile)
+    return aus
+
+
 if __name__ == "__main__":
     for name, bau in (("T_Putz_D", putz), ("T_Ziegel_D", ziegel), ("T_Asphalt_D", asphalt),
-                      ("T_Wiese_D", wiese), ("T_Wasser_D", wasser), ("T_Fassade_D", fassade)):
+                      ("T_Wiese_D", wiese), ("T_Wasser_D", wasser), ("T_Fassade_D", fassade),
+                      ("T_Pflaster_D", pflaster)):
         pfad = schreibe(name, bau())
         print("%s %d Byte" % (pfad, os.path.getsize(pfad)))
