@@ -92,7 +92,7 @@ void ALaLaBergGameMode::AktualisiereTageszeit(float DeltaSeconds) {
  // aendern - dieselbe Tag-Nacht-Faerbung wie bei der Sonne oben, damit das
  // Umgebungslicht wenigstens die Farbtemperatur mitmacht, nicht nur die Staerke.
  if(SkyLicht) {
-  SkyLicht->SetIntensity(FMath::Lerp(0.15f,1.6f,TagAnteil));
+  SkyLicht->SetIntensity(FMath::Lerp(0.15f,1.2f,TagAnteil));
   const float Hoehenanteil=FMath::Clamp((ElevationGrad+10.0f)/70.0f,0.0f,1.0f);
   const FLinearColor Tagesfarbe=FMath::Lerp(FLinearColor(1.0f,0.55f,0.32f),FLinearColor(1.0f,0.97f,0.92f),Hoehenanteil);
   SkyLicht->SetLightColor(FMath::Lerp(FLinearColor(0.5f,0.6f,0.9f),Tagesfarbe,TagAnteil));
@@ -301,8 +301,10 @@ void ALaLaBergGameMode::InitGame(const FString& MapName,const FString& Options,F
    SkyComp->bRealTimeCapture=true;
   }
   // Ohne kraeftiges Himmelslicht sind die Schattenseiten in einer Gasse
-  // vollstaendig schwarz - eine Altstadt lebt aber vom Streulicht.
-  SkyComp->Intensity=1.6f;
+  // vollstaendig schwarz - eine Altstadt lebt aber vom Streulicht. 1.6 war
+  // zu viel: Sonnen- und Schattenseite sahen gleich aus, die Stadt flach
+  // und blass (2026-09-21); 1.2 laesst die Gassen hell genug.
+  SkyComp->Intensity=1.2f;
   SkyComp->bLowerHemisphereIsBlack=false;                    // Bodenlicht statt schwarzer Unterseite
  }
  Sky->FinishSpawning(FTransform(FVector(0,0,20000)));
@@ -336,12 +338,13 @@ void ALaLaBergGameMode::InitGame(const FString& MapName,const FString& Options,F
  PP.bOverride_BloomIntensity=true;          PP.BloomIntensity=0.35f;
  PP.bOverride_VignetteIntensity=true;       PP.VignetteIntensity=0.18f;
  PP.bOverride_FilmGrainIntensity=true;      PP.FilmGrainIntensity=0.0f;
- // Etwas Saettigung: die amtlichen Farbwerte sind blass, unter blauem
- // Himmelslicht wirken sie sonst grau.
- PP.bOverride_ColorSaturation=true;         PP.ColorSaturation=FVector4(1.04f,1.03f,1.00f,1.0f);
- PP.bOverride_ColorContrast=true;           PP.ColorContrast=FVector4(1.05f,1.05f,1.05f,1.0f);
+ // Saettigung und Kontrast: die amtlichen Farbwerte sind blass, unter
+ // blauem Himmelslicht wirken sie sonst grau. Mit 1.04/1.05 sah die Altstadt
+ // noch ausgewaschen aus (Rueckmeldung 2026-09-21).
+ PP.bOverride_ColorSaturation=true;         PP.ColorSaturation=FVector4(1.13f,1.11f,1.06f,1.0f);
+ PP.bOverride_ColorContrast=true;           PP.ColorContrast=FVector4(1.10f,1.10f,1.10f,1.0f);
  PP.bOverride_MotionBlurAmount=true;        PP.MotionBlurAmount=0.0f;
- PP.bOverride_AmbientOcclusionIntensity=true; PP.AmbientOcclusionIntensity=0.55f;
+ PP.bOverride_AmbientOcclusionIntensity=true; PP.AmbientOcclusionIntensity=0.70f;
  PP.bOverride_AmbientOcclusionRadius=true;  PP.AmbientOcclusionRadius=120.0f;
  // Startpunkt: die Ausleitung nennt ihn beim Namen, sonst der Nullpunkt.
  double Ground=Data->GetNumberField(TEXT("spawnHeightCm"));

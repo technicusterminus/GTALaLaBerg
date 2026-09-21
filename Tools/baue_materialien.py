@@ -66,13 +66,28 @@ def an_kanal(quelle, ausgang, eigenschaft):
     return unreal.MaterialEditingLibrary.connect_material_property(quelle, ausgang, eigenschaft)
 
 
-def baue(name, textur, kachel_cm, rauheit, spiegelung, kontrast=1.0, uv=False, glas=False):
+def baue(name, textur, kachel_cm, rauheit, spiegelung, kontrast=1.0, uv=False, glas=False, saettigung=1.0):
     pfad = "%s/%s" % (ORDNER_M, name)
+    # An Ort und Stelle neu verdrahten statt loeschen und neu anlegen: ein
+    # geloeschtes Material laesst die Verweise aller Stadt-Meshes ins Leere
+    # laufen (dafuer gab es rebind_materialien.py, das jedes Sektor-Asset
+    # anfassen muss).
     if unreal.EditorAssetLibrary.does_asset_exist(pfad):
-        unreal.EditorAssetLibrary.delete_asset(pfad)
-    material = werkzeuge.create_asset(name, ORDNER_M, unreal.Material, unreal.MaterialFactoryNew())
+        material = unreal.load_asset(pfad)
+        unreal.MaterialEditingLibrary.delete_all_material_expressions(material)
+    else:
+        material = werkzeuge.create_asset(name, ORDNER_M, unreal.Material, unreal.MaterialFactoryNew())
 
-    farbe = knoten(material, unreal.MaterialExpressionVertexColor, -1500, 0)
+    farbe = knoten(material, unreal.MaterialExpressionVertexColor, -1900, 0)
+    if saettigung != 1.0:
+        # Die Putzpalette der Ausleitung ist pastellblass; eine negative
+        # Entsaettigung hebt die Farbe, ohne die Helligkeit zu aendern.
+        anteil = knoten(material, unreal.MaterialExpressionConstant, -1900, -140)
+        anteil.set_editor_property("r", 1.0 - saettigung)
+        satt = knoten(material, unreal.MaterialExpressionDesaturation, -1700, 0)
+        verbinde(farbe, "", satt, "")
+        verbinde(anteil, "", satt, "Fraction")
+        farbe = satt
     quelle, ausgang = farbe, ""
 
     bild = hole_textur(textur) if textur else None
@@ -160,8 +175,10 @@ def baue(name, textur, kachel_cm, rauheit, spiegelung, kontrast=1.0, uv=False, g
 
 
 gebaut = [
-    baue("M_Putz", "T_Fassade_D", 0.0, 0.88, 0.32, 1.0, uv=True, glas=True),   # Fassaden
-    baue("M_Ziegel",  "T_Ziegel_D",  190.0, 0.76, 0.35, 1.1),   # Daecher
+    # Fassaden und Daecher kraeftiger als die Palette: 2026-09-21 wirkte die
+    # Altstadt im Spiel ausgewaschen.
+    baue("M_Putz", "T_Fassade_D", 0.0, 0.88, 0.32, 1.0, uv=True, glas=True, saettigung=1.5),   # Fassaden
+    baue("M_Ziegel",  "T_Ziegel_D",  190.0, 0.76, 0.35, 1.1, saettigung=1.15),   # Daecher
     # Neue, detailreiche Asphaltoberflaeche: die fruehere prozedurale Textur
     # war bei normaler Kameradistanz fast einfarbig und liess jede Fahrbahn
     # wie eine graue Grundplatte aussehen.
