@@ -35,6 +35,10 @@ public:
  bool HoleWaffenabstand(float& AusAbstandCm) const;
  // Griff der Waffe in die Handflaeche setzen - siehe .cpp.
  void RichteWaffeAus();
+ // Fuer -LaLaBergZielFoto: Oberkoerperneigung fest vorgeben (Grad, + = nach
+ // oben) statt aus der Kamera; NaN = wieder aus der Kamera.
+ void TestNeigung(float Grad) { TestNeigungGrad = Grad; }
+ float HoleNeigung() const { return Neigung; }
 
 private:
  UPROPERTY() TObjectPtr<class USpringArmComponent> Ausleger = nullptr;
@@ -71,6 +75,11 @@ private:
  bool bSkelettGenutzt = false;
  // Die gerade laufende Animation (siehe Tick) - getauscht wird nur bei Wechsel.
  FString AktuelleAnim;
+ // Animation ueber ULaLaBergZielAnim abspielen (statt PlayAnimation): so
+ // laesst sich danach der Oberkoerper um die Blickneigung beugen.
+ void SpieleAnim(class UAnimSequence* Anim);
+ float Neigung = 0.0f;
+ float TestNeigungGrad = NAN;
  // Welche Figur gewaehlt wurde (siehe BeginPlay, wie LaLaBergPassantKI):
  // 0 = Farmer (modular), 1..N = Index+1 in EINZEL_FIGUREN.
  int32 FigurTyp = 0;

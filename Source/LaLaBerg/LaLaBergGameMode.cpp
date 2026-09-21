@@ -511,7 +511,8 @@ void ALaLaBergGameMode::BeginPlay() {
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergAuftragTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergPolizeiTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergLadenTest")) ||
-                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergAntriebTest"));
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergAntriebTest")) ||
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergZielFoto"));
  if(bAutomatisch) Beleg(FString::Printf(TEXT("LALABERG_SPIELBEGINN nach %.1fs Programmlaufzeit, %d Gebaeude"),FPlatformTime::Seconds()-GStartTime,BuildingCount));
  if(!bAutomatisch) {
   if(UGameInstance* Spiel=GetGameInstance()) {
@@ -1302,6 +1303,39 @@ void ALaLaBergGameMode::BeginPlay() {
   },0.5f,true,6.5f);
   FTimerHandle Ende;
   GetWorldTimerManager().SetTimer(Ende,[]() { FPlatformMisc::RequestExitWithStatus(false,0); },12.0f,false);
+ }
+ // -LaLaBergZielFoto: folgt der Oberkoerper beim Zielen der Kamera? Von der
+ // Seite je ein Bild bei -35, 0 und +35 Grad Neigung, dazu die gemessene
+ // Neigung der Waffe. PASS, wenn die Waffe zwischen -35 und +35 um mehr als
+ // 30 Grad mitkippt. Zum Schluss ein Bild von hinten mit echter Kameraneigung.
+ if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergZielFoto"))) {
+  static float WaffenNeigung[3]={0,0,0};
+  auto Held=[this]() { auto* PC=GetWorld()->GetFirstPlayerController(); return PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr; };
+  auto Foto=[this]() { if(auto* PC=GetWorld()->GetFirstPlayerController()) PC->ConsoleCommand(TEXT("HighResShot 1600x900")); };
+  struct FSchritt { float Zeit; TFunction<void()> Tu; };
+  TArray<FSchritt> Plan={{4.5f,[this,Held]() {
+    auto* PC=GetWorld()->GetFirstPlayerController();
+    if(auto* H=Held()) { H->SetActorRotation(FRotator(0,0,0)); PC->SetControlRotation(FRotator(-5,-90,0)); } }}};
+  const float Winkel[3]={-35.0f,0.0f,35.0f};
+  for(int32 i=0;i<3;i++) {
+   Plan.Add({5.0f+i*1.6f,[Held,W=Winkel[i]]() { if(auto* H=Held()) H->TestNeigung(W); }});
+   Plan.Add({5.9f+i*1.6f,[Held,i]() {
+     auto* H=Held();
+     WaffenNeigung[i]=H&&H->HoleWaffe()?H->HoleWaffe()->GetActorForwardVector().Rotation().Pitch:0.0f;
+     Beleg(FString::Printf(TEXT("LALABERG_ZIEL soll=%.0f neigung=%.1f waffe=%.1f"),i==0?-35.0f:(i==1?0.0f:35.0f),H?H->HoleNeigung():0.0f,WaffenNeigung[i])); }});
+   Plan.Add({6.1f+i*1.6f,Foto});
+  }
+  Plan.Add({10.0f,[this,Held]() {
+    auto* PC=GetWorld()->GetFirstPlayerController();
+    if(auto* H=Held()) { H->TestNeigung(NAN); PC->SetControlRotation(FRotator(25,0,0)); } }});
+  Plan.Add({11.0f,Foto});
+  Plan.Add({11.8f,[this]() {
+    const float Spanne=WaffenNeigung[2]-WaffenNeigung[0];
+    const bool bPass=Spanne>30.0f;
+    Beleg(FString::Printf(TEXT("LALABERG_ZIELTEST %s waffe_unten=%.1f waffe_mitte=%.1f waffe_oben=%.1f spanne=%.1f"),bPass?TEXT("PASS"):TEXT("FAIL"),
+     WaffenNeigung[0],WaffenNeigung[1],WaffenNeigung[2],Spanne));
+    FPlatformMisc::RequestExitWithStatus(false,bPass?0:1); }});
+  for(const FSchritt& S:Plan) { FTimerHandle H; TFunction<void()> Tu=S.Tu; GetWorldTimerManager().SetTimer(H,MoveTemp(Tu),S.Zeit,false); }
  }
  if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergAbbiegeTest"))) {
   static TMap<ALaLaBergVerkehrsauto*,float> LetzteGier, GierSumme;

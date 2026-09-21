@@ -133,6 +133,8 @@ Die Spielfigur wird aus einer Third-Person-Kamera gesteuert.
 - Die Spielfigur hält die Waffe in der rechten Hand und zielt damit nach vorn (`Idle_Gun_Pointing` im Stand, `Run_Shoot` in Bewegung). Das Rig endet beim Unterarm (`LowerArm_R`), einen Hand-Knochen gibt es nicht - die Handfläche liegt deshalb 8 cm hinter dem Unterarmende. Jede Waffe hat einen eigenen Griffpunkt (`ALaLaBergWaffe::GriffOrt`), der in diese Handfläche gesetzt wird, und wird jedes Bild aufrecht entlang des Unterarms ausgerichtet. Geprüft über `-LaLaBergKoerperFoto`: je Waffe `LALABERG_WAFFE_GEHALTEN` samt Seitenansicht, dazu ein Bild im Laufen. Mit `-LaLaBergPose=<Name>` lassen sich die Standposen des Figurenpakets im Bild vergleichen.
 - Der Weg dorthin, weil jeder Schritt einzeln sichtbar falsch war: Zuerst hing die Waffe am unsichtbaren Kasten-Arm und schwebte neben der Figur. Am Unterarm erbte sie dann den Maßstab 100 der Knochen und hing 2 m daneben. `Idle_Gun` ließ den Arm hängen, die Waffe zeigte zu Boden. Die Waffenmodelle lagen durch ihren alten Kameraversatz 23 bis 54 cm vor der Hand. Und nur einmal in der Ruhepose ausgerichtet, drehte die Zeige-Animation den Unterarm mit - der Griff zeigte zur Seite, der Werfer umschloss den Arm.
 
+- Zielen nach oben und unten: Der Oberkörper beugt sich um die Kameraneigung (bis ±60°), verteilt auf die Wirbel Abdomen/Torso/Chest (30/30/40 %) – Arme, Waffe und Kopf folgen der Brust, die Beine bleiben, wie die Animation sie stellt. Im Stand immer, im Laufen nur beim Schießen. Umgesetzt als eigene C++-Animationsinstanz (`ULaLaBergZielAnim`), die dieselbe Animation abspielt und danach die Knochen dreht – ohne Control Rig und ohne Animations-Blueprint. Gemessen: Waffe bei −35°/0°/+35° Neigung auf −41°/−6°/+29° (`-LaLaBergZielFoto`).
+
 ### Paintball-Waffen
 
 Das Projekt verwendet absichtlich keine tödlichen Projektile, sondern Paintball-Mechaniken.
@@ -535,6 +537,7 @@ Saved/Screenshots/WindowsEditor
 | `-LaLaBergPolizeiTest` | Zwei echte Taten (Passant, Streifenwagen) ergeben zwei Sterne; die Figur bleibt stehen, die Streifen fahren heran und nehmen fest (Bild beim Eintreffen, Bild der Vollkarte). Danach ein Stern, die Figur wird 1,1 km weit versetzt und muss die Fahndung abschütteln | `LALABERG_POLIZEITEST PASS festnahmen=1` mit `abgehaengt_nach` |
 | `-LaLaBergLadenTest` | 2000 € aufs Konto, im Paintball-Laden die MP kaufen, in den Wagen, in der Lackiererei zwei Sterne bekommen und ungesehen umlackieren; danach den Spielstand frisch von der Platte lesen | `LALABERG_LADENTEST PASS mp=1 lack=1 gespeichert=1` |
 | `-LaLaBergAntriebTest` | Befund statt Prüfung: einsteigen, Vollgas, halbsekündlich Bodenabstand des Rumpfs, Masse, Motordrehzahl, Gang und je Rad Federweg, Federkraft, Antriebsmoment, Schlupf. Mit `-LaLaBergDrehmoment=<Nm>` ein anderes Motormoment, mit `-LaLaBergSchub` statt Motor eine wachsende Schubkraft | `LALABERG_ANTRIEB …`-Zeilen |
+| `-LaLaBergZielFoto` | Oberkörper folgt der Kameraneigung: von der Seite je ein Bild bei −35°, 0° und +35°, dazu die gemessene Waffenneigung; zuletzt ein Bild von hinten mit echter Kameraneigung | `LALABERG_ZIELTEST PASS` bei mehr als 30° Spanne der Waffe |
 | `-LaLaBergAmpelTest` | Prüft Ampelkonflikte über vollen Zyklus | `LALABERG_AMPELTEST PASS verstoesse=0 ampeln=44` |
 
 ### Beispiel: Fahrtest mit GPU-Profiling
@@ -847,7 +850,6 @@ Mögliche nächste Ausbaustufen:
 - Spurbreiten aus Straßendaten ableiten
 - erweiterte Kreuzungslogik mit Warteschlangen
 - realistischere Fahrzeugnavigation und Abbiegeverhalten
-- Arm-IK und Zielanimation für die Spielfigur
 - weichere Fußgängeranimationen und Verhaltenszustände
 - weitere Stadtmöblierung und Interaktionen
 - Profiling auf RTX- und Gaming-Hardware

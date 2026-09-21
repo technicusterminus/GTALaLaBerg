@@ -1,6 +1,7 @@
 #include "LaLaBergCharacter.h"
 #include "LaLaBergPolizei.h"
 #include "LaLaBergKonto.h"
+#include "LaLaBergZielAnim.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Components/CapsuleComponent.h"
@@ -280,7 +281,7 @@ void ALaLaBergCharacter::BeginPlay() {
      FaerbeSkelett(Teil, JACKE);
     }
     if (auto* Anim = LoadObject<UAnimSequence>(nullptr, *FString::Printf(TEXT("/Game/Art/People/Animations/Anim_HumansCharacterArmature_%s.Anim_HumansCharacterArmature_%s"), *StehPose(), *StehPose())))
-     SkelettKoerper->PlayAnimation(Anim, true);
+     SpieleAnim(Anim);
    }
   } else {
    const TCHAR* Name = EINZEL_FIGUREN[Wahl - 1].Name;
@@ -292,7 +293,7 @@ void ALaLaBergCharacter::BeginPlay() {
     SkelettKoerper->SetVisibility(true);
     FaerbeSkelett(SkelettKoerper, JACKE);
     if (auto* Anim = LoadObject<UAnimSequence>(nullptr, *EinzelAnimPfad(Name, *StehPose())))
-     SkelettKoerper->PlayAnimation(Anim, true);
+     SpieleAnim(Anim);
    }
   }
  }
@@ -396,6 +397,17 @@ void ALaLaBergCharacter::Tick(float DeltaSeconds) {
  RichteWaffeAus();
 
  if (bSkelettGenutzt) {
+  // Zielen nach oben und unten: der Oberkoerper beugt sich um die
+  // Kameraneigung, Arme und Waffe folgen der Brust (ULaLaBergZielAnim). Im
+  // Stand immer - die Waffe zeigt dann, wohin man schaut -, im Laufen nur
+  // beim Schiessen, sonst lehnte sich die Figur beim Umsehen im Rennen
+  // zurueck. Weich nachgefuehrt statt sprunghaft.
+  float Soll = 0.0f;
+  if (!FMath::IsNaN(TestNeigungGrad)) Soll = TestNeigungGrad;
+  else if (Controller && (bZielt || Faktor <= 0.05f)) Soll = FRotator::NormalizeAxis(Controller->GetControlRotation().Pitch);
+  Neigung = FMath::FInterpTo(Neigung, Soll, DeltaSeconds, 12.0f);
+  if (auto* Ziel = Cast<ULaLaBergZielAnim>(SkelettKoerper->GetAnimInstance())) Ziel->SetzeNeigung(Neigung, GetActorRightVector());
+
   // Waffenhaltung statt neutraler Pose: die Spielfigur traegt immer eine
   // Waffe (siehe Waffe unten). Im Stand "Idle_Gun_Pointing" (Arm nach vorn,
   // Waffe in Blickrichtung) - per -LaLaBergKoerperFoto mit -LaLaBergPose
@@ -428,9 +440,19 @@ void ALaLaBergCharacter::Tick(float DeltaSeconds) {
    const FString Pfad = FigurTyp == 0
     ? TEXT("/Game/Art/People/Animations/Anim_HumansCharacterArmature_") + AnimName + TEXT(".Anim_HumansCharacterArmature_") + AnimName
     : EinzelAnimPfad(EINZEL_FIGUREN[FigurTyp - 1].Name, *AnimName);
-   if (auto* Anim = LoadObject<UAnimSequence>(nullptr, *Pfad)) SkelettKoerper->PlayAnimation(Anim, true);
+   if (auto* Anim = LoadObject<UAnimSequence>(nullptr, *Pfad)) SpieleAnim(Anim);
   }
  }
+}
+
+void ALaLaBergCharacter::SpieleAnim(UAnimSequence* Anim) {
+ if (!Anim || !SkelettKoerper) return;
+ if (!Cast<ULaLaBergZielAnim>(SkelettKoerper->GetAnimInstance())) {
+  SkelettKoerper->SetAnimationMode(EAnimationMode::AnimationBlueprint);
+  SkelettKoerper->SetAnimInstanceClass(ULaLaBergZielAnim::StaticClass());
+ }
+ if (auto* Ziel = Cast<ULaLaBergZielAnim>(SkelettKoerper->GetAnimInstance())) Ziel->Spiele(Anim);
+ else SkelettKoerper->PlayAnimation(Anim, true);
 }
 
 // Weg statt Zeit als Takt: schneller gehen heisst schneller wiederkehrende
