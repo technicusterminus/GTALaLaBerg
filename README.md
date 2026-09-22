@@ -609,6 +609,27 @@ Beim ausgepackten Build steht er im Paket selbst:
 
 Bestanden im Paket: Fahrtest mit Bremsen/Aussteigen/Krankenhaus, Auftrag, Laden (Spielstand, Kauf, Lackierung), Polizei, Zielen, Ampel. Die Bildrate liegt im Paket am Startpunkt bei 13–16 fps gegenüber 25 im Editor – dieselbe offene Frage wie unter „Bildrate am Startpunkt".
 
+### macOS
+
+Eine Mac-Fassung lässt sich **nicht auf Windows bauen**: Xcode, der Metal-Shadercompiler und die Signatur laufen nur unter macOS. Der Bau muss also auf einem Mac stattfinden, das Projekt selbst ist dafür vorbereitet – kein plattformabhängiger Code, die Direct3D-Einstellungen stehen in einem reinen Windows-Abschnitt, und die beiden Sonderplugins (`ModelContextProtocol`, `MCPClientToolset`) liefert die Engine selbst mit.
+
+Voraussetzungen und Ablauf stehen im Kopf von `Tools/baue_mac.sh`; kurz:
+
+```bash
+git clone <repo> && cd GTALaLaBerg
+git lfs install && git lfs pull
+# City Sample Vehicles im Editor über den Fab-Reiter nach
+# Content/CitySampleVehicles holen (nicht im Repo, Epic-Lizenz)
+Tools/baue_mac.sh ~/GTALaLaBerg-Paket
+```
+
+Erwartbare Stolpersteine, ungetestet mangels Mac:
+
+- **Apple Silicon nötig.** Die Stadt ist Nanite-Geometrie und braucht Metal 3; auf Intel-Macs fehlt das.
+- Ohne die Fab-Fahrzeuge fährt der Verkehr als Kastenform – das Spiel läuft, sieht aber ärmer aus.
+- Der erste Bau dauert deutlich länger als die 21 Minuten unter Windows, weil alle Shader für Metal neu entstehen.
+- Die Prüfschalter funktionieren wie unter Windows; das Protokoll landet im Paket unter `GTALaLaBerg.app/Contents/UE/GTALaLaBerg/Saved/Logs/LaLaBerg-Test.txt` bzw. `~/Library/Logs`.
+
 ***
 
 ## Performance
