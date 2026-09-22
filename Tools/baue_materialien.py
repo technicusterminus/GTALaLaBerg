@@ -29,6 +29,10 @@ ORDNER_T = "/Game/Art/Textures"
 werkzeuge = unreal.AssetToolsHelpers.get_asset_tools()
 WELT = unreal.load_object(None, "/Engine/Functions/Engine_MaterialFunctions01/"
                                 "Texturing/WorldAlignedTexture.WorldAlignedTexture")
+WELT_N = unreal.load_object(None, "/Engine/Functions/Engine_MaterialFunctions01/"
+                                  "Texturing/WorldAlignedNormal.WorldAlignedNormal")
+if WELT_N is None:
+    unreal.log_warning("LALABERG_TIEFE Funktion WorldAlignedNormal nicht gefunden")
 if WELT is None:
     unreal.log_warning("LALABERG_WELT Funktion nicht gefunden - Texturen bleiben aus")
 
@@ -66,7 +70,7 @@ def an_kanal(quelle, ausgang, eigenschaft):
     return unreal.MaterialEditingLibrary.connect_material_property(quelle, ausgang, eigenschaft)
 
 
-def baue(name, textur, kachel_cm, rauheit, spiegelung, kontrast=1.0, uv=False, glas=False, saettigung=1.0):
+def baue(name, textur, kachel_cm, rauheit, spiegelung, kontrast=1.0, uv=False, glas=False, saettigung=1.0, tiefenkarte=None):
     pfad = "%s/%s" % (ORDNER_M, name)
     # An Ort und Stelle neu verdrahten statt loeschen und neu anlegen: ein
     # geloeschtes Material laesst die Verweise aller Stadt-Meshes ins Leere
@@ -158,6 +162,29 @@ def baue(name, textur, kachel_cm, rauheit, spiegelung, kontrast=1.0, uv=False, g
         rau.set_editor_property("r", rauheit)
         an_kanal(rau, "", unreal.MaterialProperty.MP_ROUGHNESS)
 
+    # Tiefenkarte: dieselbe Projektion wie die Farbe - Fassaden ueber ihre
+    # eigenen Texturkoordinaten, alles andere weltbezogen (WorldAlignedNormal).
+    # Ohne sie sahen Ziegel, Pflaster und Putz im streifenden Licht flach aus.
+    tiefe = hole_textur(tiefenkarte) if tiefenkarte else None
+    if tiefe is not None and uv:
+        probe_n = knoten(material, unreal.MaterialExpressionTextureSample, -1500, 900)
+        probe_n.set_editor_property("texture", tiefe)
+        probe_n.set_editor_property("sampler_type", unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL)
+        an_kanal(probe_n, "RGB", unreal.MaterialProperty.MP_NORMAL)
+    elif tiefe is not None and WELT_N is not None:
+        objekt_n = knoten(material, unreal.MaterialExpressionTextureObjectParameter, -1900, 900)
+        objekt_n.set_editor_property("parameter_name", "Tiefe")
+        objekt_n.set_editor_property("texture", tiefe)
+        objekt_n.set_editor_property("sampler_type", unreal.MaterialSamplerType.SAMPLERTYPE_NORMAL)
+        groesse_n = knoten(material, unreal.MaterialExpressionConstant, -1900, 1080)
+        groesse_n.set_editor_property("r", float(kachel_cm))
+        welt_n = knoten(material, unreal.MaterialExpressionMaterialFunctionCall, -1500, 900)
+        welt_n.set_material_function(WELT_N)
+        ok_t = verbinde(objekt_n, "", welt_n, "TextureObject")
+        ok_g = verbinde(groesse_n, "", welt_n, "TextureSize")
+        ok_a = an_kanal(welt_n, "XYZ Texture", unreal.MaterialProperty.MP_NORMAL)
+        unreal.log("LALABERG_TIEFE %s textur=%s groesse=%s normale=%s" % (name, ok_t, ok_g, ok_a))
+
     spek = knoten(material, unreal.MaterialExpressionConstant, -500, 560)
     spek.set_editor_property("r", spiegelung)
     an_kanal(spek, "", unreal.MaterialProperty.MP_SPECULAR)
@@ -177,15 +204,15 @@ def baue(name, textur, kachel_cm, rauheit, spiegelung, kontrast=1.0, uv=False, g
 gebaut = [
     # Fassaden und Daecher kraeftiger als die Palette: 2026-09-21 wirkte die
     # Altstadt im Spiel ausgewaschen.
-    baue("M_Putz", "T_Fassade_D", 0.0, 0.88, 0.32, 1.0, uv=True, glas=True, saettigung=1.5),   # Fassaden
+    baue("M_Putz", "T_Fassade_D", 0.0, 0.88, 0.32, 1.0, uv=True, glas=True, saettigung=1.5, tiefenkarte="T_Fassade_N"),
     # Kachelgroessen seit den Fototexturen (baue_fototexturen.py) nach deren
     # Massstab: Dach 2,2 m, Wiese 4 m.
-    baue("M_Ziegel",  "T_Ziegel_D",  220.0, 0.76, 0.35, 1.0, saettigung=1.15),   # Daecher
+    baue("M_Ziegel",  "T_Ziegel_D",  220.0, 0.76, 0.35, 1.0, saettigung=1.15, tiefenkarte="T_Ziegel_N"),   # Daecher
     # Neue, detailreiche Asphaltoberflaeche: die fruehere prozedurale Textur
     # war bei normaler Kameradistanz fast einfarbig und liess jede Fahrbahn
     # wie eine graue Grundplatte aussehen.
     baue("M_Asphalt", "T_Asphalt_Real_D", 260.0, 0.72, 0.28, 1.15), # Fahrbahn und Gleis
-    baue("M_Boden",   "T_Wiese_D",   400.0, 0.94, 0.20, 1.0),   # Wiese, Acker, Wald
+    baue("M_Boden",   "T_Wiese_D",   400.0, 0.94, 0.20, 1.0, tiefenkarte="T_Wiese_N"),   # Wiese, Acker, Wald
     baue("M_Wasser",  "T_Wasser_D",  900.0, 0.26, 0.50, 0.6),   # Lech und Teiche
     baue("M_Laub",    "T_Wiese_D",   140.0, 0.92, 0.18, 1.2),   # Kronen und Staemme
     baue("M_Stein",   "T_Putz_D",    120.0, 0.62, 0.42, 0.8),   # Brunnen und Figuren

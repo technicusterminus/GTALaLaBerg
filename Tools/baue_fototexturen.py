@@ -11,6 +11,9 @@
 #   T_Pflaster_D  <- PavingStones051    (Kleinpflaster in Boegen)
 #   T_Wiese_D     <- Grass004
 #   T_Fassade_D   <- Fensterraster aus baue_texturen.py, Putzkorn aus PaintedPlaster017
+# Dazu je eine Tiefenkarte (Normalmap) T_*_N.png aus denselben Paketen: sie
+# gibt Ziegeln, Pflaster, Putz und Wiese im streifenden Licht echtes Relief.
+# Unreal erwartet DirectX-Normalen, ambientCG liefert beide - NormalDX passt.
 import io, os, sys, zipfile
 import importlib.util
 from PIL import Image, ImageChops, ImageStat
@@ -49,6 +52,11 @@ def modulator(bild, farbanteil, helligkeit=1.0, staerke=1.0, ao=None):
                 werte.append(max(0, min(255, int(v * helligkeit * 0.5 * 255 + 0.5))))
             ap[x, y] = tuple(werte)
     return aus
+
+
+def tiefenkarte(asset, groesse=1024):
+    """Normalmap aus dem Paket, unveraendert bis auf die Groesse."""
+    return lade(asset, "NormalDX").resize((groesse, groesse), Image.LANCZOS)
 
 
 def speichere(name, bild):
@@ -92,3 +100,7 @@ if __name__ == "__main__":
     speichere("T_Wiese_D", modulator(lade("Grass004", "Color"), 0.30, helligkeit=0.85, staerke=1.1,
                                      ao=lade("Grass004", "AmbientOcclusion")))
     speichere("T_Fassade_D", fassade())
+    speichere("T_Ziegel_N", tiefenkarte("RoofingTiles011A"))
+    speichere("T_Pflaster_N", tiefenkarte("PavingStones051"))
+    speichere("T_Wiese_N", tiefenkarte("Grass004"))
+    speichere("T_Fassade_N", tiefenkarte("PaintedPlaster017", 512))

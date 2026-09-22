@@ -793,7 +793,7 @@ Die 13 zusätzlichen Fahrzeugtypen stammen aus Epics kostenlosem Fab-Paket **Cit
 
 ### Fototexturen (ambientCG)
 
-Dächer, Plätze, Wiesen und das Putzkorn der Fassaden stammen aus Fotomaterialien von [ambientCG](https://ambientcg.com) unter **CC0 1.0** (gemeinfrei, keine Namensnennung nötig): `RoofingTiles011A`, `PavingStones051`, `Grass004`, `PaintedPlaster017`, jeweils 1K-JPG. Im Repo liegen nur die daraus abgeleiteten Modulatoren (`Tools/Texturen/T_*_D.png`, erzeugt von `Tools/baue_fototexturen.py`), nicht die Originalpakete.
+Dächer, Plätze, Wiesen und das Putzkorn der Fassaden stammen aus Fotomaterialien von [ambientCG](https://ambientcg.com) unter **CC0 1.0** (gemeinfrei, keine Namensnennung nötig): `RoofingTiles011A`, `PavingStones051`, `Grass004`, `PaintedPlaster017`, jeweils 1K-JPG. Im Repo liegen nur die daraus abgeleiteten Modulatoren und Tiefenkarten (`Tools/Texturen/T_*_D.png` und `T_*_N.png`, erzeugt von `Tools/baue_fototexturen.py`), nicht die Originalpakete. Die Tiefenkarten (Normalmaps, DirectX-Ausrichtung) hängen in denselben Materialien: Fassaden über ihre Texturkoordinaten, Dach, Pflaster und Wiese weltbezogen (`WorldAlignedNormal`) - im streifenden Licht bekommen Putz, Ziegel und Steine damit echtes Relief statt einer glatten Fläche.
 
 ### Waffenmodelle
 
