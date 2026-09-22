@@ -595,11 +595,19 @@ Da Shipping-Builds nicht zwingend ein Unreal-Log schreiben, werden Ergebnis, Bil
 Saved/Logs/LaLaBerg-Test.txt
 ```
 
-Im installierten Paket liegt dieser Pfad typischerweise unter:
+Beim ausgepackten Build steht er im Paket selbst:
 
 ```text
-%LOCALAPPDATA%\GTALaLaBerg\Saved\Logs\LaLaBerg-Test.txt
+<OUTPUT_DIRECTORY>\Windows\GTALaLaBerg\Saved\Logs\LaLaBerg-Test.txt
 ```
+
+**Erster vollständiger Pakettest am 2026-09-22** (Development statt Shipping, damit Log und Konsole erhalten bleiben; 4 GB, Bauzeit 21 min, danach 4 min je Neubau). Dabei gefunden und behoben:
+
+- `/Game/Audio`, das Ersatzmaterial und die 13 verwendeten City-Sample-Fahrzeugtypen werden nur über ihren Pfad geladen und fehlten in der Cook-Liste – im Paket hätte es keine Klänge gegeben und fast nur Kastenautos (der ganze Fahrzeugordner hat 7,2 GB, deshalb nur die Mesh-Ordner der benutzten Typen).
+- Absturz im Fahrtest, nur im gepackten Spiel: Die Bremsprüfung löschte ihren eigenen Timer und griff danach weiter über `this` auf die Spielart zu – in dessen Timerdaten die Lambda mitsamt Kopien liegt. Im Editor blieb der Speicher gültig, im Paket nicht. Jetzt liegen Zeiger und Werte vor dem Löschen auf dem Stapel.
+- Das Wegkriterium des Fahrtests (8 m in 4,5 s) hing an der Bildrate; es gilt jetzt Weg **oder** Tempo (25 km/h).
+
+Bestanden im Paket: Fahrtest mit Bremsen/Aussteigen/Krankenhaus, Auftrag, Laden (Spielstand, Kauf, Lackierung), Polizei, Zielen, Ampel. Die Bildrate liegt im Paket am Startpunkt bei 13–16 fps gegenüber 25 im Editor – dieselbe offene Frage wie unter „Bildrate am Startpunkt".
 
 ***
 

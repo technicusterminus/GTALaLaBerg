@@ -806,7 +806,10 @@ void ALaLaBergGameMode::BeginPlay() {
     const float Weg=FVector::Dist2D(Jetzt,FahrtStart);
     const float Tempo=It->GetVelocity().Size()*0.036f;   // cm/s in km/h
     const bool bAufraedern=FVector::DotProduct(It->GetActorUpVector(),FVector::UpVector)>0.7f;
-    bFahrtestBestanden = bFahrtestEinstieg && Weg>800.0f && bAufraedern && It->RaederAmBoden()>=2;
+    // Weg ODER Tempo: die Strecke in diesen 4,5 Sekunden haengt an der
+    // Bildrate (im Editor 25 fps und 12 m, im gepackten Spiel 13 fps und
+    // 6 m bei gleicher Physik). Beide Zahlen stehen im Beleg.
+    bFahrtestBestanden = bFahrtestEinstieg && (Weg>800.0f || Tempo>25.0f) && bAufraedern && It->RaederAmBoden()>=2;
     It->TestAnhalten();
     const float Mittel=(GFrameCounter-FahrtBilder)/FMath::Max(0.001,FPlatformTime::Seconds()-FahrtZeit);
     Beleg(FString::Printf(TEXT("LALABERG_FAHRTEST %s weg=%.1fm tempo=%.0fkmh aufraedern=%d fps_mittel=%.0f fps_schlechteste=%.0f aufloesung=%s"),
@@ -828,22 +831,32 @@ void ALaLaBergGameMode::BeginPlay() {
    GetWorldTimerManager().SetTimer(BremsUhr,[this,BremsStart,BremsOrt]() {
     for(TActorIterator<ALaLaBergWagen> It(GetWorld());It;++It) {
      const float Tempo=It->GetVelocity().Size()*0.036f;
-     const double Gebraucht=GetWorld()->GetTimeSeconds()-BremsStart;
+     // Alles, was nach dem ClearTimer noch gebraucht wird, zuerst auf den
+     // Stapel - auch this: ClearTimer gibt die Timerdaten frei, und darin
+     // liegt diese Lambda mitsamt ihren Kopien. Im Editor blieb der Speicher
+     // gueltig, im gepackten Spiel stuerzte der Fahrtest beim ersten Zugriff
+     // auf ein Feld der Spielart ab (0xffff..., 2026-09-22).
+     ALaLaBergGameMode* Selbst=this;
+     const double Start=BremsStart;
+     const FVector Ort=BremsOrt;
+     const FVector Jetzt=It->GetActorLocation();
+     ALaLaBergWagen* Wagen=*It;
+     const double Gebraucht=GetWorld()->GetTimeSeconds()-Start;
      if(Tempo>3.0f && Gebraucht<12.0) return;               // weiter bremsen
-     GetWorldTimerManager().ClearTimer(BremsUhr);
+     Selbst->GetWorldTimerManager().ClearTimer(Selbst->BremsUhr);
      const bool bBremsPass=Tempo<=3.0f;
-     bFahrtestBestanden=bFahrtestBestanden && bBremsPass;
+     Selbst->bFahrtestBestanden=Selbst->bFahrtestBestanden && bBremsPass;
      Beleg(FString::Printf(TEXT("LALABERG_BREMS_TEST %s tempo=%.2f nach=%.2fs_spiel bremsweg=%.2fm"),
-      bBremsPass?TEXT("PASS"):TEXT("FAIL"),Tempo,Gebraucht,FVector::Dist2D(It->GetActorLocation(),BremsOrt)/100.0f));
-     It->TestAussteigen();
+      bBremsPass?TEXT("PASS"):TEXT("FAIL"),Tempo,Gebraucht,FVector::Dist2D(Jetzt,Ort)/100.0f));
+     if(Wagen) Wagen->TestAussteigen();
      FScreenshotRequest::RequestScreenshot(FPaths::ScreenShotDir()/TEXT("Fahrtest_Ausstieg.png"),true,false);
      FTimerHandle Abschluss;
-     GetWorldTimerManager().SetTimer(Abschluss,[this]() {
-      auto* PC=GetWorld()->GetFirstPlayerController();
+     Selbst->GetWorldTimerManager().SetTimer(Abschluss,[Selbst]() {
+      auto* PC=Selbst->GetWorld()->GetFirstPlayerController();
       auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr;
       const bool bAusgestiegen=Figur && !Figur->IsHidden() && Figur->GetActorEnableCollision();
       Beleg(FString::Printf(TEXT("LALABERG_AUSSTIEG_TEST %s"),bAusgestiegen?TEXT("PASS"):TEXT("FAIL")));
-      const bool bPass=bFahrtestBestanden && bAusgestiegen;
+      const bool bPass=Selbst->bFahrtestBestanden && bAusgestiegen;
       Beleg(FString::Printf(TEXT("LALABERG_KRANKENHAUS_TEST %s"),bPass?TEXT("PASS"):TEXT("FAIL")));
       FPlatformMisc::RequestExitWithStatus(false,bPass?0:1);
      },1.5f,false);
