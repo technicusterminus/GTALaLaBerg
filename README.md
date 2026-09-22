@@ -178,6 +178,7 @@ Bewusst noch nicht dabei: Speicherstand (das Konto gilt für eine Sitzung), Frac
 
 - **Minikarte** unten links, Norden oben, der Spieler als Pfeil in der Mitte. Zu Fuß 300 m im Blick, im Wagen 500 m. Die Auftragssäule (blau bzw. gelb) bleibt am Rand stehen, wenn sie außerhalb liegt; Streifenwagen blinken rot-weiß.
 - **Vollkarte** mit `M`: die ganze Stadt, Auftrag mit Namen, alle Streifenwagen, der eigene Standort.
+- **Route**: Minikarte und Vollkarte zeigen den Weg zum Auftragsziel (gelb) bzw. zur blauen Säule (blau) als Linie über die Straßen – kürzester Weg über denselben Straßengraphen, den die Streifenwagen fahren, mit Einbahnregel, also eine Autoroute. Einmal je Sekunde neu berechnet, auf der Minikarte am Rand abgeschnitten.
 - Beide zeigen einen einmal vorgerenderten Stadtplan (`Tools/Export/prepare-karte.py`, 1 Pixel je Meter, dieselben Quelldaten und Farben wie der Stadtplan im Webprojekt): Straßen nach Klasse, Gebäude, Lech, Parks, Wald, Plätze. Die Minikarte dreht sich nicht mit – eine drehende Karte bräuchte ein eigenes Maskenmaterial, das Bild auf dem Canvas würde sonst über den Rand ragen.
 
 ### Polizei und Fahndung

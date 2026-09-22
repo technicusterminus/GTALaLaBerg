@@ -100,6 +100,7 @@ void ALaLaBergHUD::DrawHUD() {
   if (!bKarteGeladen) LadeKarte();
   if (PlayerOwner->WasInputKeyJustPressed(EKeys::M)) bVollkarte = !bVollkarte;
   if (bVollkarte) { Vollkarte(); return; }
+  AktualisiereRoute();
   Minikarte();
   Auftrag();
   Fahndung();
@@ -242,6 +243,60 @@ namespace {
  const FLinearColor BLAU_MARKE(0.25f, 0.6f, 1.0f), GELB_MARKE(1.0f, 0.78f, 0.05f);
 }
 
+void ALaLaBergHUD::AktualisiereRoute() {
+ const ALaLaBergAuftraege* A = ALaLaBergAuftraege::Instanz.Get();
+ const ALaLaBergPolizei* Netz = ALaLaBergPolizei::Instanz.Get();
+ APawn* Figur = PlayerOwner->GetPawn();
+ if (!A || !Netz || !Figur || (!A->IstUnterwegs() && !A->HatAngebot())) { Route.Reset(); return; }
+ const FVector Ziel = A->HoleWegpunkt();
+ const double Jetzt = GetWorld()->GetRealTimeSeconds();
+ // Neues Ziel sofort, sonst einmal je Sekunde - die Suche laeuft ueber
+ // 6000 Knoten, jedes Bild waere Verschwendung.
+ if (Jetzt - RouteZeit < 1.0 && Ziel.Equals(RouteZiel, 1.0f)) return;
+ RouteZeit = Jetzt;
+ RouteZiel = Ziel;
+ if (!Netz->Route(Figur->GetActorLocation(), Ziel, Route)) Route.Reset();
+}
+
+namespace {
+ // Liang-Barsky: Strecke auf ein Rechteck zuschneiden; false, wenn sie ganz
+ // ausserhalb liegt.
+ bool Schneide(FVector2D& A, FVector2D& B, const FBox2D& R) {
+  const FVector2D D = B - A;
+  float T0 = 0.0f, T1 = 1.0f;
+  const float P[4] = { -D.X, D.X, -D.Y, D.Y };
+  const float Q[4] = { A.X - R.Min.X, R.Max.X - A.X, A.Y - R.Min.Y, R.Max.Y - A.Y };
+  for (int32 i = 0; i < 4; i++) {
+   if (FMath::IsNearlyZero(P[i])) { if (Q[i] < 0.0f) return false; continue; }
+   const float T = Q[i] / P[i];
+   if (P[i] < 0.0f) T0 = FMath::Max(T0, T); else T1 = FMath::Min(T1, T);
+   if (T0 > T1) return false;
+  }
+  const FVector2D A0 = A;
+  A = A0 + D * T0;
+  B = A0 + D * T1;
+  return true;
+ }
+}
+
+void ALaLaBergHUD::ZeichneRoute(TFunctionRef<FVector2D(const FVector&)> Bildort, const FBox2D* Rahmen, float Dicke) {
+ const ALaLaBergAuftraege* A = ALaLaBergAuftraege::Instanz.Get();
+ if (Route.Num() < 2 || !A) return;
+ const FLinearColor Farbe = A->IstUnterwegs() ? FLinearColor(1.0f, 0.78f, 0.05f, 0.95f) : FLinearColor(0.25f, 0.6f, 1.0f, 0.95f);
+ // Erst ein dunkler, breiterer Strich, dann die Farbe - so bleibt die Route
+ // auf hellen Plaetzen und dunklen Strassen gleich gut sichtbar.
+ for (int32 Durchgang = 0; Durchgang < 2; Durchgang++) {
+  for (int32 i = 0; i + 1 < Route.Num(); i++) {
+   FVector2D P0 = Bildort(Route[i]), P1 = Bildort(Route[i + 1]);
+   if (Rahmen && !Schneide(P0, P1, *Rahmen)) continue;
+   FCanvasLineItem Strich(P0, P1);
+   Strich.LineThickness = Durchgang == 0 ? Dicke + 3.0f * Massstab : Dicke;
+   Strich.SetColor(Durchgang == 0 ? FLinearColor(0.02f, 0.02f, 0.03f, 0.7f) : Farbe);
+   Canvas->DrawItem(Strich);
+  }
+ }
+}
+
 // Unten links ueber der Ortsanzeige, Norden oben, der Spieler in der Mitte.
 // Zu Fuss 300 m im Blick, im Wagen 500 m.
 void ALaLaBergHUD::Minikarte() {
@@ -261,6 +316,8 @@ void ALaLaBergHUD::Minikarte() {
 
  const FVector2D Zentrum(X + G * 0.5f, Y + G * 0.5f);
  auto Bildort = [&](const FVector& W) { return Zentrum + (FVector2D(W) - FVector2D(Wo)) / (2.0f * Halb) * G; };
+ const FBox2D Rahmen(FVector2D(X, Y), FVector2D(X + G, Y + G));
+ ZeichneRoute(Bildort, &Rahmen, 3.0f * S);
  auto Eingesperrt = [&](FVector2D P, float Rand) {
   return FVector2D(FMath::Clamp(P.X, X + Rand, X + G - Rand), FMath::Clamp(P.Y, Y + Rand, Y + G - Rand));
  };
@@ -311,6 +368,7 @@ void ALaLaBergHUD::Vollkarte() {
  Bild.BlendMode = SE_BLEND_Opaque;
  Canvas->DrawItem(Bild);
  auto Bildort = [&](const FVector& W) { return FVector2D(X, Y) + (FVector2D(W) - KarteUrsprung) / KarteMass * FVector2D(B, H); };
+ ZeichneRoute(Bildort, nullptr, 3.0f * S);
  Schrift(Stadt.IsEmpty() ? FString(TEXT("Stadtplan")) : Stadt, Canvas->ClipX * 0.5f, 22 * S, 24, Weiss, true, true);
  if (const ALaLaBergAuftraege* A = ALaLaBergAuftraege::Instanz.Get(); A && (A->IstUnterwegs() || A->HatAngebot())) {
   const FVector2D P = Bildort(A->HoleWegpunkt());

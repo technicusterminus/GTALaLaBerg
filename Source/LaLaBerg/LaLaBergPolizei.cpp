@@ -195,6 +195,16 @@ void ALaLaBergPolizei::HoleStreifen(TArray<FVector>& Orte) const {
   if (IsValid(S.Auto) && !S.Auto->IstGeparkt()) Orte.Add(S.Auto->GetActorLocation());
 }
 
+bool ALaLaBergPolizei::Route(const FVector& Von, const FVector& Nach, TArray<FVector>& Wegpunkte) const {
+ Wegpunkte.Reset();
+ TArray<int32> Pfad;
+ if (!SuchePfad(NaechsterKnoten(Von), NaechsterKnoten(Nach), Pfad)) return false;
+ Wegpunkte.Add(Von);
+ for (int32 K : Pfad) Wegpunkte.Add(Knoten[K]);
+ Wegpunkte.Add(Nach);
+ return true;
+}
+
 float ALaLaBergPolizei::NaechsteStreifeCm() const {
  const auto* PC = GetWorld()->GetFirstPlayerController();
  const APawn* Spieler = PC ? PC->GetPawn() : nullptr;

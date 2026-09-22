@@ -1084,7 +1084,11 @@ void ALaLaBergGameMode::BeginPlay() {
    {7.6f,[this,Stelle]() { if(auto* A=ALaLaBergAuftraege::Instanz.Get(); A&&A->IstUnterwegs()) {
       const FVector Z=A->HoleWegpunkt(); auto* PC=GetWorld()->GetFirstPlayerController();
       if(PC&&PC->GetPawn()) Stelle(PC->GetPawn()->GetActorLocation()-FVector(0,0,110),Z); } }},
-   {9.0f,Foto},
+   // Vollkarte mit der Route zum Ziel (M-Taste), dann wieder zu.
+   {8.0f,[this]() { if(auto* PC=GetWorld()->GetFirstPlayerController()) if(auto* HUD=Cast<ALaLaBergHUD>(PC->GetHUD())) HUD->ZeigeVollkarte(true); }},
+   {8.5f,Foto},
+   {8.8f,[this]() { if(auto* PC=GetWorld()->GetFirstPlayerController()) if(auto* HUD=Cast<ALaLaBergHUD>(PC->GetHUD())) HUD->ZeigeVollkarte(false); }},
+   {9.3f,Foto},
    {10.0f,[this,Stelle]() { if(auto* A=ALaLaBergAuftraege::Instanz.Get(); A&&A->IstUnterwegs()) {
       const FVector Z=A->HoleWegpunkt(); auto* PC=GetWorld()->GetFirstPlayerController();
       const FVector Von=PC&&PC->GetPawn()?PC->GetPawn()->GetActorLocation():Z;

@@ -45,6 +45,10 @@ public:
  // Fuer -LaLaBergPolizeiTest.
  void TestSetzeSterne(int32 Anzahl);
  float NaechsteStreifeCm() const;
+ // Route fuer die Karte (siehe ALaLaBergHUD::Route): kuerzester Weg ueber
+ // denselben Strassengraphen, den die Streifen fahren - mit Einbahnregel,
+ // also eine Autoroute. Liefert false ohne Netz oder ohne Weg.
+ bool Route(const FVector& Von, const FVector& Nach, TArray<FVector>& Wegpunkte) const;
 
  static constexpr float FESTNAHME_DAUER = 2.5f;
 

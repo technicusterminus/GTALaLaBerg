@@ -56,6 +56,14 @@ private:
  void Fahndung();
  // Im Laden: Warenliste mit Preisen, Auswahl, Kontostand.
  void Laden();
+ // Route zum Auftragsziel bzw. zur blauen Saeule: einmal je Sekunde neu
+ // ueber den Strassengraphen, gezeichnet auf Minikarte und Vollkarte.
+ TArray<FVector> Route;
+ double RouteZeit = -10.0;
+ FVector RouteZiel = FVector::ZeroVector;
+ void AktualisiereRoute();
+ // Linienzug zeichnen; Minikarte schneidet am Kartenrand ab.
+ void ZeichneRoute(TFunctionRef<FVector2D(const FVector&)> Bildort, const FBox2D* Rahmen, float Dicke);
  float Massstab = 1.0f;
  UPROPERTY() TObjectPtr<class UFont> Roboto = nullptr;
 
