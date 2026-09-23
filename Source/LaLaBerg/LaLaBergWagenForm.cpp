@@ -193,6 +193,15 @@ const TCHAR* const LaLaBergWagenForm::CARCONCEPT_TEILE[] = {
  TEXT("BodyTurnsignalsRear"), TEXT("BodyUnderside"), TEXT("BodyWindowsRearSides"), TEXT("BodyWindshield"),
  TEXT("BodyWindshieldGasket"), TEXT("BodyWindshieldWipers"), TEXT("BodyWindshieldWipersBase"),
  TEXT("License_Plate"), TEXT("InteriorRearHatch"), TEXT("InteriorRearPanels"),
+ // Innenraum: ohne ihn sah man durch die Scheiben glatt durch den Wagen
+ // hindurch auf die Wiese darunter. Nicht das ganze Paket (Pedale, Lenk-
+ // saeule, sechs Tuerverkleidungen je Seite) - nur, was man von aussen
+ // durch die Scheiben sieht: Boden, Kaefig, Mittelkonsole, Armaturenbrett,
+ // Sitze und Lenkrad.
+ TEXT("InteriorFloor"), TEXT("InteriorCage"), TEXT("InteriorMid"),
+ TEXT("InteriorDashMid"), TEXT("InteriorDashSides"), TEXT("InteriorPillar"),
+ TEXT("InteriorSeatsColor1"), TEXT("InteriorSeatsColor2"),
+ TEXT("InteriorSteeringDash"), TEXT("InteriorSteeringWheel01"),
  TEXT("WheelFrontLRim"), TEXT("WheelFrontRRim"), TEXT("WheelRearLRim"), TEXT("WheelRearRRim"),
  TEXT("CarConcept_node_84"), TEXT("CarConcept_node_89"), TEXT("CarConcept_node_94"), TEXT("CarConcept_node_99"),
 };

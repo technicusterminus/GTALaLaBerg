@@ -369,10 +369,14 @@ void ALaLaBergVerkehrsauto::BeginPlay() {
    Teil->SetStaticMesh(Mesh);
    // Nur Lackteile ersetzen: Glas, Reifen, Lampen und Chrom behalten ihre Materialien.
    const FString Teilname(LaLaBergWagenForm::CARCONCEPT_TEILE[i]);
-   const bool bBlau = Teilname.Contains(TEXT("Color2"));
-   const bool bSilber = Teilname.Contains(TEXT("Color1")) || Teilname == TEXT("BodyHood")
+   // Der Innenraum behaelt seine eigenen Materialien: Sitze heissen auch
+   // "Color1"/"Color2" und wurden sonst mitlackiert - ein Streifenwagen mit
+   // silbernen und blauen Sitzen.
+   const bool bInnen = Teilname.StartsWith(TEXT("Interior"));
+   const bool bBlau = !bInnen && Teilname.Contains(TEXT("Color2"));
+   const bool bSilber = !bInnen && (Teilname.Contains(TEXT("Color1")) || Teilname == TEXT("BodyHood")
     || Teilname == TEXT("BodyRoofPanel") || Teilname == TEXT("BodyPillars")
-    || Teilname == TEXT("BodyTaillightsPanels");
+    || Teilname == TEXT("BodyTaillightsPanels"));
    if (bBlau || bSilber) {
     auto* Basis = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
     if (Basis) for (int32 Slot = 0; Slot < Teil->GetNumMaterials(); ++Slot) {
