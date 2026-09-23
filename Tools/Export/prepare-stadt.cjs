@@ -101,11 +101,14 @@ function flaeche(s, a, b, c, d) {
 // hoeher als die genaue Hoehenabfrage. Strassen und Plaetze verschwanden
 // deshalb unter der Wiese.
 const B = city.bounds, SCHRITT = 10;
+// Bounded hospital pilot, source coordinates in metres; no other district
+// is changed by the terrain sampling repair.
+function imKlinikum(x, z) { return x >= -1150 && x <= -850 && z >= -100 && z <= 250; }
 const cols = Math.ceil((B.x1 - B.x0) / SCHRITT) + 1, rows = Math.ceil((B.z1 - B.z0) / SCHRITT) + 1;
 const hoehen = new Float64Array(cols * rows);
 for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) hoehen[r * cols + c] = boden(B.x0 + c * SCHRITT, B.z0 + r * SCHRITT);
 
-function rasterHoehe(x, z) {
+function rasterHoehe(x, z, exakt = false) {
   const fx = (x - B.x0) / SCHRITT, fz = (z - B.z0) / SCHRITT;
   let c = Math.floor(fx), r = Math.floor(fz);
   c = Math.max(0, Math.min(cols - 2, c));
@@ -113,6 +116,13 @@ function rasterHoehe(x, z) {
   const tx = Math.max(0, Math.min(1, fx - c)), tz = Math.max(0, Math.min(1, fz - r));
   const h00 = hoehen[r * cols + c], h10 = hoehen[r * cols + c + 1];
   const h01 = hoehen[(r + 1) * cols + c], h11 = hoehen[(r + 1) * cols + c + 1];
+  // Hospital pilot: sample the actual two terrain triangles, not a bilinear
+  // saddle surface which can lie below the rendered ground.
+  if (exakt) {
+    return tx >= tz
+      ? h00 * (1 - tx) + h10 * (tx - tz) + h11 * tz
+      : h00 * (1 - tz) + h11 * tx + h01 * (tz - tx);
+  }
   return (h00 * (1 - tx) + h10 * tx) * (1 - tz) + (h01 * (1 - tx) + h11 * tx) * tz;
 }
 // Bruecken haengen nicht am Gelaende: dort gilt die Fahrbahnhoehe.
@@ -804,6 +814,72 @@ for (let bi = 0; bi < city.buildings.length; bi++) {
 // --------------------------------------------------------- Baender am Boden
 // Strassen, Wege und Gleise liegen als Mittellinie mit Breite vor. Jedes
 // Segment bekommt ein eigenes Rechteck, das der Gelaendehoehe folgt.
+// Split road polygons along the SAME cells and diagonal as the terrain.
+// More samples alone cannot prevent a wide road triangle cutting a ridge.
+function klinikumFlaeche(s, quad, hoch) {
+  const clip = (poly, a, b) => {
+    const side = p => (b[0]-a[0])*(p[1]-a[1])-(b[1]-a[1])*(p[0]-a[0]);
+    const out = [];
+    for (let i=0; i<poly.length; i++) {
+      const p=poly[i], q=poly[(i+1)%poly.length], dp=side(p), dq=side(q);
+      if (dp >= -1e-9) out.push(p);
+      if ((dp >= 0) !== (dq >= 0)) {
+        const t=dp/(dp-dq); out.push([p[0]+t*(q[0]-p[0]),p[1]+t*(q[1]-p[1])]);
+      }
+    }
+    return out;
+  };
+  const xs=quad.map(p=>p[0]), zs=quad.map(p=>p[1]);
+  const c0=Math.max(0,Math.floor((Math.min(...xs)-B.x0)/SCHRITT));
+  const c1=Math.min(cols-2,Math.floor((Math.max(...xs)-B.x0)/SCHRITT));
+  const r0=Math.max(0,Math.floor((Math.min(...zs)-B.z0)/SCHRITT));
+  const r1=Math.min(rows-2,Math.floor((Math.max(...zs)-B.z0)/SCHRITT));
+  for(let r=r0;r<=r1;r++) for(let c=c0;c<=c1;c++) {
+    const x=B.x0+c*SCHRITT,z=B.z0+r*SCHRITT,d=SCHRITT;
+    for(const tri of [[[x,z],[x+d,z],[x+d,z+d]],[[x,z],[x+d,z+d],[x,z+d]]]) {
+      let poly=quad;
+      for(let e=0;e<3 && poly.length;e++) poly=clip(poly,tri[e],tri[(e+1)%3]);
+      if(poly.length<3) continue;
+      const ids=poly.map(([px,pz])=>punkt(s,px,Math.max(rasterHoehe(px,pz,true),Terrain.surfaceAt(px,pz))+Math.max(hoch,0.035),pz));
+      for(let k=1;k+1<ids.length;k++) dreieck(s,ids[0],ids[k],ids[k+1]);
+    }
+  }
+}
+
+// Dieselbe Zellenteilung fuer die ganze Stadt, nicht nur fuer den
+// Klinikums-Versuch: ueberall sonst schnitten Gelaendedreiecke in die
+// Fahrbahn, und es sah aus, als waechse Gras mitten aus dem Asphalt.
+const GENAU_UEBERALL = true;
+
+// Ein Streifen neben der Mittellinie: von/bis sind seitliche Abstaende in
+// Metern (mit Vorzeichen), also z.B. 3,5 bis 5,1 fuer den rechten Gehweg.
+// Dazu die senkrechte Bordkante an der Strassenseite - ohne sie schwebt der
+// Gehweg als Platte ueber dem Boden.
+function seitenband(s, pts, von, bis, hoch) {
+  const n = pts.length / 2;
+  let stueck = 0;
+  for (let i = 0; i < n - 1; i++) {
+    const x0 = pts[i * 2], z0 = pts[i * 2 + 1], x1 = pts[i * 2 + 2], z1 = pts[i * 2 + 3];
+    const dx = x1 - x0, dz = z1 - z0, len = Math.hypot(dx, dz);
+    if (len < 0.2) continue;
+    const ux = -dz / len, uz = dx / len;
+    const teile = Math.max(1, Math.ceil(len / 8));
+    for (let k = 0; k < teile; k++) {
+      const t0 = k / teile, t1 = (k + 1) / teile;
+      const ax = x0 + dx * t0, az = z0 + dz * t0, bx = x0 + dx * t1, bz = z0 + dz * t1;
+      const ai = [ax + ux * von, az + uz * von], bi = [bx + ux * von, bz + uz * von];
+      const aa = [ax + ux * bis, az + uz * bis], ba = [bx + ux * bis, bz + uz * bis];
+      const o = p => [p[0], auflage(p[0], p[1]) + hoch, p[1]];
+      const u = p => [p[0], auflage(p[0], p[1]), p[1]];
+      flaeche(s, o(ai), o(bi), o(ba), o(aa));
+      // Bordkante zur Fahrbahn hin.
+      flaeche(s, u(ai), o(ai), o(bi), u(bi));
+      stueck++;
+    }
+  }
+  return stueck;
+}
+
 function band(s, pts, breite, hoch) {
   const n = pts.length / 2;
   let stueck = 0;
@@ -821,7 +897,10 @@ function band(s, pts, breite, hoch) {
       // Andersherum als bei den Gelaendezellen: fuer ein Band laengs der
       // Fahrtrichtung ergibt die andere Reihenfolge die Oberseite. Vorher
       // zeigten alle Fahrbahnen nach unten und waren weggeschnitten.
-      flaeche(s,
+      if (GENAU_UEBERALL || imKlinikum(ax-nx,az-nz) || imKlinikum(bx-nx,bz-nz) ||
+          imKlinikum(bx+nx,bz+nz) || imKlinikum(ax+nx,az+nz)) {
+        klinikumFlaeche(s, [[ax-nx,az-nz],[bx-nx,bz-nz],[bx+nx,bz+nz],[ax+nx,az+nz]], hoch);
+      } else flaeche(s,
         [ax - nx, h(ax - nx, az - nz), az - nz], [bx - nx, h(bx - nx, bz - nz), bz - nz],
         [bx + nx, h(bx + nx, bz + nz), bz + nz], [ax + nx, h(ax + nx, az + nz), az + nz]);
       stueck++;
@@ -831,6 +910,21 @@ function band(s, pts, breite, hoch) {
 }
 
 const STRASSE = [0x3c3c3f, 0x44443f, 0x4a4438, 0x585048];
+// Ein Gehweg gehoert an die Strasse zwischen Haeusern, nicht an den Feldweg
+// zwischen zwei Aeckern. Raster aus 25-m-Zellen um jeden Gebaeudemittel-
+// punkt; innerorts ist, wo in der eigenen oder einer Nachbarzelle ein Haus
+// steht - also im Umkreis von rund 35 m.
+const BEBAUT = new Set();
+const bauZelle = (x, z) => Math.floor(x / 25) + ':' + Math.floor(z / 25);
+for (const bd of city.buildings) if (bd && bd.o) BEBAUT.add(bauZelle(bd.o[0], bd.o[1]));
+function innerorts(x, z) {
+  for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++)
+    if (BEBAUT.has(bauZelle(x + dx * 25, z + dz * 25))) return true;
+  return false;
+}
+// Bordsteinhoehe und Gehwegbreite in Metern, wie an einer gewoehnlichen
+// Stadtstrasse.
+const BORD = 0.14, GEHWEG_BREIT = 1.8;
 let strassenTeile = 0;
 let gehwegTeile = 0;
 for (const r of city.roads) {
@@ -843,6 +937,14 @@ for (const r of city.roads) {
     // Nur vier Zentimeter ueber dem Scan: Pflaster hat eine Bordkante, wirkt
     // aber nicht wie eine aufgeklebte Platte.
     gehwegTeile += band(ziel('Sidewalk', farbe(0x77736B)), r.p, breite + 1.45, 0.04);
+  } else if (innerorts(mx, mz)) {
+    // Ausserhalb der Altstadt lag die Fahrbahn bisher blank in der Wiese.
+    // Jetzt beidseits ein Gehweg mit Bordstein - Platz fuer die Passanten
+    // und eine erkennbare Strassenkante statt eines ausgefransten Rands.
+    const s = ziel('Sidewalk', farbe(0x8C8880));
+    const innen = breite / 2;
+    gehwegTeile += seitenband(s, r.p, innen, innen + GEHWEG_BREIT, BORD);
+    gehwegTeile += seitenband(s, r.p, -innen - GEHWEG_BREIT, -innen, BORD);
   }
   // Asphalt liegt fast buendig auf dem Terrain; der Gehweg bleibt sichtbar
   // hoeher und bildet damit die reale Bordsteinkante.
@@ -1123,7 +1225,7 @@ const ergebnis = {
   sources: QUELLEN.map(file => ({ file, sha256: crypto.createHash('sha256').update(read(file)).digest('hex') })),
   sections: liste,
 };
-const out = path.resolve(REPO, 'Content/SourceData/stadt.json');
+const out = process.env.LALABERG_AUSGABE ? path.resolve(process.env.LALABERG_AUSGABE) : path.resolve(REPO, 'Content/SourceData/stadt.json');
 fs.mkdirSync(path.dirname(out), { recursive: true });
 fs.writeFileSync(out, JSON.stringify(ergebnis));
 console.log(JSON.stringify({
