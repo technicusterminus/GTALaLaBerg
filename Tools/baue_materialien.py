@@ -208,10 +208,12 @@ gebaut = [
     # Kachelgroessen seit den Fototexturen (baue_fototexturen.py) nach deren
     # Massstab: Dach 2,2 m, Wiese 4 m.
     baue("M_Ziegel",  "T_Ziegel_D",  220.0, 0.76, 0.35, 1.0, saettigung=1.15, tiefenkarte="T_Ziegel_N"),   # Daecher
-    # Neue, detailreiche Asphaltoberflaeche: die fruehere prozedurale Textur
-    # war bei normaler Kameradistanz fast einfarbig und liess jede Fahrbahn
-    # wie eine graue Grundplatte aussehen.
-    baue("M_Asphalt", "T_Asphalt_Real_D", 260.0, 0.72, 0.28, 1.15), # Fahrbahn und Gleis
+    # Fahrbahn und Gleis. Seit 2026-09-23 ein Foto-Asphalt (CC0, ambientCG
+    # Asphalt026A, siehe baue_fototexturen.py) mit Tiefenkarte statt der
+    # koernigen Vorgaengertextur: die wirkte aus Augenhoehe wie Schotter.
+    # Kachel 4,2 m statt 2,6 m - das Muster wiederholt sich seltener, und die
+    # Strasse franst am Rand nicht mehr so auffaellig aus.
+    baue("M_Asphalt", "T_Asphalt_Real_D", 420.0, 0.78, 0.22, 1.0, tiefenkarte="T_Asphalt_Real_N"),
     baue("M_Boden",   "T_Wiese_D",   400.0, 0.94, 0.20, 1.0, tiefenkarte="T_Wiese_N"),   # Wiese, Acker, Wald
     baue("M_Wasser",  "T_Wasser_D",  900.0, 0.26, 0.50, 0.6),   # Lech und Teiche
     baue("M_Laub",    "T_Wiese_D",   140.0, 0.92, 0.18, 1.2),   # Kronen und Staemme
