@@ -531,6 +531,7 @@ Saved/Screenshots/WindowsEditor
 | `-LaLaBergNacht` | Setzt die Tageszeit auf Mitternacht | Für Nachtbildtests |
 | `-LaLaBergGpu` | GPU-Zeiten pro Renderphase | Profilingdaten im Log |
 | `-LaLaBergWaffentest` | Alle Waffen plus Treffer auf Fahrzeug und Wand | `LALABERG_WAFFENTEST PASS` |
+| `-LaLaBergUebernahmeTest` | Ein fahrendes KI-Auto uebernehmen: sitzt man danach in genau diesem Modell? | `LALABERG_UEBERNAHME PASS ki_typ=2 eigener_typ=2` |
 | `-LaLaBergVerkehrFoto` | Screenshot von erstem KI-Auto und KI-Passanten, dazu Bodenprobe: steht jede Figur auf dem Boden statt darin? | `LALABERG_VERKEHRFOTO PASS autos=70 passanten=94 boden_geprueft=94 versenkt=0 tiefste=0cm` |
 | `-LaLaBergLechFoto` | Luftaufnahme über dem Lech | Prüft `M_Lech` |
 | `-LaLaBergKoerperFoto` | Prüft Figur, Arm und Waffenhaltung: Bild von hinten, je Waffe ein Seitenbild, ein Bild im Laufen | `LALABERG_WAFFE_GEHALTEN PASS` je Waffe (Griff unter 25 cm von der Handfläche) |

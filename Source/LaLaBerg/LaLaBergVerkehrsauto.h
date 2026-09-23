@@ -62,6 +62,11 @@ public:
  // Wie oft dieses Auto am Routenende auf der Stelle umgekehrt ist - auf
  // einem Rundkurs immer 0 (siehe FLaLaBergWegfolger::Wenden).
  int32 HoleWenden() const { return Weg.Wenden; }
+ // Modell und Lack dieses Autos - fuer die Uebernahme beim Einsteigen
+ // (siehe ALaLaBergWagen::UebernimmModell): der Spieler soll in genau dem
+ // Auto sitzen, das er angehalten hat.
+ int32 HoleFahrzeugTyp() const { return FahrzeugTyp; }
+ FLinearColor HoleLack() const { return Lack; }
  // Strassenklasse am aktuellen Wegpunkt (siehe SetzeSpurdaten) - nicht die
  // der ganzen Route. BremseVorKreuzung vergleicht damit den Vorfahrtsrang
  // dort, wo die Autos tatsaechlich aufeinandertreffen.

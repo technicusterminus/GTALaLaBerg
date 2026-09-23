@@ -603,8 +603,15 @@ void ALaLaBergCharacter::Einsteigen() {
    if (Abstand < BesteKI) { BesteKI = Abstand; NaechstesKI = *It; }
   }
   if (NaechstesKI) {
-   Naechster = GetWorld()->SpawnActor<ALaLaBergWagen>(NaechstesKI->GetActorLocation(), NaechstesKI->GetActorRotation());
+   // Aufgeschoben erzeugt (SpawnActorDeferred), damit Modell und Lack des
+   // uebernommenen Autos noch vor BeginPlay feststehen - dort wird die
+   // Karosserie gebaut. Vorher wuerfelte der neue Wagen sein Modell selbst
+   // und man sass in einem ganz anderen Auto, als man angehalten hatte.
+   const FTransform Stelle(NaechstesKI->GetActorRotation(), NaechstesKI->GetActorLocation());
+   Naechster = GetWorld()->SpawnActorDeferred<ALaLaBergWagen>(ALaLaBergWagen::StaticClass(), Stelle);
    if (Naechster) {
+    Naechster->UebernimmModell(NaechstesKI->HoleFahrzeugTyp(), NaechstesKI->HoleLack());
+    Naechster->FinishSpawning(Stelle);
     Beste = BesteKI;
     // Wer ein fahrendes Auto uebernimmt, stiehlt es - und ein Streifenwagen
     // wiegt doppelt.

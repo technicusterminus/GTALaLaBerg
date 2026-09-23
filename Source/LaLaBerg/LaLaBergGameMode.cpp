@@ -512,6 +512,7 @@ void ALaLaBergGameMode::BeginPlay() {
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergPolizeiTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergLadenTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergAntriebTest")) ||
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergUebernahmeTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergZielFoto"));
  if(bAutomatisch) Beleg(FString::Printf(TEXT("LALABERG_SPIELBEGINN nach %.1fs Programmlaufzeit, %d Gebaeude"),FPlatformTime::Seconds()-GStartTime,BuildingCount));
  if(!bAutomatisch) {
@@ -1022,6 +1023,44 @@ void ALaLaBergGameMode::BeginPlay() {
  // je gleichzeitig Gruen zeigen. Ohne diesen Test waere "kreuzende Strassen
  // haben nie gleichzeitig Gruen" nur eine Behauptung ueber den Code, der die
  // Zeitrechnung dafuer aufstellt, nicht ueber das tatsaechliche Verhalten.
+ // Wer ein KI-Auto uebernimmt, soll in genau diesem Auto sitzen. Vorher
+ // wuerfelte der neue Wagen sein Modell selbst, und man sass regelmaessig im
+ // roten CarConcept-Flitzer statt in dem Lieferwagen, den man angehalten
+ // hatte. Der Test haelt fest, welches Modell das KI-Auto fuhr, und
+ // vergleicht es mit dem, in dem man nach dem Einsteigen sitzt.
+ if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergUebernahmeTest"))) {
+  // Hinstellen und Einsteigen im selben Zug: ein KI-Auto faehrt weiter und
+  // waere eine halbe Sekunde spaeter schon ausser Reichweite.
+  FTimerHandle Steig;
+  GetWorldTimerManager().SetTimer(Steig,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr;
+   if(!Figur) return;
+   for(ALaLaBergVerkehrsauto* Auto:ALaLaBergVerkehrsauto::Alle) {
+    if(!Auto||Auto->IstGeparkt()) continue;
+    UebernahmeTyp=Auto->HoleFahrzeugTyp();
+    const FVector Ziel=Auto->GetActorLocation()+Auto->GetActorRightVector()*260.0f+FVector(0,0,60);
+    Figur->SetActorLocation(Ziel,false,nullptr,ETeleportType::TeleportPhysics);
+    PC->SetControlRotation((Auto->GetActorLocation()-Ziel).Rotation());
+    Figur->Einsteigen();
+    break;
+   }
+  },4.6f,false);
+  FTimerHandle Bild;
+  GetWorldTimerManager().SetTimer(Bild,[this]() {
+   if(auto* PC=GetWorld()->GetFirstPlayerController()) PC->ConsoleCommand(TEXT("HighResShot 1600x900"));
+  },5.6f,false);
+  FTimerHandle Ende;
+  GetWorldTimerManager().SetTimer(Ende,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   auto* Wagen=PC?Cast<ALaLaBergWagen>(PC->GetPawn()):nullptr;
+   const int32 Jetzt=Wagen?Wagen->HoleFahrzeugTyp():-99;
+   const bool bPass=Wagen&&Jetzt==UebernahmeTyp;
+   Beleg(FString::Printf(TEXT("LALABERG_UEBERNAHME %s ki_typ=%d eigener_typ=%d"),
+                         bPass?TEXT("PASS"):TEXT("FAIL"),UebernahmeTyp,Jetzt));
+   FPlatformMisc::RequestExitWithStatus(false,bPass?0:1);
+  },6.4f,false);
+ }
  if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergAmpelTest"))) {
   auto Pruefe=[this]() {
    int32 Verstoesse=0;

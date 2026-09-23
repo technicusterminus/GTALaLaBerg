@@ -23,6 +23,8 @@ private:
  FVector FahrtStart=FVector::ZeroVector;
  bool bFahrtestBestanden = false;
  bool bFahrtestEinstieg = false;
+ // -LaLaBergUebernahmeTest: Modell des KI-Autos, das uebernommen wird.
+ int32 UebernahmeTyp = -99;
  FTimerHandle FahrtUhr;
  // Wartet im Fahrtest auf den Stillstand, bevor die Figur aussteigt.
  FTimerHandle BremsUhr;

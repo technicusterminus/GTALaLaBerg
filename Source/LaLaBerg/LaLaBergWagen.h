@@ -29,6 +29,13 @@ public:
  // gespeicherter Lack) - sonst gilt die Farbe nur fuer die Ersatzform, und
  // jedes Modell behaelt seine eigene Lackierung wie bisher.
  void SetzeLack(const FLinearColor& Farbe, bool bModell = false);
+ // Ein uebernommenes KI-Auto behaelt sein Modell und seinen Lack: vor
+ // FinishSpawning setzen, denn BeginPlay baut die Karosserie schon. Ohne das
+ // sass man nach jedem Einsteigen im roten CarConcept-Flitzer, egal welches
+ // Auto man angehalten hatte.
+ void UebernimmModell(int32 Typ, const FLinearColor& Farbe) { FahrzeugTyp = Typ; Lack = Farbe; }
+ // Fuer -LaLaBergUebernahmeTest: welches Modell dieser Wagen fahrt.
+ int32 HoleFahrzeugTyp() const { return FahrzeugTyp; }
  // Wer eingestiegen ist, steigt auch wieder aus - der Wagen haelt die Figur.
  void SetzeFahrer(class ACharacter* Figur);
  // Fuer den Fahrtest: Gas und Lenkung ohne Tastatur setzen.
