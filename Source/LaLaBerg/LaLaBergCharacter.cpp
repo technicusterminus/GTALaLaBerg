@@ -12,6 +12,8 @@
 #include "Engine/World.h"
 #include "Engine/GameInstance.h"
 #include "LaLaBergMenueSteuerung.h"
+#include "Engine/StaticMesh.h"
+#include "Components/StaticMeshComponent.h"
 #include "LaLaBergWagen.h"
 #include "LaLaBergSonderfahrzeug.h"
 #include "LaLaBergHUD.h"
@@ -466,8 +468,27 @@ void ALaLaBergCharacter::PruefeSchritt(float Zeit) {
  constexpr float Schrittlaenge = 140.0f;
  if (SchrittWeg < Schrittlaenge) return;
  SchrittWeg = 0.0f;
- if (auto* Sound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Audio/SFX_Schritt.SFX_Schritt")))
-  UGameplayStatics::PlaySoundAtLocation(this, Sound, GetActorLocation(), 0.7f, FMath::FRandRange(0.9f, 1.1f));
+ // Auf Asphalt und Pflaster klackt der Absatz, auf der Wiese knistert es.
+ // Welcher Belag es ist, sagt der Name des Netzes unter den Fuessen (die
+ // Stadtteile heissen Road, Sidewalk, Plaza, Ground - siehe
+ // LaLaBergImportCommandlet).
+ bool bHart = true;
+ {
+  FHitResult Boden;
+  FCollisionQueryParams Fragen; Fragen.AddIgnoredActor(this);
+  const FVector Fuss = GetActorLocation();
+  if (GetWorld()->LineTraceSingleByChannel(Boden, Fuss, Fuss - FVector(0, 0, 250.0f), ECC_Visibility, Fragen)) {
+   const auto* Belag = Cast<UStaticMeshComponent>(Boden.GetComponent());
+   const FString Name = Belag && Belag->GetStaticMesh() ? Belag->GetStaticMesh()->GetName() : FString();
+   bHart = Name.Contains(TEXT("Road")) || Name.Contains(TEXT("Sidewalk")) || Name.Contains(TEXT("Plaza"))
+        || Name.Contains(TEXT("Rail")) || Name.Contains(TEXT("Roof")) || Name.Contains(TEXT("Wall"));
+  }
+ }
+ const TCHAR* Pfad = bHart ? TEXT("/Game/Audio/SFX_Schritt.SFX_Schritt")
+                           : TEXT("/Game/Audio/SFX_Schritt_Gras.SFX_Schritt_Gras");
+ USoundBase* Sound = LoadObject<USoundBase>(nullptr, Pfad);
+ if (!Sound) Sound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Audio/SFX_Schritt.SFX_Schritt"));
+ if (Sound) UGameplayStatics::PlaySoundAtLocation(this, Sound, GetActorLocation(), 0.7f, FMath::FRandRange(0.9f, 1.1f));
 }
 
 void ALaLaBergCharacter::WarteAufBoden() {

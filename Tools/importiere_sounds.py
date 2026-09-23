@@ -17,7 +17,7 @@ ORDNER = "/Game/Audio"
 werkzeuge = unreal.AssetToolsHelpers.get_asset_tools()
 
 NAMEN = ["SFX_Schuss_Pistole", "SFX_Schuss_Maschine", "SFX_Schuss_Schrot", "SFX_Schuss_Rakete",
-         "SFX_Klecks", "SFX_Schritt", "SFX_Motor",
+         "SFX_Klecks", "SFX_Schritt", "SFX_Schritt_Gras", "SFX_Motor",
          # Dauerklaenge: Martinshorn, Rotor und Panzerdiesel laufen in der
          # Schleife, solange die Quelle da ist.
          "SFX_Sirene", "SFX_Rotor", "SFX_Panzer"]
