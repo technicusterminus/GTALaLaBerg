@@ -13,6 +13,7 @@
 #include "Engine/GameInstance.h"
 #include "LaLaBergMenueSteuerung.h"
 #include "LaLaBergWagen.h"
+#include "LaLaBergSonderfahrzeug.h"
 #include "LaLaBergHUD.h"
 #include "LaLaBergVerkehrsauto.h"
 #include "LaLaBergWaffe.h"
@@ -588,6 +589,31 @@ void ALaLaBergCharacter::Quit() {
 void ALaLaBergCharacter::Einsteigen() {
  APlayerController* PC = Cast<APlayerController>(GetController());
  if (!PC) return;
+ // Panzer und Hubschrauber zuerst: wer vor dem Panzer steht, will in den
+ // Panzer, auch wenn daneben ein Auto parkt.
+ {
+  ALaLaBergSonderfahrzeug* Sonder = nullptr;
+  float BesteS = 900.0f;
+  for (TActorIterator<ALaLaBergSonderfahrzeug> It(GetWorld()); It; ++It) {
+   if (It->HatFahrer()) continue;
+   const float Abstand = FVector::Dist(It->GetActorLocation(), GetActorLocation());
+   if (Abstand < BesteS) { BesteS = Abstand; Sonder = *It; }
+  }
+  if (Sonder) {
+   Sonder->SetzeFahrer(this);
+   SetActorHiddenInGame(true);
+   SetActorEnableCollision(false);
+   GetCharacterMovement()->SetMovementMode(MOVE_None);
+   PC->Possess(Sonder);
+   if (auto* HUD = Cast<ALaLaBergHUD>(PC->GetHUD()))
+    HUD->ZeigeRueckmeldung(Sonder->HoleArt() == ELaLaBergSonderart::Panzer
+     ? TEXT("Panzer - W/S fahren, A/D drehen, Turm folgt dem Blick, E aussteigen.")
+     : TEXT("Hubschrauber - Leertaste steigen, W/S fliegen, A/D drehen, E aussteigen."));
+   UE_LOG(LogTemp, Display, TEXT("LALABERG_SONDER eingestiegen art=%d abstand=%.0f"),
+          static_cast<int32>(Sonder->HoleArt()), BesteS);
+   return;
+  }
+ }
  ALaLaBergWagen* Naechster = nullptr;
  float Beste = 800.0f;
  for (TActorIterator<ALaLaBergWagen> It(GetWorld()); It; ++It) {

@@ -44,6 +44,7 @@
 #include "LaLaBergAutoPool.h"
 #include "LaLaBergKastenPool.h"
 #include "LaLaBergPassantKI.h"
+#include "LaLaBergSonderfahrzeug.h"
 #include "LaLaBergAmpel.h"
 #include "LaLaBergHUD.h"
 #include "UObject/UObjectIterator.h"
@@ -405,6 +406,37 @@ void ALaLaBergGameMode::InitGame(const FString& MapName,const FString& Options,F
    }
   },2.5f,false);
  }
+ // Sonderfahrzeuge: nichts weist auf sie hin, keine Saeule, kein Eintrag auf
+ // der Karte. Der Panzer steht im Waldstueck westlich der Stadt (die Stelle
+ // hat den dichtesten Baumbestand bei mindestens 45 m Abstand zu jeder
+ // Strasse und 60 m zu jedem Haus), der Hubschrauber auf dem Dach des
+ // Klinikums - dort, wo ein Rettungshubschrauber auch landen wuerde. Beide
+ // erst nach der Stadtkollision, sonst faellt der Panzer durchs Gelaende
+ // und der Hubschrauber findet kein Dach.
+ {
+  FTimerHandle H;
+  GetWorldTimerManager().SetTimer(H,[this]() {
+   auto Absetzen=[this](ELaLaBergSonderart Art,const FVector2D& XY,float Suchhoehe,float Ueber) {
+    FHitResult Treffer;
+    const FVector Oben(XY.X,XY.Y,Suchhoehe);
+    if(!GetWorld()->LineTraceSingleByChannel(Treffer,Oben,Oben-FVector(0,0,60000.0f),ECC_Visibility)) {
+     UE_LOG(LogTemp,Warning,TEXT("LALABERG_SONDER kein Boden bei %s"),*XY.ToString());
+     return;
+    }
+    const FVector Ort=Treffer.ImpactPoint+FVector(0,0,Ueber);
+    auto* Fahrzeug=GetWorld()->SpawnActorDeferred<ALaLaBergSonderfahrzeug>(ALaLaBergSonderfahrzeug::StaticClass(),
+     FTransform(FRotator(0,Art==ELaLaBergSonderart::Panzer?35.0f:180.0f,0),Ort),
+     nullptr,nullptr,ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+    if(!Fahrzeug) return;
+    Fahrzeug->SetzeArt(Art);
+    Fahrzeug->FinishSpawning(FTransform(FRotator(0,Art==ELaLaBergSonderart::Panzer?35.0f:180.0f,0),Ort));
+   };
+   Absetzen(ELaLaBergSonderart::Panzer,FVector2D(-187070.0f,40760.0f),20000.0f,110.0f);
+   // Vom Dach aus nach unten: der Strahl faengt hoch genug an, um ueber dem
+   // Klinikum zu beginnen, und trifft damit das Dach statt des Vorplatzes.
+   Absetzen(ELaLaBergSonderart::Hubschrauber,FVector2D(-159000.0f,14230.0f),30000.0f,150.0f);
+  },3.0f,false);
+ }
  // KI-Verkehr und Passanten, aus demselben Grund erst verzoegert wie der
  // fahrbare Wagen: die Stadtkollision muss stehen, bevor jemand darauf
  // faehrt oder geht.
@@ -514,6 +546,7 @@ void ALaLaBergGameMode::BeginPlay() {
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergAntriebTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergUebernahmeTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergSperrTest")) ||
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergSonderTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergZielFoto"));
  if(bAutomatisch) Beleg(FString::Printf(TEXT("LALABERG_SPIELBEGINN nach %.1fs Programmlaufzeit, %d Gebaeude"),FPlatformTime::Seconds()-GStartTime,BuildingCount));
  if(!bAutomatisch) {
@@ -1024,6 +1057,90 @@ void ALaLaBergGameMode::BeginPlay() {
  // je gleichzeitig Gruen zeigen. Ohne diesen Test waere "kreuzende Strassen
  // haben nie gleichzeitig Gruen" nur eine Behauptung ueber den Code, der die
  // Zeitrechnung dafuer aufstellt, nicht ueber das tatsaechliche Verhalten.
+ // Panzer und Hubschrauber: hinstellen, einsteigen, ein Stueck fahren bzw.
+ // steigen - und je ein Bild, damit man sieht, was da im Wald steht und auf
+ // dem Klinikumsdach wartet.
+ if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergSonderTest"))) {
+  static float PanzerWeg=-1.0f, HeliHoehe=-1.0f;
+  static FVector PanzerStart=FVector::ZeroVector, HeliStart=FVector::ZeroVector;
+  auto Hin=[this](ELaLaBergSonderart Art,float Hinter,float Hoch) {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr;
+   if(!Figur) return;
+   for(TActorIterator<ALaLaBergSonderfahrzeug> It(GetWorld());It;++It) {
+    if(It->HoleArt()!=Art) continue;
+    const FVector Ort=It->GetActorLocation()-It->GetActorForwardVector()*Hinter+FVector(0,0,Hoch);
+    Figur->SetActorLocation(Ort,false,nullptr,ETeleportType::TeleportPhysics);
+    PC->SetControlRotation((It->GetActorLocation()-Ort).Rotation());
+    if(auto* Anzeige=Cast<ALaLaBergHUD>(PC->GetHUD())) Anzeige->OrtSofort();
+    break;
+   }
+  };
+  auto Bild=[this](float Wann) {
+   FTimerHandle H;
+   GetWorldTimerManager().SetTimer(H,[this]() {
+    if(auto* PC=GetWorld()->GetFirstPlayerController()) PC->ConsoleCommand(TEXT("HighResShot 1600x900"));
+   },Wann,false);
+  };
+  FTimerHandle ZumPanzer;
+  GetWorldTimerManager().SetTimer(ZumPanzer,[this,Hin]() { Hin(ELaLaBergSonderart::Panzer,700.0f,150.0f); },4.0f,false);
+  Bild(4.6f);
+  FTimerHandle PanzerRein;
+  GetWorldTimerManager().SetTimer(PanzerRein,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   if(auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr) Figur->Einsteigen();
+   if(auto* Sonder=PC?Cast<ALaLaBergSonderfahrzeug>(PC->GetPawn()):nullptr) {
+    PanzerStart=Sonder->GetActorLocation();
+    Sonder->TestSteuerung(1.0f,0.0f,0.0f);
+   }
+  },5.0f,false);
+  FTimerHandle PanzerAus;
+  GetWorldTimerManager().SetTimer(PanzerAus,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   if(auto* Sonder=PC?Cast<ALaLaBergSonderfahrzeug>(PC->GetPawn()):nullptr) {
+    PanzerWeg=FVector::Dist2D(PanzerStart,Sonder->GetActorLocation())/100.0f;
+    Sonder->TestSteuerung(0.0f,0.0f,0.0f);
+    Beleg(FString::Printf(TEXT("LALABERG_SONDER panzer weg=%.0fm tempo=%.0fkmh"),PanzerWeg,Sonder->TempoKmh()));
+   }
+  },9.0f,false);
+  Bild(9.2f);
+  FTimerHandle ZumHeli;
+  GetWorldTimerManager().SetTimer(ZumHeli,[this,Hin]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   // Erst aussteigen: die Figur sitzt noch im Panzer, und solange sie das
+   // tut, ist der Pawn kein Character mehr - das Hinstellen liefe ins Leere.
+   if(auto* Sonder=PC?Cast<ALaLaBergSonderfahrzeug>(PC->GetPawn()):nullptr) {
+    Sonder->TestSteuerung(0.0f,0.0f,0.0f);
+    Sonder->TestAussteigen();
+   }
+  },10.0f,false);
+  FTimerHandle ZumHeli2;
+    // Nicht weiter als 5 m weg hinstellen: einsteigen geht nur bis 9 m, und
+  // aus 9 m plus Hoehe war die Figur schon zu weit entfernt.
+  GetWorldTimerManager().SetTimer(ZumHeli2,[this,Hin]() { Hin(ELaLaBergSonderart::Hubschrauber,500.0f,120.0f); },10.4f,false);
+  Bild(11.0f);
+  FTimerHandle HeliRein;
+  GetWorldTimerManager().SetTimer(HeliRein,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   if(auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr) Figur->Einsteigen();
+   if(auto* Sonder=PC?Cast<ALaLaBergSonderfahrzeug>(PC->GetPawn()):nullptr) {
+    HeliStart=Sonder->GetActorLocation();
+    Sonder->TestSteuerung(0.4f,0.0f,1.0f);
+   }
+  },11.4f,false);
+  FTimerHandle Ende;
+  GetWorldTimerManager().SetTimer(Ende,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   auto* Sonder=PC?Cast<ALaLaBergSonderfahrzeug>(PC->GetPawn()):nullptr;
+   if(Sonder) HeliHoehe=(Sonder->GetActorLocation().Z-HeliStart.Z)/100.0f;
+   if(PC) PC->ConsoleCommand(TEXT("HighResShot 1600x900"));
+   const bool bPass=PanzerWeg>8.0f&&HeliHoehe>8.0f;
+   Beleg(FString::Printf(TEXT("LALABERG_SONDERTEST %s panzer_weg=%.0fm heli_stieg=%.0fm"),
+                         bPass?TEXT("PASS"):TEXT("FAIL"),PanzerWeg,HeliHoehe));
+   FTimerHandle Schluss;
+   GetWorldTimerManager().SetTimer(Schluss,[bPass]() { FPlatformMisc::RequestExitWithStatus(false,bPass?0:1); },1.2f,false);
+  },15.0f,false);
+ }
  // Ab drei Sternen sperrt die Polizei die Strasse voraus. Der Test setzt
  // vier Sterne, setzt sich in einen Wagen und faehrt los; danach muss eine
  // Sperre stehen, und zwar voraus auf der Strasse, nicht irgendwo.
