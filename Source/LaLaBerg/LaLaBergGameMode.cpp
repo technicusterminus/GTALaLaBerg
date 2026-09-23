@@ -513,6 +513,7 @@ void ALaLaBergGameMode::BeginPlay() {
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergLadenTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergAntriebTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergUebernahmeTest")) ||
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergSperrTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergZielFoto"));
  if(bAutomatisch) Beleg(FString::Printf(TEXT("LALABERG_SPIELBEGINN nach %.1fs Programmlaufzeit, %d Gebaeude"),FPlatformTime::Seconds()-GStartTime,BuildingCount));
  if(!bAutomatisch) {
@@ -1023,6 +1024,51 @@ void ALaLaBergGameMode::BeginPlay() {
  // je gleichzeitig Gruen zeigen. Ohne diesen Test waere "kreuzende Strassen
  // haben nie gleichzeitig Gruen" nur eine Behauptung ueber den Code, der die
  // Zeitrechnung dafuer aufstellt, nicht ueber das tatsaechliche Verhalten.
+ // Ab drei Sternen sperrt die Polizei die Strasse voraus. Der Test setzt
+ // vier Sterne, setzt sich in einen Wagen und faehrt los; danach muss eine
+ // Sperre stehen, und zwar voraus auf der Strasse, nicht irgendwo.
+ if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergSperrTest"))) {
+  FTimerHandle Start;
+  GetWorldTimerManager().SetTimer(Start,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   if(auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr) Figur->Einsteigen();
+   if(auto* P=ALaLaBergPolizei::Instanz.Get()) P->TestSetzeSterne(4);
+  },4.0f,false);
+  FTimerHandle Gas;
+  GetWorldTimerManager().SetTimer(Gas,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   if(auto* Wagen=PC?Cast<ALaLaBergWagen>(PC->GetPawn()):nullptr) Wagen->TestSteuerung(1.0f,0.0f);
+  },5.0f,true);
+  FTimerHandle Ende;
+  GetWorldTimerManager().SetTimer(Ende,[this]() {
+   auto* P=ALaLaBergPolizei::Instanz.Get();
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   APawn* Figur=PC?PC->GetPawn():nullptr;
+   const bool bSteht=P&&P->SperreSteht();
+   const float Weit=bSteht&&Figur?FVector::Dist2D(Figur->GetActorLocation(),P->HoleSperrOrt())/100.0f:-1.0f;
+   if(PC&&bSteht) {
+    // Hinsehen: das Bild soll die Sperre zeigen, nicht die Windschutzscheibe.
+    // Schraeg von oben, 35 m ueber der Sperre: aus Augenhoehe verdeckt die
+    // erste Bake die zweite, und man sieht nicht, ob die Strasse wirklich zu
+    // ist.
+    // 80 m zurueck und 35 m hoch: naeher als 60 m gilt die Sperre als
+    // passiert, dann raeumt die Polizei sie noch vor dem Bild wieder ab.
+    const FVector Ort=P->HoleSperrOrt()+FVector(0,0,3500)-(P->HoleSperrOrt()-Figur->GetActorLocation()).GetSafeNormal2D()*8000.0f;
+    Figur->SetActorLocation(Ort,false,nullptr,ETeleportType::TeleportPhysics);
+    PC->SetControlRotation((P->HoleSperrOrt()-Ort).Rotation());
+    // Erst im naechsten Bild fotografieren: im selben Tick steht die Kamera
+    // noch am alten Platz.
+    FTimerHandle Bild;
+    GetWorldTimerManager().SetTimer(Bild,[this]() {
+     if(auto* PC2=GetWorld()->GetFirstPlayerController()) PC2->ConsoleCommand(TEXT("HighResShot 1600x900"));
+    },0.5f,false);
+   }
+   const bool bPass=bSteht&&Weit>20.0f;
+   Beleg(FString::Printf(TEXT("LALABERG_SPERRTEST %s steht=%d abstand=%.0fm"),bPass?TEXT("PASS"):TEXT("FAIL"),bSteht?1:0,Weit));
+   FTimerHandle Schluss;
+   GetWorldTimerManager().SetTimer(Schluss,[bPass]() { FPlatformMisc::RequestExitWithStatus(false,bPass?0:1); },1.5f,false);
+  },16.0f,false);
+ }
  // Wer ein KI-Auto uebernimmt, soll in genau diesem Auto sitzen. Vorher
  // wuerfelte der neue Wagen sein Modell selbst, und man sass regelmaessig im
  // roten CarConcept-Flitzer statt in dem Lieferwagen, den man angehalten

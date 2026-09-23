@@ -45,6 +45,9 @@ public:
  // Fuer -LaLaBergPolizeiTest.
  void TestSetzeSterne(int32 Anzahl);
  float NaechsteStreifeCm() const;
+ // Fuer -LaLaBergSperrTest: steht gerade eine Strassensperre, und wo?
+ bool SperreSteht() const { return bSperreSteht; }
+ FVector HoleSperrOrt() const { return SperrOrt; }
  // Route fuer die Karte (siehe ALaLaBergHUD::Route): kuerzester Weg ueber
  // denselben Strassengraphen, den die Streifen fahren - mit Einbahnregel,
  // also eine Autoroute. Liefert false ohne Netz oder ohne Weg.
@@ -90,6 +93,22 @@ private:
  };
  TArray<FStreife> Streifen;
  UPROPERTY() TArray<TObjectPtr<class ALaLaBergVerkehrsauto>> StreifenHalter;   // haelt die Wagen fuer den GC
+
+ // Strassensperre ab drei Sternen: ein Stueck voraus auf der Strasse, die
+ // der Spieler gerade faehrt, stellen sich zwei Streifenwagen quer und
+ // dazwischen stehen rot-weisse Baken. Wer trotzdem durchfaehrt, kommt
+ // durch - es ist eine Sperre, keine Wand.
+ void StelleSperre(const FVector& Spieler, const FVector& Fahrtrichtung);
+ void RaeumeSperre();
+ // Knoten ein Stueck voraus in Fahrtrichtung, plus die Strassenrichtung
+ // dort. INDEX_NONE, wenn der Graph dort nicht weiterfuehrt.
+ int32 KnotenVoraus(const FVector& Von, const FVector& Richtung, float WeiteCm, FVector& Strassenrichtung) const;
+ UPROPERTY() TArray<TObjectPtr<class ALaLaBergVerkehrsauto>> Sperrwagen;
+ UPROPERTY() TArray<TObjectPtr<class UStaticMeshComponent>> Baken;
+ FVector SperrOrt = FVector::ZeroVector;
+ bool bSperreSteht = false;
+ double SperreSeit = 0.0;
+
  bool Entsende(FStreife& S, const FVector& Ziel);
  void Plane(FStreife& S, const FVector& Ziel);
  bool Sieht(const class ALaLaBergVerkehrsauto* Auto, const APawn* Spieler) const;

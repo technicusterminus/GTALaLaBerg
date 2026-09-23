@@ -70,6 +70,9 @@ public:
  // sonst waere "die Streife hat eine Sirene" nur eine Behauptung ueber den
  // Code statt ueber das, was man hoert.
  bool SireneAn() const { return bSireneLaeuft; }
+ // Wagen einer Strassensperre: steht, aber im Einsatz - Blaulicht und Horn
+ // laufen, obwohl keine Route anliegt.
+ void SetzeSperre(bool bAn) { bSperre = bAn; }
  FLinearColor HoleLack() const { return Lack; }
  // Strassenklasse am aktuellen Wegpunkt (siehe SetzeSpurdaten) - nicht die
  // der ganzen Route. BremseVorKreuzung vergleicht damit den Vorfahrtsrang
@@ -153,6 +156,7 @@ private:
  // also genau dann, wenn auch das Blaulicht blinkt.
  UPROPERTY() TObjectPtr<class UAudioComponent> Sirene = nullptr;
  bool bSireneLaeuft = false;
+ bool bSperre = false;
  UPROPERTY() TObjectPtr<class UMaterialInstanceDynamic> BlauMaterial[2] = {};
  // Nur fuer geparkte Autos (siehe SetzeLack): der Kasten kommt dann aus
  // ALaLaBergKastenPool statt aus einem eigenen Netz - siehe dort fuer den

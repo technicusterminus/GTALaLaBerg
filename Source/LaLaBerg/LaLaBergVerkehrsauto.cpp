@@ -534,7 +534,7 @@ void ALaLaBergVerkehrsauto::Tick(float Zeit) {
  if (bPolizei && Blitz) {
   // Wechselblinken, 2,5 Takte je Sekunde; geparkt dunkel.
   const bool bLinks = FMath::Frac(GetWorld()->GetTimeSeconds() * 2.5f) < 0.5f;
-  const bool bAn = Weg.Gueltig();
+  const bool bAn = Weg.Gueltig() || bSperre;
   for (int32 i = 0; i < 2; i++)
    if (BlauMaterial[i]) BlauMaterial[i]->SetVectorParameterValue(TEXT("Color"),
     // Grundfarbe, nicht Leuchtfarbe: ueber 1 wird sie weiss statt heller.

@@ -12,6 +12,10 @@
 #include "Misc/Paths.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
+#include "Materials/MaterialInterface.h"
+#include "Materials/MaterialInstanceDynamic.h"
 
 TWeakObjectPtr<ALaLaBergPolizei> ALaLaBergPolizei::Instanz;
 
@@ -227,6 +231,84 @@ bool ALaLaBergPolizei::Sieht(const ALaLaBergVerkehrsauto* Auto, const APawn* Spi
  return !GetWorld()->LineTraceTestByChannel(Von, Nach, ECC_Visibility, Q);
 }
 
+int32 ALaLaBergPolizei::KnotenVoraus(const FVector& Von, const FVector& Richtung, float WeiteCm, FVector& Strassenrichtung) const {
+ // Nicht Kante fuer Kante nach der Fahrtrichtung tasten - das scheiterte
+ // schon am ersten Knoten, wenn er keine Ausfahrt in genau diese Richtung
+ // hat (Einbahn, Kurve, Sackgasse). Stattdessen derselbe A* wie fuer die
+ // Streifen: vom Knoten beim Spieler zu dem Knoten, der dort liegt, wo er
+ // in dieser Richtung hinkaeme, und dann der erste Punkt des Weges, der
+ // weit genug vorn liegt.
+ const int32 Start = NaechsterKnoten(Von, &Richtung);
+ const int32 Ende = NaechsterKnoten(Von + Richtung * WeiteCm, nullptr);
+ TArray<int32> Pfad;
+ if (Start == INDEX_NONE || Ende == INDEX_NONE || !SuchePfad(Start, Ende, Pfad) || Pfad.Num() < 2) {
+  UE_LOG(LogTemp, Verbose, TEXT("LALABERG_SPERRE kein Weg voraus (start=%d ende=%d)"), Start, Ende);
+  return INDEX_NONE;
+ }
+ for (int32 i = 1; i < Pfad.Num(); i++) {
+  if (FVector::Dist2D(Knoten[Pfad[i]], Von) < WeiteCm * 0.6f) continue;
+  Strassenrichtung = (Knoten[Pfad[i]] - Knoten[Pfad[i - 1]]).GetSafeNormal2D();
+  return Pfad[i];
+ }
+ return INDEX_NONE;
+}
+
+void ALaLaBergPolizei::RaeumeSperre() {
+ for (auto& Wagen : Sperrwagen) if (IsValid(Wagen)) { Wagen->SetzeSperre(false); Wagen->Parke(); }
+ Sperrwagen.Reset();
+ for (auto& Bake : Baken) if (IsValid(Bake)) Bake->DestroyComponent();
+ Baken.Reset();
+ bSperreSteht = false;
+}
+
+void ALaLaBergPolizei::StelleSperre(const FVector& Spieler, const FVector& Fahrtrichtung) {
+ FVector Strasse;
+ const int32 K = KnotenVoraus(Spieler, Fahrtrichtung, 28000.0f, Strasse);
+ if (K == INDEX_NONE) return;
+ RaeumeSperre();
+ const FVector Ort = Knoten[K];
+ const FVector Quer = FVector::CrossProduct(FVector::UpVector, Strasse).GetSafeNormal2D();
+ // Zwei Wagen quer zur Fahrbahn, links und rechts der Mitte.
+ for (int32 i = 0; i < 2; i++) {
+  const FVector Stelle = Ort + Quer * (i == 0 ? -260.0f : 260.0f);
+  const FRotator Blick = Quer.Rotation();
+  auto* Auto = GetWorld()->SpawnActorDeferred<ALaLaBergVerkehrsauto>(ALaLaBergVerkehrsauto::StaticClass(), FTransform(Blick, Stelle),
+                                                                    nullptr, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+  if (!Auto) continue;
+  Auto->bPolizei = true;
+  Auto->WunschTyp = -1;
+  Auto->FinishSpawning(FTransform(Blick, Stelle));
+  Auto->SetzeSperre(true);
+  Sperrwagen.Add(Auto);
+ }
+ // Dazwischen fuenf rot-weisse Baken. Eigene Komponenten an der Polizei,
+ // nicht an den Wagen: sie stehen auf der Strasse, nicht am Auto.
+ auto* Wuerfel = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+ auto* Basis = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+ for (int32 i = 0; i < 5 && Wuerfel; i++) {
+  auto* Bake = NewObject<UStaticMeshComponent>(this);
+  Bake->SetMobility(EComponentMobility::Movable);
+  Bake->SetupAttachment(GetRootComponent());
+  Bake->SetUsingAbsoluteLocation(true);
+  Bake->SetUsingAbsoluteRotation(true);
+  Bake->SetUsingAbsoluteScale(true);
+  Bake->SetStaticMesh(Wuerfel);
+  Bake->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+  Bake->SetWorldLocation(Ort + Quer * (i - 2) * 110.0f + FVector(0, 0, 45.0f));
+  Bake->SetWorldRotation(Strasse.Rotation());
+  Bake->SetWorldScale3D(FVector(0.12f, 1.0f, 0.9f));
+  Bake->RegisterComponent();
+  if (Basis) if (auto* M = Bake->CreateDynamicMaterialInstance(0))
+   M->SetVectorParameterValue(TEXT("Color"), i % 2 ? FLinearColor(0.85f, 0.85f, 0.82f) : FLinearColor(0.75f, 0.06f, 0.05f));
+  Baken.Add(Bake);
+ }
+ SperrOrt = Ort;
+ bSperreSteht = true;
+ SperreSeit = GetWorld()->GetTimeSeconds();
+ Meldung(GetWorld(), TEXT("Straßensperre voraus"));
+ UE_LOG(LogTemp, Display, TEXT("LALABERG_SPERRE bei %s wagen=%d baken=%d"), *Ort.ToString(), Sperrwagen.Num(), Baken.Num());
+}
+
 bool ALaLaBergPolizei::Entsende(FStreife& S, const FVector& Ziel) {
  const FVector& Spieler = Ziel;
  // Faehrt der Wagen noch vom letzten Einsatz davon, dreht er einfach um.
@@ -370,6 +452,7 @@ void ALaLaBergPolizei::Tick(float DeltaSeconds) {
  StreifenHalter.RemoveAll([](const TObjectPtr<ALaLaBergVerkehrsauto>& A) { return !IsValid(A); });
 
  if (Sterne == 0) {
+  if (bSperreSteht) RaeumeSperre();
   // Nach der Fahndung: abziehende Wagen verschwinden ausser Sicht.
   for (FStreife& S : Streifen)
    if (!S.Auto->IstGeparkt() && (S.Auto->AmZiel() || FVector::Dist2D(S.Auto->GetActorLocation(), Wo) > 25000.0f)) S.Auto->Parke();
@@ -387,6 +470,17 @@ void ALaLaBergPolizei::Tick(float DeltaSeconds) {
    return;
   }
  }
+
+ // Ab drei Sternen wird der Weg gesperrt. Eine neue Sperre erst, wenn die
+ // alte passiert ist (naeher als 60 m) oder eine Minute ungenutzt stand -
+ // sonst baut die Polizei dem Spieler alle paar Sekunden eine neue.
+ if (Sterne >= 3) {
+  const FVector Fahrt = Spieler->GetVelocity().SizeSquared2D() > 40000.0f
+   ? Spieler->GetVelocity().GetSafeNormal2D() : Spieler->GetActorForwardVector().GetSafeNormal2D();
+  const bool bVerbraucht = bSperreSteht &&
+   (FVector::Dist2D(Wo, SperrOrt) < 6000.0f || Jetzt - SperreSeit > 60.0);
+  if (!bSperreSteht || bVerbraucht) StelleSperre(Wo, Fahrt);
+ } else if (bSperreSteht) RaeumeSperre();
 
  // Je Stern eine Streife; neue kommen nicht alle auf einmal.
  int32 Aktiv = 0;
