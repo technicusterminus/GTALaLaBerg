@@ -1,4 +1,6 @@
 #include "LaLaBergVerkehrsauto.h"
+#include "Components/AudioComponent.h"
+#include "Sound/SoundBase.h"
 #include "LaLaBergPolizei.h"
 #include "LaLaBergWagen.h"
 #include "Components/PrimitiveComponent.h"
@@ -333,6 +335,19 @@ void ALaLaBergVerkehrsauto::BeginPlay() {
    BlauMaterial[i] = Leuchte->CreateDynamicMaterialInstance(0);
    Blaulicht[i] = Leuchte;
   }
+  // Martinshorn: zwei Toene im Quartabstand (siehe Tools/erzeuge_sounds.py).
+  // Eigene Reichweite statt einer Attenuation-Vorlage - 120 m weit hoerbar,
+  // damit man die Streife kommen hoert, bevor man sie sieht.
+  Sirene = NewObject<UAudioComponent>(this);
+  Sirene->SetupAttachment(GetRootComponent());
+  Sirene->bAutoActivate = false;
+  Sirene->bOverrideAttenuation = true;
+  Sirene->AttenuationOverrides.bAttenuate = true;
+  Sirene->AttenuationOverrides.FalloffDistance = 12000.0f;
+  Sirene->AttenuationOverrides.AttenuationShapeExtents = FVector(600.0f, 0, 0);
+  if (auto* Horn = LoadObject<USoundBase>(nullptr, TEXT("/Game/Audio/SFX_Sirene.SFX_Sirene"))) Sirene->SetSound(Horn);
+  Sirene->RegisterComponent();
+
   Blitz = NewObject<UPointLightComponent>(this);
   Blitz->SetMobility(EComponentMobility::Movable);
   Blitz->SetupAttachment(GetRootComponent());
@@ -526,6 +541,12 @@ void ALaLaBergVerkehrsauto::Tick(float Zeit) {
     bAn && (i == 0) == bLinks ? FLinearColor(0.03f, 0.2f, 1.0f) : FLinearColor(0.02f, 0.03f, 0.08f));
   Blitz->SetIntensity(bAn ? 9000.0f : 0.0f);
   Blitz->SetRelativeLocation(FVector(20.0f, bLinks ? -40.0f : 40.0f, 150.0f));
+  // Horn und Blaulicht gehoeren zusammen: nur im Einsatz, und nur einmal
+  // umgeschaltet statt jedes Bild neu gestartet.
+  if (Sirene && bAn != bSireneLaeuft) {
+   bSireneLaeuft = bAn;
+   if (bAn) Sirene->Play(); else Sirene->Stop();
+  }
  }
 
  // Sichtweiten-LOD: das Detailmodell (Pool-Instanz) nur nah am Spieler, sonst

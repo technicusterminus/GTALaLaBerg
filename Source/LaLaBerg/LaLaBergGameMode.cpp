@@ -1188,7 +1188,7 @@ void ALaLaBergGameMode::BeginPlay() {
  // Figur wird 1,5 km weit weggesetzt und muss die Fahndung abschuetteln.
  if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergPolizeiTest"))) {
   static double FestnahmeZeit=-1.0, AbhaengStart=-1.0;
-  static bool bBildGemacht=false, bAbhaengen=false, bNahbild=false;
+  static bool bBildGemacht=false, bAbhaengen=false, bNahbild=false, bSireneGehoert=false;
   static FVector InspektionOrt=FVector::ZeroVector;
   FTimerHandle Tat;
   GetWorldTimerManager().SetTimer(Tat,[this]() {
@@ -1266,12 +1266,15 @@ void ALaLaBergGameMode::BeginPlay() {
     Beleg(FString::Printf(TEXT("LALABERG_POLIZEITEST abhaengen von=%s nach=%s weite=%.0fm"),*InspektionOrt.ToString(),
      *Weit.GetLocation().ToString(),FVector::Dist2D(InspektionOrt,Weit.GetLocation())/100.0f));
    }
+   // Mindestens eine Streife im Einsatz muss dabei das Martinshorn fahren.
+   for(const ALaLaBergVerkehrsauto* Auto:ALaLaBergVerkehrsauto::Alle)
+    if(Auto&&Auto->SireneAn()) { bSireneGehoert=true; break; }
    const bool bFertig=bAbhaengen&&P->HoleSterne()==0;
    const bool bZeitUm=Jetzt>150.0||(bAbhaengen&&Jetzt>AbhaengStart+30.0);
    if(bFertig||bZeitUm) {
-    const bool bPass=bFertig&&P->HoleFestnahmen()==1&&bBildGemacht;
-    Beleg(FString::Printf(TEXT("LALABERG_POLIZEITEST %s festnahmen=%d abgehaengt_nach=%.1fs bild=%d"),bPass?TEXT("PASS"):TEXT("FAIL"),
-     P->HoleFestnahmen(),bAbhaengen?Jetzt-AbhaengStart:-1.0,bBildGemacht?1:0));
+    const bool bPass=bFertig&&P->HoleFestnahmen()==1&&bBildGemacht&&bSireneGehoert;
+    Beleg(FString::Printf(TEXT("LALABERG_POLIZEITEST %s festnahmen=%d abgehaengt_nach=%.1fs bild=%d sirene=%d"),bPass?TEXT("PASS"):TEXT("FAIL"),
+     P->HoleFestnahmen(),bAbhaengen?Jetzt-AbhaengStart:-1.0,bBildGemacht?1:0,bSireneGehoert?1:0));
     FPlatformMisc::RequestExitWithStatus(false,bPass?0:1);
    }
   },0.25f,true);

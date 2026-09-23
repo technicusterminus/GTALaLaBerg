@@ -66,6 +66,10 @@ public:
  // (siehe ALaLaBergWagen::UebernimmModell): der Spieler soll in genau dem
  // Auto sitzen, das er angehalten hat.
  int32 HoleFahrzeugTyp() const { return FahrzeugTyp; }
+ // Heult das Martinshorn dieses Wagens gerade? Fuer -LaLaBergPolizeiTest -
+ // sonst waere "die Streife hat eine Sirene" nur eine Behauptung ueber den
+ // Code statt ueber das, was man hoert.
+ bool SireneAn() const { return bSireneLaeuft; }
  FLinearColor HoleLack() const { return Lack; }
  // Strassenklasse am aktuellen Wegpunkt (siehe SetzeSpurdaten) - nicht die
  // der ganzen Route. BremseVorKreuzung vergleicht damit den Vorfahrtsrang
@@ -145,6 +149,10 @@ private:
  // Blaulicht (nur bPolizei): zwei Leuchten auf dem Dach, im Wechsel.
  UPROPERTY() TObjectPtr<class UStaticMeshComponent> Blaulicht[2] = {};
  UPROPERTY() TObjectPtr<class UPointLightComponent> Blitz = nullptr;
+ // Martinshorn (nur bPolizei): laeuft, solange der Wagen im Einsatz ist -
+ // also genau dann, wenn auch das Blaulicht blinkt.
+ UPROPERTY() TObjectPtr<class UAudioComponent> Sirene = nullptr;
+ bool bSireneLaeuft = false;
  UPROPERTY() TObjectPtr<class UMaterialInstanceDynamic> BlauMaterial[2] = {};
  // Nur fuer geparkte Autos (siehe SetzeLack): der Kasten kommt dann aus
  // ALaLaBergKastenPool statt aus einem eigenen Netz - siehe dort fuer den
