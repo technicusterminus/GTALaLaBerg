@@ -8,9 +8,8 @@
 #
 #   Motor   - einzelne Zuendungen, durch die Resonanzen der Auspuffanlage
 #             geschickt, dazu Ansauggeraeusch und mechanisches Klappern.
-#   Schuss  - Muendungsknall (breitbandig, in Millisekunden abfallend), der
-#             Koerperschlag darunter, der scharfe Peitschenknall obendrauf
-#             und der Nachhall der Haeuser ringsum.
+#   Schuss  - Paintball-Markierer: Luftstoss, dessen Klangfarbe mit dem
+#             Druck abfaellt, der Ton des Laufs und die Klicks des Bolzens.
 #   Schritt - Absatz und Abrollen, getrennt nach hartem Belag und Wiese.
 #   Sirene  - Martinshorn nach DIN 14610 (a' und d''), Druckkammertoene.
 #   Rotor   - Blattschlag plus Turbine, Panzer - Diesel plus Kettenklappern.
@@ -200,48 +199,95 @@ def motor(drehzahl=900.0, zylinder=4, dauer=1.0):
 
 
 # ------------------------------------------------------------------ Schuss
-# Drei Anteile, die man in jeder Aufnahme wiederfindet: der Muendungsknall
-# (breitbandig, in wenigen Millisekunden weg), der Koerperschlag darunter
-# (die Gassaeule im Lauf) und der Peitschenknall (sehr hoch, sehr kurz).
-# Dazu der Nachhall der Haeuser - ohne ihn klingt jeder Schuss wie im
-# Wattebausch.
-def schuss(knalldauer, koerper_hz, koerper_abfall, helligkeit, peitsche, hall):
-    n = int(SR * knalldauer)
+# Wichtig und lange uebersehen: die Waffen im Spiel sind Paintball-Waffen
+# (siehe LaLaBergWaffe, der Laden heisst Paintball-Laden). Ein Markierer
+# knallt nicht wie ein Gewehr - er stoesst Druckluft aus. Der erste Versuch
+# baute Muendungsknall, Koerperschlag und Haeuserhall nach und klang
+# entsprechend nach Rauschen mit Blecheimer.
+#
+# Was man bei einem Markierer tatsaechlich hoert:
+#   1. den Luftstoss - Rauschen, dessen Klangfarbe binnen 25 ms von hell
+#      nach dunkel faellt, weil der Druck abfaellt,
+#   2. den Ton des Laufs - eine kurze, stark gedaempfte Resonanz,
+#   3. die Mechanik - Bolzen vor und zurueck, ein bis zwei metallische
+#      Klicks wenige Millisekunden spaeter,
+#   4. kaum Nachhall - im Freien ist nach 150 ms nichts mehr da.
+def faltung(x, antwort):
+    """Kurze Faltung - nur fuer wenige Millisekunden Anregung gedacht, sonst
+    rechnet reines Python zu lange."""
+    n = len(x) + len(antwort)
+    aus = [0.0] * n
+    for i, xi in enumerate(x):
+        if abs(xi) < 1e-5:
+            continue
+        for j, hj in enumerate(antwort):
+            aus[i + j] += xi * hj
+    return aus
+
+
+def raumantwort(dauer, daempfung, seed):
+    """Dichte, zufaellige Rueckwuerfe statt vier einzelner Echos: vier Taps
+    klangen wie ein Blecheimer (Kammfilter), hier ist es einfach Raum."""
+    n = int(SR * dauer)
+    roh = rauschen(n, seed)
+    weich = tiefpass(roh, daempfung)
+    return [weich[i] * math.exp(-i / SR * (6.0 / dauer)) * (i / (SR * 0.004) if i < SR * 0.004 else 1.0)
+            for i in range(n)]
+
+
+def markierer(luftdauer, lauf_hz, helligkeit, mechanik, hall=0.10, nachbolzen=None):
+    n = int(SR * luftdauer)
     roh = rauschen(n, 1)
-    # Der Knall wird waehrend des Abklingens dumpfer: erst alles, dann nur
-    # noch das Tiefe - deshalb zwei Tiefpaesse ueberblendet.
-    hell = tiefpass(roh, 7000.0 * helligkeit)
-    dumpf = tiefpass(roh, 700.0)
-    huelle_knall = huellkurve(n, 0.0004, 55.0)
-    knall = [(hell[i] * math.exp(-i / SR * 90.0) + dumpf[i] * (1 - math.exp(-i / SR * 90.0)))
-             * huelle_knall[i] for i in range(n)]
-    # Koerperschlag: gedaempfte Schwingung der Gassaeule.
-    koerper = [math.sin(2 * math.pi * koerper_hz * i / SR) * math.exp(-i / SR * koerper_abfall)
-               for i in range(n)]
-    # Peitschenknall: sehr kurz, sehr hoch.
-    kurz = int(SR * 0.004)
-    riss = hochpass(rauschen(kurz, 5), 3500.0)
-    peitschen = [riss[i] * math.exp(-i / SR * 900.0) * peitsche for i in range(kurz)]
-    roh_mix = mische([k * 0.85 for k in knall], [k * 0.55 for k in koerper], peitschen)
-    return normiere(nachhall(roh_mix, hall), 0.95)
-
-
-def rakete():
-    """Raketenwerfer: kein Knall, sondern ein Ausstoss - tiefes Zischen, das
-    anschwillt und mit dem Abflug leiser wird."""
-    n = int(SR * 0.9)
-    roh = rauschen(n, 7)
-    zischen = bandpass(tiefpass(roh, 3200.0), 240.0, 0.8, 1.0)
-    aus = []
+    # 1. Luftstoss: ein Tiefpass, dessen Grenze mitlaeuft - von hell nach
+    #    dunkel, weil der Druck im Lauf abfaellt.
+    luft = [0.0] * n
+    y = 0.0
     for i in range(n):
         t = i / SR
-        # 40 ms anschwellen, dann ueber eine halbe Sekunde weg.
-        h = min(1.0, t / 0.04) * math.exp(-max(0.0, t - 0.04) * 4.5)
-        # Der Ton faellt, waehrend die Rakete davonfliegt (Doppler).
-        mod = 1.0 + 0.25 * math.sin(2 * math.pi * 26.0 * t)
-        aus.append(zischen[i] * h * mod)
-    schlag = [math.sin(2 * math.pi * 62.0 * i / SR) * math.exp(-i / SR * 14.0) * 0.6 for i in range(n)]
-    return normiere(nachhall(mische(aus, schlag), 0.25), 0.95)
+        grenze = (5200.0 * helligkeit) * math.exp(-t * 55.0) + 300.0
+        a = math.exp(-2 * math.pi * grenze / SR)
+        y = y * a + roh[i] * (1 - a)
+        huelle = min(1.0, t / 0.0004) * math.exp(-t * 46.0)
+        luft[i] = y * huelle
+    # 2. Lauf: kurze, stark gedaempfte Resonanz auf demselben Stoss.
+    lauf = bandpass([luft[i] * math.exp(-i / SR * 120.0) for i in range(n)], lauf_hz, 6.0, 1.6)
+    # 3. Mechanik: metallische Klicks, ein paar Millisekunden versetzt.
+    aus = [luft[i] * 1.0 + lauf[i] * 0.8 for i in range(n)]
+    klicks = [(0.006, 1.0)] + ([(nachbolzen, 0.7)] if nachbolzen else [])
+    for versatz, pegel in klicks:
+        i0 = int(SR * versatz)
+        kurz = int(SR * 0.012)
+        anregung = [rauschen(kurz, 31)[i] * math.exp(-i / SR * 1400.0) for i in range(kurz)]
+        metall = mische(bandpass(anregung, 2600.0, 18.0, 1.0), bandpass(anregung, 4300.0, 22.0, 0.6))
+        for i, v in enumerate(metall):
+            if i0 + i < n:
+                aus[i0 + i] += v * mechanik * pegel
+    # 4. Der Raum, sparsam: nur die ersten Millisekunden werden gefaltet.
+    if hall > 0.0:
+        anregung = aus[:int(SR * 0.006)]
+        schwanz = faltung(anregung, raumantwort(0.16, 2400.0, 3))
+        aus = mische(aus, [v * hall for v in schwanz])
+    return normiere(aus, 0.9)
+
+
+def werfer():
+    """Paintball-Werfer: keine Druckluft aus duennem Lauf, sondern ein
+    dumpfer Ausstoss aus weitem Rohr - tiefer, laenger, ohne scharfen
+    Klick."""
+    n = int(SR * 0.35)
+    roh = rauschen(n, 7)
+    aus = [0.0] * n
+    y = 0.0
+    for i in range(n):
+        t = i / SR
+        grenze = 1400.0 * math.exp(-t * 30.0) + 160.0
+        a = math.exp(-2 * math.pi * grenze / SR)
+        y = y * a + roh[i] * (1 - a)
+        aus[i] = y * min(1.0, t / 0.0015) * math.exp(-t * 16.0)
+    rohrton = bandpass(aus, 190.0, 4.0, 1.4)
+    gemischt = [aus[i] * 0.8 + rohrton[i] for i in range(n)]
+    schwanz = faltung(gemischt[:int(SR * 0.008)], raumantwort(0.22, 1800.0, 5))
+    return normiere(mische(gemischt, [v * 0.16 for v in schwanz]), 0.92)
 
 
 # ----------------------------------------------------------------- Klecks
@@ -376,12 +422,12 @@ def panzer(dauer=1.2, drehzahl=800.0, zylinder=12):
 
 
 if __name__ == "__main__":
-    # Waffen: Pistole hell und kurz, MP kuerzer und schaerfer, Schrotflinte
-    # tief und breit, Raketenwerfer als Ausstoss statt Knall.
-    schreibe("SFX_Schuss_Pistole", schuss(0.30, 190.0, 40.0, 1.0, 0.55, 0.30))
-    schreibe("SFX_Schuss_Maschine", schuss(0.24, 230.0, 55.0, 1.15, 0.70, 0.26))
-    schreibe("SFX_Schuss_Schrot", schuss(0.40, 110.0, 26.0, 0.8, 0.40, 0.38))
-    schreibe("SFX_Schuss_Rakete", rakete())
+    # Pistole: kurzer, heller Stoss. MP: schneller Bolzen, zweiter Klick
+    # beim Zurueckfahren. Schrotflinte: weiteres Rohr, tiefer und voller.
+    schreibe("SFX_Schuss_Pistole", markierer(0.20, 900.0, 1.00, 0.45))
+    schreibe("SFX_Schuss_Maschine", markierer(0.15, 1150.0, 1.15, 0.60, nachbolzen=0.028))
+    schreibe("SFX_Schuss_Schrot", markierer(0.30, 520.0, 0.80, 0.35, hall=0.16))
+    schreibe("SFX_Schuss_Rakete", werfer())
     schreibe("SFX_Klecks", klecks())
     schreibe("SFX_Schritt", schritt(hart=True))
     schreibe("SFX_Schritt_Gras", schritt(hart=False))
