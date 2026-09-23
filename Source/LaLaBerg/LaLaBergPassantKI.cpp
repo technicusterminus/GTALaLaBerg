@@ -318,8 +318,53 @@ void ALaLaBergPassantKI::EndPlay(const EEndPlayReason::Type Grund) {
  Super::EndPlay(Grund);
 }
 
+float ALaLaBergPassantKI::HoleSohleZ() const {
+ float Tiefste = TNumericLimits<float>::Max();
+ TArray<UPrimitiveComponent*> Teile;
+ GetComponents<UPrimitiveComponent>(Teile);
+ for (const UPrimitiveComponent* Teil : Teile) {
+  if (Teil == Huelle || !Teil->IsVisible()) continue;      // die Huelle ist unsichtbar und reicht per Definition bis zum Boden
+  Tiefste = FMath::Min(Tiefste, (float)Teil->Bounds.GetBox().Min.Z);
+ }
+ return Tiefste == TNumericLimits<float>::Max() ? (float)GetActorLocation().Z : Tiefste;
+}
+
+// Misst die Hoehe der sichtbaren Oberflaeche unter dem Routenpunkt. Der
+// Strahl reicht 3 m hoch und 3 m tief: das deckt Bordkante, Wiesenkante und
+// Treppenabsatz ab, ohne von einem Vordach oder Balkon gefangen zu werden.
+void ALaLaBergPassantKI::PruefeBoden(const FVector& RoutenOrt) {
+ FHitResult Treffer;
+ FCollisionQueryParams Params;
+ Params.AddIgnoredActor(this);
+ if (!GetWorld()->LineTraceSingleByChannel(Treffer, RoutenOrt + FVector(0, 0, 300),
+                                           RoutenOrt - FVector(0, 0, 300), ECC_Visibility, Params)) return;
+ BodenversatzZiel = Treffer.ImpactPoint.Z - RoutenOrt.Z;
+ if (!bBodenGemessen) {
+  // Beim ersten Mal ohne Nachfuehren: die Figur soll nicht sichtbar aus dem
+  // Boden herauswachsen, sondern gleich richtig stehen.
+  bBodenGemessen = true;
+  Bodenversatz = BodenversatzZiel;
+ }
+}
+
 void ALaLaBergPassantKI::Tick(float Zeit) {
  Super::Tick(Zeit);
+ if (bSkelettGenutzt && !bSohleGesetzt) {
+  // Einmal nachmessen, sobald die Pose steht: wie weit haengt die Figur
+  // unter der Huelle? Der feste Versatz -86 (siehe Konstruktor) stimmte nur
+  // fuer ein Mesh mit Ursprung an den Fuessen; bei den uebrigen liegt er in
+  // Huefthoehe, und die Figur steckte bis zum Bauch im Boden. Die Grenzen
+  // des Assets taugen dafuer nicht (sie melden je Figurenart voellig andere
+  // Werte als die fertige Pose) - gemessen wird an den Weltgrenzen der
+  // Komponenten, also an dem, was man tatsaechlich sieht.
+  bSohleGesetzt = true;
+  const float Diff = (float)GetActorLocation().Z - HoleSohleZ();
+  if (FMath::Abs(Diff) > 2.0f && FMath::Abs(Diff) < 400.0f) {
+   for (USkeletalMeshComponent* Teil : { SkelettKoerper, SkelettKopf, SkelettFuesse, SkelettBeine })
+    Teil->SetRelativeLocation(Teil->GetRelativeLocation() + FVector(0, 0, Diff));
+   UE_LOG(LogTemp, Verbose, TEXT("LALABERG_PASSANT_SOHLE typ=%d hebung=%.0f"), FigurTyp, Diff);
+  }
+ }
  if (!Weg.Gueltig()) return;
  // Angefahren: der Spieler sitzt in einem Wagen (kein Character) und ist
  // schneller als Schritttempo bis auf Stossstangenbreite heran.
@@ -332,10 +377,21 @@ void ALaLaBergPassantKI::Tick(float Zeit) {
  }
  const bool bStolpert = GetWorld()->GetTimeSeconds() < StolpertBis;
  FVector Ort = GetActorLocation() - LetzterAusweichOffset;
+ // Auf die reine Routenhoehe zurueck: der Wegfolger zieht Ort zu den
+ // Routenpunkten, ein aufgeschlagener Bodenversatz wuerde sich sonst Bild
+ // um Bild aufsummieren (derselbe Fehler wie einst beim Seitversatz).
+ Ort.Z -= Bodenversatz;
  const FVector Vorwaerts = GetActorForwardVector();
  const float Bremse = FMath::Min(BremseVorPassant(this, Ort, Vorwaerts), BremseVorSpieler(GetWorld(), Ort, Vorwaerts));
  const float Faktor = (bStolpert ? 0.15f : 1.0f) * Bremse;
  const FVector Richtung = Weg.Bewege(Ort, Tempo * Zeit * Faktor);
+ if (GetWorld()->GetTimeSeconds() >= NaechsteBodenpruefung) {
+  // Gestreut, damit nicht alle Passanten im selben Bild messen.
+  NaechsteBodenpruefung = GetWorld()->GetTimeSeconds() + FMath::FRandRange(0.2f, 0.3f);
+  PruefeBoden(Ort);
+ }
+ Bodenversatz = FMath::FInterpTo(Bodenversatz, BodenversatzZiel, Zeit, 8.0f);
+ Ort.Z += Bodenversatz;
  SetActorLocation(Ort);
  if (!Richtung.IsNearlyZero()) SetActorRotation(FMath::RInterpTo(GetActorRotation(), Richtung.Rotation(), Zeit, 4.0f));
 

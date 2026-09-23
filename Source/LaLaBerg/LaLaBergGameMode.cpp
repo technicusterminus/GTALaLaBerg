@@ -996,8 +996,25 @@ void ALaLaBergGameMode::BeginPlay() {
   },7.0f,false);   // kurz nach dem Hinstellen, bevor der Passant aus dem Bild laeuft
   FTimerHandle Ende;
   GetWorldTimerManager().SetTimer(Ende,[this]() {
-   Beleg(FString::Printf(TEXT("LALABERG_VERKEHRFOTO PASS autos=%d passanten=%d"),AutoZahl,PassantZahl));
-   FPlatformMisc::RequestExitWithStatus(false,0);
+   // Stehen die Figuren auf dem Boden? Unter der Sohle (tiefste sichtbare
+   // Stelle, siehe HoleSohleZ) darf keine Flaeche mehr liegen - sonst steckt
+   // die Figur darin, wie zuletzt bis zur Huefte in der Wiese.
+   int32 Geprueft=0,Versenkt=0; float Tiefste=0.0f;
+   for(ALaLaBergPassantKI* P:ALaLaBergPassantKI::Alle) {
+    if(!P||Geprueft>=200) break;
+    const FVector Ort=P->GetActorLocation();
+    FHitResult Boden; FCollisionQueryParams Params; Params.AddIgnoredActor(P);
+    if(!GetWorld()->LineTraceSingleByChannel(Boden,Ort+FVector(0,0,300),Ort-FVector(0,0,300),ECC_Visibility,Params)) continue;
+    Geprueft++;
+    const float Tief=Boden.ImpactPoint.Z-P->HoleSohleZ();   // > 0: Boden ueber den Sohlen
+    // Toleranz 25 cm: die Mesh-Grenzen sind etwas grosszuegiger als die Figur.
+    if(Tief>25.0f) { Versenkt++; Tiefste=FMath::Max(Tiefste,Tief); }
+    if(Geprueft<=3) UE_LOG(LogTemp,Display,TEXT("LALABERG_PASSANT_PROBE aktor=%.0f sohle=%.0f boden=%.0f"),Ort.Z,P->HoleSohleZ(),Boden.ImpactPoint.Z);
+   }
+   const bool bPass=Versenkt==0;
+   Beleg(FString::Printf(TEXT("LALABERG_VERKEHRFOTO %s autos=%d passanten=%d boden_geprueft=%d versenkt=%d tiefste=%.0fcm"),
+                         bPass?TEXT("PASS"):TEXT("FAIL"),AutoZahl,PassantZahl,Geprueft,Versenkt,Tiefste));
+   FPlatformMisc::RequestExitWithStatus(false,bPass?0:1);
   },9.4f,false);
  }
  // Prueft ueber eine volle Zyklusdauer, ob zwei Ampeln derselben Kreuzung

@@ -21,6 +21,10 @@ public:
  void SetzeRoute(const TArray<FVector>& Punkte, float TempoKmh);
  virtual void ErhalteFarbe(const FLinearColor& Farbe, const FVector& AusRichtung) override;
  float HoleTempo() const { return Tempo; }
+ // Welthoehe der tiefsten sichtbaren Stelle (die Sohle). Die Bodenprobe in
+ // -LaLaBergVerkehrFoto vergleicht sie mit der Oberflaeche darunter - die
+ // Aktorhoehe allein sagt nichts darueber, ob die Figur im Boden steckt.
+ float HoleSohleZ() const;
  // Kurze eigene Liste statt TActorIterator - siehe LaLaBergVerkehrsauto.h.
  static TArray<ALaLaBergPassantKI*> Alle;
 
@@ -34,6 +38,14 @@ private:
  // um "Laenge" ausgedehnt - so biegt eine Drehung des Gelenks das Glied wie
  // an einem echten Scharnier.
  void BaueGlied(class UProceduralMeshComponent* Netz, const FLinearColor& Farbe, float HalbBreite, float Laenge);
+ // Die Route bringt die Hoehe des ausgeraeumten Gelaendes mit (Tools/Export/
+ // prepare-verkehr.cjs), die sichtbare Stadt liegt daruber: Wiese, Gehweg-
+ // platten und Absaetze sind bis zu einem knappen Meter hoeher. Ohne
+ // Nachmessen standen die Figuren dort bis zur Huefte im Gras. Darum je
+ // Viertelsekunde ein Strahl nach unten; der gemessene Versatz zur Routen-
+ // hoehe wird sanft nachgefuehrt, damit eine Bordkante die Figur nicht
+ // springen laesst.
+ void PruefeBoden(const FVector& RoutenOrt);
 
  UPROPERTY() TObjectPtr<class UCapsuleComponent> Huelle = nullptr;
  UPROPERTY() TObjectPtr<class UProceduralMeshComponent> Netz = nullptr;         // Kopf, Hals, Rumpf - unbewegt
@@ -70,6 +82,13 @@ private:
  float Gehphase = 0.0f;
  FVector LetzterAusweichOffset = FVector::ZeroVector;
  FLinearColor Jacke;
+ // Siehe PruefeBoden: Bodenversatz ist der gerade angewandte Aufschlag auf
+ // die Routenhoehe, BodenversatzZiel der zuletzt gemessene.
+ float Bodenversatz = 0.0f;
+ float BodenversatzZiel = 0.0f;
+ float NaechsteBodenpruefung = -1.0f;   // Weltzeit der naechsten Messung
+ bool bBodenGemessen = false;           // erste Messung sofort, ohne Nachfuehren
+ bool bSohleGesetzt = false;            // siehe Tick: Sohlenhoehe einmal nachgemessen
  float Groesse = 1.72f;
  float BeinL = 0.0f;                // Beinlaenge in cm, aus Groesse abgeleitet
  float OberschenkelL = 0.0f, UnterschenkelL = 0.0f, OberarmL = 0.0f;
