@@ -2,6 +2,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "LaLaBergFarbbar.h"
+#include "LaLaBergVerletzbar.h"
 #include "LaLaBergWegfolger.h"
 #include "LaLaBergKastenPool.h"
 #include "LaLaBergVerkehrsauto.generated.h"
@@ -12,9 +13,14 @@
 // Wegpunkte. Dieselbe Karosserie aus wagen.json wie jeder geparkte und der
 // fahrbare Wagen (LaLaBergWagenForm).
 UCLASS()
-class LALABERG_API ALaLaBergVerkehrsauto : public AActor, public ILaLaBergFarbbar {
+class LALABERG_API ALaLaBergVerkehrsauto : public AActor, public ILaLaBergFarbbar, public ILaLaBergVerletzbar {
  GENERATED_BODY()
 public:
+ // ILaLaBergVerletzbar: 100 Punkte. Bei null bleibt der Wagen stehen, wird
+ // russig und faehrt nicht mehr weiter - kein Wrack, kein Feuer.
+ virtual void Verletze(float Schaden, const FVector& AusRichtung, ELaLaBergSchaden Art) override;
+ virtual bool IstAusgeschaltet() const override { return Leben <= 0.0f; }
+ virtual float Lebensanteil() const override { return FMath::Clamp(Leben / 100.0f, 0.0f, 1.0f); }
  ALaLaBergVerkehrsauto();
  virtual void Tick(float Zeit) override;
  // Vor BeginPlay setzen: die Wegpunkte in Unreal-Zentimetern.
@@ -148,6 +154,7 @@ private:
  // unterwegs verschwinden kann (siehe ALaLaBergAutoPool-Verstecken/Zerstoeren).
  TWeakObjectPtr<class ALaLaBergVerkehrsauto> Ueberholt;
  FLinearColor Lack = FLinearColor(0.6f, 0.6f, 0.6f);
+ float Leben = 100.0f;
  bool bNetzGebaut = false;
  // Blaulicht (nur bPolizei): zwei Leuchten auf dem Dach, im Wechsel.
  UPROPERTY() TObjectPtr<class UStaticMeshComponent> Blaulicht[2] = {};

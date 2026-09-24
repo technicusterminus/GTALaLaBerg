@@ -17,6 +17,10 @@ public:
  // Schwerkraftfaktor (ein Raketenwerfer fliegt flacher als eine Pistole).
  void Einrichten(const FLinearColor& Farbe, float KugelRadius, float KleckMin, float KleckMax, float Schwerkraft);
  void Abschiessen(const FVector& Richtung, float Tempo);
+ // Panzerkanone: beim Einschlag nimmt alles im Umkreis Schaden, nach aussen
+ // abnehmend. Vor FinishSpawning setzen; ohne Aufruf bleibt es beim reinen
+ // Farbklecks.
+ void SetzeWucht(float Schaden, float RadiusCm) { Wucht = Schaden; WuchtRadius = RadiusCm; }
  // Fuer die Schrotflinte: die Kugeln einer Salve entstehen im selben Bild
  // dicht nebeneinander und trafen sich sonst gegenseitig statt des Ziels.
  void IgnoriereGeschwister(AActor* Anderer);
@@ -35,4 +39,5 @@ private:
  FLinearColor Farbe = FLinearColor(0.8f, 0.1f, 0.5f, 1.0f);
  float Radius = 1.4f;
  float KleckMin = 9.0f, KleckMax = 15.0f;
+ float Wucht = 0.0f, WuchtRadius = 0.0f;
 };

@@ -201,6 +201,9 @@ bool ALaLaBergSonderfahrzeug::Feuern() {
       this, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn)) {
   // Grosses Kaliber: 20 cm Kugel, Klecks zwischen 12 und 22 m, flache Bahn.
   Kugel->Einrichten(FLinearColor(0.95f, 0.55f, 0.05f), 20.0f, 1200.0f, 2200.0f, 0.25f);
+  // Wirkung im Umkreis von 14 m: wer in der Mitte steht, ist erledigt, am
+  // Rand reicht es fuer eine Beule.
+  Kugel->SetzeWucht(130.0f, 1400.0f);
   Kugel->FinishSpawning(Lage);
   Kugel->Abschiessen(Richtung, KANONE_TEMPO);
  }

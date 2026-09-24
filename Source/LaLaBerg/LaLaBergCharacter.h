@@ -1,13 +1,23 @@
 #pragma once
 #include "CoreMinimal.h"
+#include "LaLaBergVerletzbar.h"
 #include "GameFramework/Character.h"
 #include "LaLaBergCharacter.generated.h"
 
 UCLASS()
-class LALABERG_API ALaLaBergCharacter : public ACharacter {
+class LALABERG_API ALaLaBergCharacter : public ACharacter, public ILaLaBergVerletzbar {
  GENERATED_BODY()
 public:
  ALaLaBergCharacter();
+ // ILaLaBergVerletzbar: die Figur haelt 100 Punkte aus. Bei null wacht sie
+ // im Klinikum wieder auf - wie in dem Spiel, dem dieses nachempfunden ist,
+ // kostet das Geld, nicht den Spielstand.
+ virtual void Verletze(float Schaden, const FVector& AusRichtung, ELaLaBergSchaden Art) override;
+ virtual bool IstAusgeschaltet() const override { return Leben <= 0.0f; }
+ virtual float Lebensanteil() const override { return FMath::Clamp(Leben / 100.0f, 0.0f, 1.0f); }
+ // Fuer -LaLaBergSchadenTest.
+ float HoleLeben() const { return Leben; }
+ int32 HoleKrankenhausbesuche() const { return Krankenhausbesuche; }
  virtual void SetupPlayerInputComponent(UInputComponent* Input) override;
  virtual void BeginPlay() override;
  virtual void Tick(float DeltaSeconds) override;
@@ -96,5 +106,14 @@ private:
  // fuer die Spielfigur), sondern rein an die zurueckgelegte Strecke am Boden -
  // alle ~140 cm ein Tritt, wie ein durchschnittlicher Schritt.
  void PruefeSchritt(float Zeit);
+ // Angefahren werden: jedes Bild pruefen, ob ein schnelles Fahrzeug die
+ // Figur erwischt - Fahrzeuge bewegen sich kinematisch, ein Stossimpuls
+ // aus der Physik kommt dort nie an.
+ void PruefeAnprall(float Zeit);
+ // Aufwachen im Klinikum: Leben voll, Geld weg, Fahndung eingestellt.
+ void InsKrankenhaus();
+ float Leben = 100.0f;
+ float LetzterAnprall = -10.0f;      // Weltzeit, gegen Dauerschaden im selben Stoss
+ int32 Krankenhausbesuche = 0;
  float SchrittWeg = 0.0f;
 };

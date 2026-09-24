@@ -368,6 +368,7 @@ void ALaLaBergCharacter::Tick(float DeltaSeconds) {
  Super::Tick(DeltaSeconds);
  if (bFeuerKnopf) Feuern();
  PruefeSchritt(DeltaSeconds);
+ PruefeAnprall(DeltaSeconds);
 
  // Gang wie bei den KI-Passanten (siehe LaLaBergPassantKI::Tick), an das
  // tatsaechliche Tempo gekoppelt statt an einen festen Takt. Der rechte Arm
@@ -490,6 +491,79 @@ void ALaLaBergCharacter::PruefeSchritt(float Zeit) {
  USoundBase* Sound = LoadObject<USoundBase>(nullptr, Pfad);
  if (!Sound) Sound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Audio/SFX_Schritt.SFX_Schritt"));
  if (Sound) UGameplayStatics::PlaySoundAtLocation(this, Sound, GetActorLocation(), 0.7f, FMath::FRandRange(0.9f, 1.1f));
+}
+
+// Angefahren werden. Die Fahrzeuge bewegen sich kinematisch (Verkehrsautos)
+// oder haengen an Chaos (der eigene Wagen) - ein Stossimpuls aus der Physik
+// kommt bei der Figur nie an. Deshalb jedes Bild selbst nachsehen: was ist
+// nah, wie schnell ist es, und kommt es auf mich zu?
+void ALaLaBergCharacter::PruefeAnprall(float Zeit) {
+ if (Leben <= 0.0f) return;
+ const float Jetzt = GetWorld()->GetTimeSeconds();
+ if (Jetzt - LetzterAnprall < 1.2f) return;          // ein Stoss, nicht dreissig
+ const FVector Wo = GetActorLocation();
+ auto Pruefe = [&](AActor* Fahrzeug) {
+  if (!Fahrzeug) return false;
+  const FVector Weg = Wo - Fahrzeug->GetActorLocation();
+  if (Weg.SizeSquared2D() > FMath::Square(320.0f) || FMath::Abs(Weg.Z) > 260.0f) return false;
+  const FVector Fahrt = Fahrzeug->GetVelocity();
+  const float TempoKmh = Fahrt.Size() * 0.036f;
+  if (TempoKmh < 12.0f) return false;
+  // Nur, wenn das Fahrzeug auch in meine Richtung faehrt.
+  if (FVector::DotProduct(Fahrt.GetSafeNormal2D(), Weg.GetSafeNormal2D()) < 0.2f) return false;
+  LetzterAnprall = Jetzt;
+  Verletze(FMath::GetMappedRangeValueClamped(FVector2D(12.0f, 80.0f), FVector2D(8.0f, 95.0f), TempoKmh),
+           Fahrt.GetSafeNormal2D(), ELaLaBergSchaden::Anprall);
+  return true;
+ };
+ for (ALaLaBergVerkehrsauto* Auto : ALaLaBergVerkehrsauto::Alle) if (Pruefe(Auto)) return;
+ for (TActorIterator<ALaLaBergWagen> It(GetWorld()); It; ++It) if (Pruefe(*It)) return;
+}
+
+void ALaLaBergCharacter::Verletze(float Schaden, const FVector& AusRichtung, ELaLaBergSchaden Art) {
+ if (Leben <= 0.0f) return;
+ Leben -= Schaden;
+ // Ein Stoss wirft die Figur ein Stueck - sichtbar, aber ohne Kontrolle zu
+ // nehmen.
+ if (Art == ELaLaBergSchaden::Anprall || Art == ELaLaBergSchaden::Sprengung)
+  LaunchCharacter(AusRichtung.GetSafeNormal2D() * 420.0f + FVector(0, 0, 260.0f), true, true);
+ if (auto* PC = Cast<APlayerController>(GetController()))
+  if (auto* HUD = Cast<ALaLaBergHUD>(PC->GetHUD()))
+   HUD->ZeigeRueckmeldung(Leben > 0.0f ? FString::Printf(TEXT("Getroffen – %d Punkte übrig"), FMath::CeilToInt(Leben))
+                                       : FString(TEXT("Umgehauen – ab ins Klinikum")));
+ UE_LOG(LogTemp, Display, TEXT("LALABERG_SCHADEN spieler=%.0f art=%d"), Leben, static_cast<int32>(Art));
+ if (Leben <= 0.0f) InsKrankenhaus();
+}
+
+// Aufwachen im Klinikum. Der Startpunkt des Spiels ist ohnehin dort - hier
+// wird er zum Krankenhaus im Wortsinn.
+void ALaLaBergCharacter::InsKrankenhaus() {
+ Leben = 100.0f;
+ Krankenhausbesuche++;
+ auto* PC = Cast<APlayerController>(GetController());
+ // Behandlungskosten: ein Viertel des Geldes, hoechstens 500 Euro.
+ int32 Kosten = 0;
+ if (ULaLaBergKonto* Konto = ULaLaBergKonto::Hole(this)) {
+  Kosten = FMath::Min(500, FMath::Max(0, Konto->HoleGeld() / 4));
+  if (Kosten > 0) Konto->Bezahle(Kosten);
+ }
+ // Die Fahndung ist mit dem Zusammenbruch vorbei.
+ if (ALaLaBergPolizei* Polizei = ALaLaBergPolizei::Instanz.Get()) Polizei->Verwische();
+ // Auf den Vorplatz des Klinikums setzen, auf dem Boden.
+ FVector Ziel(-159000.0f, 15600.0f, 30000.0f);
+ FHitResult Boden;
+ FCollisionQueryParams Fragen; Fragen.AddIgnoredActor(this);
+ if (GetWorld()->LineTraceSingleByChannel(Boden, Ziel, Ziel - FVector(0, 0, 60000.0f), ECC_Visibility, Fragen))
+  Ziel = Boden.ImpactPoint + FVector(0, 0, GetCapsuleComponent()->GetScaledCapsuleHalfHeight() + 10.0f);
+ SetActorLocation(Ziel, false, nullptr, ETeleportType::TeleportPhysics);
+ if (auto* Bewegung = GetCharacterMovement()) Bewegung->StopMovementImmediately();
+ if (PC) {
+  PC->SetControlRotation(FRotator(0, -90.0f, 0));
+  if (auto* HUD = Cast<ALaLaBergHUD>(PC->GetHUD()))
+   HUD->ZeigeRueckmeldung(Kosten > 0 ? FString::Printf(TEXT("Klinikum – wieder auf den Beinen, Behandlung %d €"), Kosten)
+                                     : FString(TEXT("Klinikum – wieder auf den Beinen")));
+ }
+ UE_LOG(LogTemp, Display, TEXT("LALABERG_KRANKENHAUS besuch=%d kosten=%d"), Krankenhausbesuche, Kosten);
 }
 
 void ALaLaBergCharacter::WarteAufBoden() {

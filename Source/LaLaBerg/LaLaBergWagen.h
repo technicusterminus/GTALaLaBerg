@@ -2,6 +2,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Pawn.h"
 #include "LaLaBergFarbbar.h"
+#include "LaLaBergVerletzbar.h"
 #include "LaLaBergWagen.generated.h"
 
 // Ein fahrbarer Wagen ohne Skelettnetz: die Karosserie entsteht zur Laufzeit
@@ -11,9 +12,14 @@
 // Motor-/Getriebe-Kennfeld statt vier Federstrahlen, ohne dass die
 // unsichtbare Rumpf-Kollisionsbox dafuer ein Skelettnetz braucht.
 UCLASS()
-class LALABERG_API ALaLaBergWagen : public APawn, public ILaLaBergFarbbar {
+class LALABERG_API ALaLaBergWagen : public APawn, public ILaLaBergFarbbar, public ILaLaBergVerletzbar {
  GENERATED_BODY()
 public:
+ // ILaLaBergVerletzbar: 100 Punkte. Bei null steht der Motor - man kann
+ // aussteigen und zu Fuss weiter, der Wagen bleibt liegen.
+ virtual void Verletze(float Schaden, const FVector& AusRichtung, ELaLaBergSchaden Art) override;
+ virtual bool IstAusgeschaltet() const override { return Leben <= 0.0f; }
+ virtual float Lebensanteil() const override { return FMath::Clamp(Leben / 100.0f, 0.0f, 1.0f); }
  // ILaLaBergFarbbar: ein Paintball-Treffer faerbt den Lack um und stoesst
  // leicht in Trefferrichtung - ein Wagen soll spuerbar getroffen wirken,
  // nicht nur die Farbe wechseln.
@@ -92,6 +98,7 @@ private:
  // Einmal in BaueKarosserie gewaehlt und behalten - SetzeLack faerbt das
  // gewaehlte Modell nur um, wuerfelt nicht neu.
  int32 FahrzeugTyp = -2;
+ float Leben = 100.0f;
  UPROPERTY() TObjectPtr<class USpringArmComponent> Ausleger = nullptr;
  UPROPERTY() TObjectPtr<class UCameraComponent> Kamera = nullptr;
  UPROPERTY() TObjectPtr<class UAudioComponent> Motorklang = nullptr;

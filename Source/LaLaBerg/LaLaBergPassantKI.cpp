@@ -378,8 +378,11 @@ void ALaLaBergPassantKI::Tick(float Zeit) {
      && GetWorld()->GetTimeSeconds() >= StolpertBis && Spieler->GetVelocity().Size() > 400.0f
      && FVector::Dist2D(Spieler->GetActorLocation(), GetActorLocation()) < 260.0f
      && FMath::Abs(Spieler->GetActorLocation().Z - GetActorLocation().Z) < 250.0f) {
-  StolpertBis = GetWorld()->GetTimeSeconds() + 2.5f;
   ALaLaBergPolizei::Melde(ELaLaBergTat::PassantAngefahren);
+  // Schaden nach Tempo: ab 30 km/h wird es ernst, ab 70 legt es jeden um.
+  const float AnprallKmh = Spieler->GetVelocity().Size() * 0.036f;
+  Verletze(FMath::GetMappedRangeValueClamped(FVector2D(15.0f, 70.0f), FVector2D(12.0f, 110.0f), AnprallKmh),
+           (GetActorLocation() - Spieler->GetActorLocation()).GetSafeNormal2D(), ELaLaBergSchaden::Anprall);
  }
  // Nah oder fern? Der Wechsel schaltet Sichtbarkeit und Taktrate um.
  {
@@ -391,6 +394,15 @@ void ALaLaBergPassantKI::Tick(float Zeit) {
    // Ferne Figuren gehen weiter, nur in groesseren Schritten.
    PrimaryActorTick.TickInterval = bNah ? 0.0f : 0.25f;
   }
+ }
+ // Liegt: nichts tun, bis die Zeit um ist - dann aufstehen und weiter.
+ if (IstAusgeschaltet()) {
+  if (GetWorld()->GetTimeSeconds() < LiegtBis) return;
+  Leben = 100.0f;
+  SetActorRotation(FRotator(0, GetActorRotation().Yaw, 0));
+  if (bSkelettGenutzt) for (USkeletalMeshComponent* Teil : { SkelettKoerper.Get(), SkelettKopf.Get(), SkelettFuesse.Get(), SkelettBeine.Get() })
+   if (Teil) Teil->bPauseAnims = false;
+  bSohleGesetzt = false;      // nach dem Aufstehen neu einmessen
  }
  const bool bStolpert = GetWorld()->GetTimeSeconds() < StolpertBis;
  FVector Ort = GetActorLocation() - LetzterAusweichOffset;
@@ -463,4 +475,24 @@ void ALaLaBergPassantKI::Tick(float Zeit) {
 void ALaLaBergPassantKI::ErhalteFarbe(const FLinearColor& Farbe, const FVector& AusRichtung) {
  StolpertBis = GetWorld()->GetTimeSeconds() + 1.6f;
  ALaLaBergPolizei::Melde(ELaLaBergTat::PassantBeschossen);
+ // Ein Paintball tut weh, mehr nicht - erst der zehnte legt jemanden um.
+ Verletze(11.0f, AusRichtung, ELaLaBergSchaden::Beschuss);
+}
+
+void ALaLaBergPassantKI::Verletze(float Schaden, const FVector& AusRichtung, ELaLaBergSchaden Art) {
+ if (IstAusgeschaltet()) return;
+ Leben -= Schaden;
+ StolpertBis = FMath::Max(StolpertBis, (float)GetWorld()->GetTimeSeconds() + (Art == ELaLaBergSchaden::Anprall ? 2.5f : 1.6f));
+ if (Leben > 0.0f) return;
+ // Umfallen: zur Seite legen, in Stossrichtung ein Stueck rutschen und
+ // eine Weile liegen bleiben. Kein Ragdoll - die Figur haengt an einer
+ // Route, nicht an der Physik.
+ Leben = 0.0f;
+ LiegtBis = GetWorld()->GetTimeSeconds() + 14.0;
+ const FVector Stoss = AusRichtung.IsNearlyZero() ? GetActorForwardVector() : AusRichtung.GetSafeNormal2D();
+ SetActorRotation(FRotator(0.0f, Stoss.Rotation().Yaw, 86.0f));
+ SetActorLocation(GetActorLocation() + Stoss * 70.0f + FVector(0, 0, 10.0f));
+ if (bSkelettGenutzt) for (USkeletalMeshComponent* Teil : { SkelettKoerper.Get(), SkelettKopf.Get(), SkelettFuesse.Get(), SkelettBeine.Get() })
+  if (Teil) Teil->bPauseAnims = true;
+ UE_LOG(LogTemp, Display, TEXT("LALABERG_PASSANT umgefallen art=%d"), static_cast<int32>(Art));
 }

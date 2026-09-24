@@ -44,6 +44,7 @@
 #include "LaLaBergAutoPool.h"
 #include "LaLaBergKastenPool.h"
 #include "LaLaBergPassantKI.h"
+#include "LaLaBergVerletzbar.h"
 #include "LaLaBergSonderfahrzeug.h"
 #include "LaLaBergAmpel.h"
 #include "LaLaBergHUD.h"
@@ -547,6 +548,7 @@ void ALaLaBergGameMode::BeginPlay() {
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergUebernahmeTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergSperrTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergSonderTest")) ||
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergSchadenTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergZielFoto"));
  if(bAutomatisch) Beleg(FString::Printf(TEXT("LALABERG_SPIELBEGINN nach %.1fs Programmlaufzeit, %d Gebaeude"),FPlatformTime::Seconds()-GStartTime,BuildingCount));
  if(!bAutomatisch) {
@@ -1057,6 +1059,54 @@ void ALaLaBergGameMode::BeginPlay() {
  // je gleichzeitig Gruen zeigen. Ohne diesen Test waere "kreuzende Strassen
  // haben nie gleichzeitig Gruen" nur eine Behauptung ueber den Code, der die
  // Zeitrechnung dafuer aufstellt, nicht ueber das tatsaechliche Verhalten.
+ // Schaden: Lebenspunkte bei Passanten, Spieler und Fahrzeugen. Geprueft
+ // wird die Rechnung (halber Schaden, halbes Leben), der Zusammenbruch mit
+ // Aufwachen im Klinikum und der Weg, den die Panzerkanone nimmt: Einschlag,
+ // Wirkung im Umkreis, umgefallener Passant.
+ if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergSchadenTest"))) {
+  static float PassantAnteil=-1.0f, SpielerLeben=-1.0f, SpielerNachKlinik=-1.0f;
+  static int32 Besuche=-1; static float KlinikAbstand=-1.0f;
+  static bool bPassantUmgefallen=false, bAutoAus=false;
+  FTimerHandle Rechnung;
+  GetWorldTimerManager().SetTimer(Rechnung,[this]() {
+   // Passant: 50 Punkte Schaden lassen die Haelfte uebrig.
+   for(ALaLaBergPassantKI* P:ALaLaBergPassantKI::Alle) {
+    if(!P) continue;
+    P->Verletze(50.0f,FVector(1,0,0),ELaLaBergSchaden::Beschuss);
+    PassantAnteil=P->Lebensanteil();
+    P->Verletze(60.0f,FVector(1,0,0),ELaLaBergSchaden::Anprall);
+    bPassantUmgefallen=P->IstAusgeschaltet();
+    break;
+   }
+   // Verkehrsauto: ein Treffer mit voller Wucht schaltet es ab.
+   for(ALaLaBergVerkehrsauto* A:ALaLaBergVerkehrsauto::Alle) {
+    if(!A||A->IstGeparkt()) continue;
+    A->Verletze(130.0f,FVector(1,0,0),ELaLaBergSchaden::Sprengung);
+    bAutoAus=A->IstAusgeschaltet();
+    break;
+   }
+   // Spieler: 40 Punkte, dann der Rest - danach muss er im Klinikum stehen.
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   if(auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr) {
+    Figur->Verletze(40.0f,FVector(1,0,0),ELaLaBergSchaden::Beschuss);
+    SpielerLeben=Figur->HoleLeben();
+    Figur->Verletze(70.0f,FVector(1,0,0),ELaLaBergSchaden::Beschuss);
+    SpielerNachKlinik=Figur->HoleLeben();
+    Besuche=Figur->HoleKrankenhausbesuche();
+    KlinikAbstand=FVector::Dist2D(Figur->GetActorLocation(),FVector(-159000.0f,15600.0f,0.0f))/100.0f;
+   }
+  },4.0f,false);
+  FTimerHandle Ende;
+  GetWorldTimerManager().SetTimer(Ende,[this]() {
+   const bool bPass=FMath::IsNearlyEqual(PassantAnteil,0.5f,0.02f)&&bPassantUmgefallen&&bAutoAus
+                   &&FMath::IsNearlyEqual(SpielerLeben,60.0f,0.5f)&&Besuche==1
+                   &&FMath::IsNearlyEqual(SpielerNachKlinik,100.0f,0.5f)&&KlinikAbstand<120.0f;
+   Beleg(FString::Printf(TEXT("LALABERG_SCHADENTEST %s passant=%.2f umgefallen=%d auto_aus=%d spieler=%.0f klinik=%d leben_danach=%.0f abstand=%.0fm"),
+                         bPass?TEXT("PASS"):TEXT("FAIL"),PassantAnteil,bPassantUmgefallen?1:0,bAutoAus?1:0,
+                         SpielerLeben,Besuche,SpielerNachKlinik,KlinikAbstand));
+   FPlatformMisc::RequestExitWithStatus(false,bPass?0:1);
+  },6.0f,false);
+ }
  // Panzer und Hubschrauber: hinstellen, einsteigen, ein Stueck fahren bzw.
  // steigen - und je ein Bild, damit man sieht, was da im Wald steht und auf
  // dem Klinikumsdach wartet.

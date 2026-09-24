@@ -354,6 +354,23 @@ void ALaLaBergWagen::FaerbeModell() {
  UE_LOG(LogTemp, Display, TEXT("LALABERG_LACK typ=%d lackslots=%d"), FahrzeugTyp, Slots);
 }
 
+void ALaLaBergWagen::Verletze(float Schaden, const FVector& AusRichtung, ELaLaBergSchaden Art) {
+ if (IstAusgeschaltet()) return;
+ Leben -= Schaden;
+ if (auto* PC = Cast<APlayerController>(GetController()))
+  if (auto* HUD = Cast<ALaLaBergHUD>(PC->GetHUD()))
+   HUD->ZeigeRueckmeldung(Leben > 0.0f ? FString::Printf(TEXT("Wagen beschädigt – %d %%"), FMath::CeilToInt(Leben))
+                                       : FString(TEXT("Motor hin – aussteigen mit E")));
+ if (Leben > 0.0f) return;
+ Leben = 0.0f;
+ // Motor aus: Gas wirkt nicht mehr, der Lack ist russig. Der Wagen bleibt
+ // fahrbereit im Sinne der Physik - er rollt aus und steht dann.
+ Bremsen();
+ SetzeLack(FLinearColor(0.06f, 0.055f, 0.05f), true);
+ if (Motorklang && Motorklang->IsPlaying()) Motorklang->Stop();
+ UE_LOG(LogTemp, Display, TEXT("LALABERG_WAGEN ausgeschaltet art=%d"), static_cast<int32>(Art));
+}
+
 void ALaLaBergWagen::BaueKarosserie() {
  if (!CarConceptTeile.IsEmpty()) return;  // schon gebaut - faerbt sich nicht per SetzeLack um
  // Fahrzeugvielfalt wie bei den KI-Autos (siehe LaLaBergVerkehrsauto): einmal
@@ -553,7 +570,8 @@ void ALaLaBergWagen::Tick(float Zeit) {
   else if (GasWert > 0.0f && Bewegung->GetTargetGear() <= 0)
    Bewegung->SetTargetGear(1, true);
  }
- Bewegung->SetThrottleInput(bAnhalten ? 0.0f : FMath::Abs(GasWert));
+ // Ausgeschaltet: kein Gas mehr, egal was die Taste sagt (siehe Verletze).
+ Bewegung->SetThrottleInput(bAnhalten || IstAusgeschaltet() ? 0.0f : FMath::Abs(GasWert));
  Bewegung->SetSteeringInput(Lenkung);
  Bewegung->SetBrakeInput(bAnhalten ? 1.0f : 0.0f);
  // Handbremse statt Parkmodus, solange niemand faehrt - haelt den Wagen am

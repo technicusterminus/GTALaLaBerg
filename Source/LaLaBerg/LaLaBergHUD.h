@@ -54,6 +54,9 @@ private:
  void Vollkarte();
  // Sterne oben rechts, Suchbalken, Festnahmebalken.
  void Fahndung();
+ // Lebensanzeige oben links - nur, solange man zu Fuss unterwegs ist oder
+ // schon Schaden hat; ein voller Balken die ganze Zeit waere nur Deko.
+ void Leben();
  // Im Laden: Warenliste mit Preisen, Auswahl, Kontostand.
  void Laden();
  // Route zum Auftragsziel bzw. zur blauen Saeule: einmal je Sekunde neu

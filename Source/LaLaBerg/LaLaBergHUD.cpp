@@ -6,6 +6,7 @@
 #include "LaLaBergMenueSteuerung.h"
 #include "LaLaBergAuftraege.h"
 #include "LaLaBergPolizei.h"
+#include "LaLaBergVerletzbar.h"
 #include "LaLaBergLaeden.h"
 #include "LaLaBergKonto.h"
 #include "ImageUtils.h"
@@ -104,6 +105,7 @@ void ALaLaBergHUD::DrawHUD() {
   Minikarte();
   Auftrag();
   Fahndung();
+  Leben();
   Laden();
  }
  if (auto* Wagen = Cast<ALaLaBergWagen>(Figur)) {
@@ -397,6 +399,23 @@ void ALaLaBergHUD::Vollkarte() {
  Pfeil(Ich + FVector2D(1, 1) * S, Figur->GetActorRotation().Yaw + 90.0f, 13 * S, FLinearColor(0, 0, 0, 0.7f));
  Pfeil(Ich, Figur->GetActorRotation().Yaw + 90.0f, 13 * S, Weiss);
  Tastenleiste(TEXT("M  Karte schließen"));
+}
+
+void ALaLaBergHUD::Leben() {
+ const auto* PC = GetOwningPlayerController();
+ const APawn* Figur = PC ? PC->GetPawn() : nullptr;
+ const auto* Verletzbar = Cast<ILaLaBergVerletzbar>(Figur);
+ if (!Verletzbar) return;
+ const float Anteil = Verletzbar->Lebensanteil();
+ const float S = Massstab;
+ const float X = 30 * S, Y = 26 * S, B = 260 * S, H = 16 * S;
+ Tafel(X, Y, B, H, FLinearColor(0.02f, 0.025f, 0.035f, 0.78f));
+ // Gruen, gelb, rot - nach Anteil, nicht nach fester Schwelle.
+ const FLinearColor Farbe = Anteil > 0.55f ? FLinearColor(0.20f, 0.78f, 0.34f)
+                          : Anteil > 0.25f ? FLinearColor(0.92f, 0.72f, 0.16f)
+                                           : FLinearColor(0.88f, 0.22f, 0.18f);
+ Tafel(X + 2 * S, Y + 2 * S, (B - 4 * S) * Anteil, H - 4 * S, Farbe);
+ Schrift(TEXT("Leben"), X + B + 12 * S, Y + 1 * S, 12, Leise, true);
 }
 
 void ALaLaBergHUD::Fahndung() {

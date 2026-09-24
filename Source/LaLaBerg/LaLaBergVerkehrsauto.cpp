@@ -436,6 +436,20 @@ void ALaLaBergVerkehrsauto::EndPlay(const EEndPlayReason::Type Grund) {
  Super::EndPlay(Grund);
 }
 
+void ALaLaBergVerkehrsauto::Verletze(float Schaden, const FVector& AusRichtung, ELaLaBergSchaden Art) {
+ if (IstAusgeschaltet()) return;
+ Leben -= Schaden;
+ if (Leben > 0.0f) return;
+ Leben = 0.0f;
+ // Stehenbleiben und russig werden. Die Route endet hier; der Wagen bleibt
+ // als Hindernis auf der Strasse stehen, wo er getroffen wurde.
+ Weg.Route.Reset();
+ SetzeLack(FLinearColor(0.06f, 0.055f, 0.05f));
+ if (bPolizei && Sirene && bSireneLaeuft) { Sirene->Stop(); bSireneLaeuft = false; }
+ UE_LOG(LogTemp, Display, TEXT("LALABERG_AUTO ausgeschaltet art=%d bei %s"),
+        static_cast<int32>(Art), *GetActorLocation().ToString());
+}
+
 void ALaLaBergVerkehrsauto::Tick(float Zeit) {
  Super::Tick(Zeit);
  // Ohne gueltige Route (die 1078 geparkten Autos - siehe LadeVerkehr) faellt

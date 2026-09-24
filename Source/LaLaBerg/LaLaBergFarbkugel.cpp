@@ -1,4 +1,5 @@
 #include "LaLaBergFarbkugel.h"
+#include "EngineUtils.h"
 #include "Components/SphereComponent.h"
 #include "ProceduralMeshComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
@@ -7,6 +8,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Kismet/GameplayStatics.h"
 #include "LaLaBergFarbbar.h"
+#include "LaLaBergVerletzbar.h"
 #include "LaLaBergGameMode.h"
 #include "LaLaBergEinschlagblitz.h"
 #include "Sound/SoundBase.h"
@@ -113,6 +115,22 @@ void ALaLaBergFarbkugel::Aufprall(UPrimitiveComponent* TroffeneKomponente, AActo
  if (auto* Blitz = GetWorld()->SpawnActor<ALaLaBergEinschlagblitz>(Treffer.Location, FRotator::ZeroRotator))
   Blitz->Einrichten(Farbe, 3500.0f, 220.0f, 0.10f);
  if (auto* Reaktion = Cast<ILaLaBergFarbbar>(AndererActor)) Reaktion->ErhalteFarbe(Farbe, GetVelocity());
+ // Panzerkanone: Wirkung im Umkreis, nach aussen linear abnehmend. Eine
+ // Paintballkugel hat keine Wucht und ueberspringt das hier.
+ if (Wucht > 0.0f && WuchtRadius > 0.0f) {
+  int32 Getroffen = 0;
+  for (TActorIterator<AActor> It(GetWorld()); It; ++It) {
+   auto* Verletzbar = Cast<ILaLaBergVerletzbar>(*It);
+   if (!Verletzbar || *It == GetOwner()) continue;
+   const FVector Weg = It->GetActorLocation() - Treffer.Location;
+   const float Abstand = Weg.Size();
+   if (Abstand > WuchtRadius) continue;
+   Verletzbar->Verletze(Wucht * (1.0f - Abstand / WuchtRadius),
+                        Abstand > 1.0f ? Weg / Abstand : FVector::UpVector, ELaLaBergSchaden::Sprengung);
+   Getroffen++;
+  }
+  UE_LOG(LogTemp, Display, TEXT("LALABERG_WUCHT radius=%.0fm getroffen=%d"), WuchtRadius / 100.0f, Getroffen);
+ }
  if (auto* Modus = Cast<ALaLaBergGameMode>(UGameplayStatics::GetGameMode(this))) Modus->ZaehleFarbtreffer();
  UE_LOG(LogTemp, Display, TEXT("LALABERG_FARBKLECKS bei %s auf %s"), *Treffer.Location.ToString(),
         AndererActor ? *AndererActor->GetName() : TEXT("?"));

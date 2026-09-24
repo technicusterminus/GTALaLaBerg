@@ -2,6 +2,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "LaLaBergFarbbar.h"
+#include "LaLaBergVerletzbar.h"
 #include "LaLaBergWegfolger.h"
 #include "LaLaBergPassantKI.generated.h"
 
@@ -13,9 +14,15 @@
 // sind unbewegte Kaesten, einmal gebaut und am jeweiligen Gelenk befestigt -
 // kein Nachbau der Netz-Abschnitte mehr bei jedem Schritt.
 UCLASS()
-class LALABERG_API ALaLaBergPassantKI : public AActor, public ILaLaBergFarbbar {
+class LALABERG_API ALaLaBergPassantKI : public AActor, public ILaLaBergFarbbar, public ILaLaBergVerletzbar {
  GENERATED_BODY()
 public:
+ // ILaLaBergVerletzbar: ein Passant haelt 100 Punkte aus. Bei null faellt
+ // er um, bleibt eine Weile liegen und steht dann wieder auf - dies ist ein
+ // Paintball-Spiel, niemand stirbt.
+ virtual void Verletze(float Schaden, const FVector& AusRichtung, ELaLaBergSchaden Art) override;
+ virtual bool IstAusgeschaltet() const override { return Leben <= 0.0f; }
+ virtual float Lebensanteil() const override { return FMath::Clamp(Leben / 100.0f, 0.0f, 1.0f); }
  ALaLaBergPassantKI();
  virtual void Tick(float Zeit) override;
  void SetzeRoute(const TArray<FVector>& Punkte, float TempoKmh);
@@ -78,6 +85,11 @@ private:
  FLaLaBergWegfolger Weg;
  float Tempo = 140.0f;             // cm/s, gewoehnliches Gehtempo
  float StolpertBis = -10.0f;       // ein Treffer bremst kurz
+ // Umgefallen: Leben bei null, liegt bis LiegtBis und steht dann mit vollem
+ // Leben wieder auf. Die Ausgangslage merkt sich die Figur, um sich beim
+ // Hinfallen sauber zur Seite zu legen.
+ float Leben = 100.0f;
+ double LiegtBis = -1.0;
  float Seitversatz = 0.0f;         // seitliches Ausweichen, siehe Tick
  float Gehphase = 0.0f;
  FVector LetzterAusweichOffset = FVector::ZeroVector;
