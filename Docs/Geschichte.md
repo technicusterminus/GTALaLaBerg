@@ -18,14 +18,13 @@ unentschieden ausging. Jede haelt ein Revier und faerbt es in ihrer Farbe:
 
 | Revier | Mannschaft | Farbe | Wahrzeichen (aus `orte.json`) |
 |---|---|---|---|
+| Vorstadt-Nord | Die Gelben | gelb | Bahnhof, Polizeiinspektion, Sankt Katharina, Stadtverwaltung |
+| Lechviertel | Die Blauen | blau | Mutterturm, Johanniskirche, Faerbertor, Stadttheater |
+| Klinikum und Sued | Die Gruenen | gruen | Klinikum, kbo-Lech-Mangfall-Klinik, Christuskirche, Friedhofskirche |
 | Altstadt | Die Weissen | weiss | Historisches Rathaus, Schmalzturm, Bayertor, Stadtpfarrkirche |
 
-Genommen werden sie in dieser Reihenfolge: Vorstadt-Nord, Lechviertel,
-Klinikum und Sued, Altstadt. Das eigene Viertel faellt spaet - man nimmt es
-den Gruenen ab, nicht umgekehrt.
-| Vorstadt-Nord | Die Gelben | gelb | Bahnhof, Polizeiinspektion, Sankt Katharina, Stadtverwaltung |
-| Lechviertel | Die Blauen | blau | Mutterturm, Karolinenbruecke, Johanniskirche, Faerbertor |
-| Klinikum und Sued | Die Gruenen | gruen | Klinikum, kbo-Lech-Mangfall-Klinik, Christuskirche, Friedhofskirche |
+Genommen werden sie in dieser Reihenfolge - das eigene Viertel faellt spaet:
+man nimmt es den Gruenen ab, nicht umgekehrt.
 
 Der Spieler faengt ohne Farbe an: er wacht im Klinikum auf, ohne Geld, ohne
 Ruf, mit einer geliehenen Paintball-Pistole. Genau dort, wo das Spiel ohnehin
