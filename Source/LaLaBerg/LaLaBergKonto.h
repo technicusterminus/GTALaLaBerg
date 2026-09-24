@@ -17,6 +17,22 @@ public:
  UPROPERTY() bool bHatLack = false;
  UPROPERTY() FLinearColor Lack = FLinearColor::White;
  UPROPERTY() int32 Erledigt = 0;
+
+ // ------------------------------------------------------- Charakterwerte
+ // Drei Faehigkeiten, die durch Benutzung wachsen, wie in dem Spiel, dem
+ // das hier nachempfunden ist: wer laeuft, wird ausdauernder; wer trifft,
+ // zielt besser; wer faehrt, faehrt sicherer. Gespeichert wird der
+ // Erfahrungswert (0 bis 1000), nicht die Stufe - die rechnet sich daraus.
+ UPROPERTY() int32 Ausdauer = 0;
+ UPROPERTY() int32 Zielsicherheit = 0;
+ UPROPERTY() int32 Fahren = 0;
+ // Ruf oeffnet die Geschichte: Reviere, Gegner, Ausruestung.
+ UPROPERTY() int32 Ruf = 0;
+ // Je Revier ein Bit: wem die Altstadt, die Vorstadt, das Klinikum und das
+ // Lechviertel gerade gehoeren (siehe LaLaBergRevier).
+ UPROPERTY() int32 Reviere = 0;
+ // Abschnitt der Geschichte, an dem man steht.
+ UPROPERTY() int32 Kapitel = 0;
 };
 
 // Konto, gekaufte Waffen und Lack des eigenen Wagens - ein Subsystem der
@@ -45,6 +61,24 @@ public:
  void SetzeLack(const FLinearColor& Farbe);
  void ZaehleAuftrag();
  int32 HoleErledigt() const { return Stand ? Stand->Erledigt : 0; }
+
+ // ------------------------------------------------------- Charakterwerte
+ // Welche Faehigkeit. Die Reihenfolge steht auch im Spielstand.
+ enum class EWert : uint8 { Ausdauer, Zielsicherheit, Fahren, Ruf };
+ // Erfahrung dazurechnen. Wachsen darf nur langsam: die Werte sind auf
+ // 1000 gedeckelt, und ein Punkt ist wenig - eine Stufe kostet 200.
+ void Uebe(EWert Wert, float Punkte);
+ int32 HoleWert(EWert Wert) const;
+ // 0 bis 1: der Anteil am Hoechstwert, fuer Anzeigen und Wirkung.
+ float Anteil(EWert Wert) const { return FMath::Clamp(HoleWert(Wert) / 1000.0f, 0.0f, 1.0f); }
+ // 1 bis 5 - die Stufe, die im HUD steht.
+ int32 Stufe(EWert Wert) const { return FMath::Clamp(HoleWert(Wert) / 200 + 1, 1, 5); }
+ // Reviere und Kapitel - die Geschichte (siehe LaLaBergRevier).
+ bool HatRevier(int32 Nummer) const { return Stand && (Stand->Reviere & (1 << Nummer)); }
+ void NimmRevier(int32 Nummer);
+ int32 HoleReviere() const { return Stand ? Stand->Reviere : 0; }
+ int32 HoleKapitel() const { return Stand ? Stand->Kapitel : 0; }
+ void SetzeKapitel(int32 Neu);
 
  void Speichere();
  const FString& HoleSlot() const { return Slot; }

@@ -57,6 +57,8 @@ private:
  // Lebensanzeige oben links - nur, solange man zu Fuss unterwegs ist oder
  // schon Schaden hat; ein voller Balken die ganze Zeit waere nur Deko.
  void Leben();
+ // Auf der Vollkarte: die Werte der Figur, Geld und erledigte Auftraege.
+ void Figurblatt();
  // Im Laden: Warenliste mit Preisen, Auswahl, Kontostand.
  void Laden();
  // Route zum Auftragsziel bzw. zur blauen Saeule: einmal je Sekunde neu

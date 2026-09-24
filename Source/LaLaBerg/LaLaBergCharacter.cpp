@@ -369,6 +369,7 @@ void ALaLaBergCharacter::Tick(float DeltaSeconds) {
  if (bFeuerKnopf) Feuern();
  PruefeSchritt(DeltaSeconds);
  PruefeAnprall(DeltaSeconds);
+ PflegeWerte(DeltaSeconds);
 
  // Gang wie bei den KI-Passanten (siehe LaLaBergPassantKI::Tick), an das
  // tatsaechliche Tempo gekoppelt statt an einen festen Takt. Der rechte Arm
@@ -491,6 +492,20 @@ void ALaLaBergCharacter::PruefeSchritt(float Zeit) {
  USoundBase* Sound = LoadObject<USoundBase>(nullptr, Pfad);
  if (!Sound) Sound = LoadObject<USoundBase>(nullptr, TEXT("/Game/Audio/SFX_Schritt.SFX_Schritt"));
  if (Sound) UGameplayStatics::PlaySoundAtLocation(this, Sound, GetActorLocation(), 0.7f, FMath::FRandRange(0.9f, 1.1f));
+}
+
+// Die Charakterwerte: Ausdauer waechst vom Laufen und macht schneller,
+// Zielsicherheit und Fahren wachsen anderswo (Waffe, Wagen). Ein voller
+// Ausdauerwert bringt ein Drittel mehr Tempo - genug, um es zu merken,
+// wenig genug, um das Spiel nicht umzuwerfen.
+void ALaLaBergCharacter::PflegeWerte(float Zeit) {
+ auto* Konto = ULaLaBergKonto::Hole(this);
+ auto* Bewegung = GetCharacterMovement();
+ if (!Konto || !Bewegung) return;
+ const float Tempo = GetVelocity().Size2D();
+ if (Bewegung->MovementMode == MOVE_Walking && Tempo > 150.0f)
+  Konto->Uebe(ULaLaBergKonto::EWert::Ausdauer, Tempo * Zeit / 900.0f);
+ Bewegung->MaxWalkSpeed = 450.0f * (1.0f + 0.33f * Konto->Anteil(ULaLaBergKonto::EWert::Ausdauer));
 }
 
 // Angefahren werden. Die Fahrzeuge bewegen sich kinematisch (Verkehrsautos)

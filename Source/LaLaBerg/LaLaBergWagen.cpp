@@ -1,4 +1,5 @@
 #include "LaLaBergWagen.h"
+#include "LaLaBergKonto.h"
 #include "LaLaBergHUD.h"
 #include "Sound/SoundAttenuation.h"
 #include "ProceduralMeshComponent.h"
@@ -599,6 +600,15 @@ void ALaLaBergWagen::Tick(float Zeit) {
   const float Grenze = FMath::Max(Bewegung->GetEngineMaxRotationSpeed(), 1.0f);
   const float Drehzahl = FMath::Clamp(Bewegung->GetEngineRotationSpeed() / Grenze, 0.0f, 1.0f);
   Motorklang->SetPitchMultiplier(FMath::Lerp(0.6f, 1.8f, Drehzahl));
+ // Fahren waechst mit jedem gefahrenen Meter und bringt bis zu einem
+ // Fuenftel mehr Drehmoment - der geuebte Fahrer holt mehr aus demselben
+ // Wagen heraus.
+ if (Fahrer)
+  if (auto* Konto = ULaLaBergKonto::Hole(this)) {
+   Konto->Uebe(ULaLaBergKonto::EWert::Fahren, FMath::Abs(TempoKmh()) * Zeit / 240.0f);
+   if (auto* Antrieb = Cast<UChaosWheeledVehicleMovementComponent>(GetMovementComponent()))
+    Antrieb->EngineSetup.MaxTorque = 320.0f * (1.0f + 0.2f * Konto->Anteil(ULaLaBergKonto::EWert::Fahren));
+  }
   Motorklang->SetVolumeMultiplier(FMath::Lerp(0.35f, 1.0f, Drehzahl));
  }
 }

@@ -9,6 +9,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "LaLaBergFarbbar.h"
 #include "LaLaBergVerletzbar.h"
+#include "LaLaBergKonto.h"
 #include "LaLaBergGameMode.h"
 #include "LaLaBergEinschlagblitz.h"
 #include "Sound/SoundBase.h"
@@ -114,7 +115,11 @@ void ALaLaBergFarbkugel::Aufprall(UPrimitiveComponent* TroffeneKomponente, AActo
   UGameplayStatics::PlaySoundAtLocation(this, Sound, Treffer.Location, 1.0f, FMath::FRandRange(0.92f, 1.08f));
  if (auto* Blitz = GetWorld()->SpawnActor<ALaLaBergEinschlagblitz>(Treffer.Location, FRotator::ZeroRotator))
   Blitz->Einrichten(Farbe, 3500.0f, 220.0f, 0.10f);
- if (auto* Reaktion = Cast<ILaLaBergFarbbar>(AndererActor)) Reaktion->ErhalteFarbe(Farbe, GetVelocity());
+ if (auto* Reaktion = Cast<ILaLaBergFarbbar>(AndererActor)) {
+  Reaktion->ErhalteFarbe(Farbe, GetVelocity());
+  // Getroffen zu haben uebt das Zielen - eine Hauswand zaehlt nicht.
+  if (auto* Konto = ULaLaBergKonto::Hole(this)) Konto->Uebe(ULaLaBergKonto::EWert::Zielsicherheit, 6.0f);
+ }
  // Panzerkanone: Wirkung im Umkreis, nach aussen linear abnehmend. Eine
  // Paintballkugel hat keine Wucht und ueberspringt das hier.
  if (Wucht > 0.0f && WuchtRadius > 0.0f) {

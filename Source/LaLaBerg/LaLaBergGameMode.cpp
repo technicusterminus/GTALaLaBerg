@@ -550,6 +550,7 @@ void ALaLaBergGameMode::BeginPlay() {
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergSonderTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergSchadenTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergTaxiTest")) ||
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergFigurTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergRennTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergJagdTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergZielFoto"));
@@ -1062,6 +1063,46 @@ void ALaLaBergGameMode::BeginPlay() {
  // je gleichzeitig Gruen zeigen. Ohne diesen Test waere "kreuzende Strassen
  // haben nie gleichzeitig Gruen" nur eine Behauptung ueber den Code, der die
  // Zeitrechnung dafuer aufstellt, nicht ueber das tatsaechliche Verhalten.
+ // Charakterwerte: waechst der Wert durch Uebung, stimmt die Stufe, wirkt
+ // die Ausdauer aufs Lauftempo, und ueberlebt alles einen Speicherlauf?
+ // Dazu ein Bild der Vollkarte mit dem Figurblatt.
+ if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergFigurTest"))) {
+  static int32 StufeVorher=0, StufeNachher=0, WertPlatte=-1;
+  static float TempoVorher=0.0f, TempoNachher=0.0f;
+  FTimerHandle Ueben;
+  GetWorldTimerManager().SetTimer(Ueben,[this]() {
+   auto* Konto=ULaLaBergKonto::Hole(this);
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr;
+   if(!Konto||!Figur) return;
+   StufeVorher=Konto->Stufe(ULaLaBergKonto::EWert::Ausdauer);
+   TempoVorher=Figur->GetCharacterMovement()->MaxWalkSpeed;
+   // 620 Punkte: das sind vier Stufen, genug fuer einen sichtbaren Sprung.
+   Konto->Uebe(ULaLaBergKonto::EWert::Ausdauer,620.0f);
+   Konto->Uebe(ULaLaBergKonto::EWert::Zielsicherheit,210.0f);
+   Konto->Uebe(ULaLaBergKonto::EWert::Ruf,410.0f);
+   Konto->NimmRevier(0);
+   Konto->NimmRevier(2);
+   Konto->Speichere();
+   StufeNachher=Konto->Stufe(ULaLaBergKonto::EWert::Ausdauer);
+   if(auto* Platte=Konto->LadeVonPlatte()) WertPlatte=Platte->Ausdauer;
+   if(auto* HUD=Cast<ALaLaBergHUD>(PC->GetHUD())) HUD->ZeigeVollkarte(true);
+  },4.0f,false);
+  FTimerHandle Bild;
+  GetWorldTimerManager().SetTimer(Bild,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   if(auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr)
+    TempoNachher=Figur->GetCharacterMovement()->MaxWalkSpeed;
+   if(PC) PC->ConsoleCommand(TEXT("HighResShot 1600x900"));
+  },5.0f,false);
+  FTimerHandle Ende;
+  GetWorldTimerManager().SetTimer(Ende,[this]() {
+   const bool bPass=StufeVorher==1&&StufeNachher==4&&WertPlatte==620&&TempoNachher>TempoVorher*1.15f;
+   Beleg(FString::Printf(TEXT("LALABERG_FIGURTEST %s stufe=%d->%d platte=%d tempo=%.0f->%.0f"),
+                         bPass?TEXT("PASS"):TEXT("FAIL"),StufeVorher,StufeNachher,WertPlatte,TempoVorher,TempoNachher));
+   FPlatformMisc::RequestExitWithStatus(false,bPass?0:1);
+  },6.0f,false);
+ }
  // Rennen und Verfolgung: derselbe Ablauf wie beim Taxi - zum Wagen,
  // einsteigen, an der blauen Saeule annehmen -, danach je nach Art die
  // Kontrollpunkte abfahren oder den fluechtenden Wagen stellen.

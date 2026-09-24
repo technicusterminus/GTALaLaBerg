@@ -110,6 +110,8 @@ private:
  // Figur erwischt - Fahrzeuge bewegen sich kinematisch, ein Stossimpuls
  // aus der Physik kommt dort nie an.
  void PruefeAnprall(float Zeit);
+ // Werte pflegen: Ausdauer waechst vom Laufen, das Lauftempo haengt daran.
+ void PflegeWerte(float Zeit);
  // Aufwachen im Klinikum: Leben voll, Geld weg, Fahndung eingestellt.
  void InsKrankenhaus();
  float Leben = 100.0f;

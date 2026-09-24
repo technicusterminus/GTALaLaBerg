@@ -4,6 +4,7 @@
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInterface.h"
 #include "LaLaBergFarbkugel.h"
+#include "LaLaBergKonto.h"
 #include "LaLaBergEinschlagblitz.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
@@ -307,7 +308,11 @@ bool ALaLaBergWaffe::Feuern(const FVector& Ort, const FVector& Richtung) {
  // nebeneinander und sollen sich nicht gegenseitig treffen.
  TArray<ALaLaBergFarbkugel*> Salve;
  for (int32 i = 0; i < K.KugelnJeSchuss; i++) {
-  const FVector Kegel = K.StreuungGrad > 0.0f ? FMath::VRandCone(Richtung, FMath::DegreesToRadians(K.StreuungGrad)) : Richtung;
+  // Zielsicherheit halbiert die Streuung, wenn sie ausgebaut ist.
+  float Streuung = K.StreuungGrad;
+  if (const auto* Konto = ULaLaBergKonto::Hole(this))
+   Streuung *= 1.0f - 0.5f * Konto->Anteil(ULaLaBergKonto::EWert::Zielsicherheit);
+  const FVector Kegel = Streuung > 0.0f ? FMath::VRandCone(Richtung, FMath::DegreesToRadians(Streuung)) : Richtung;
   // Verzoegert spawnen: Farbe und Groesse muessen stehen, bevor BeginPlay
   // die Kugel aus ihnen aufbaut - sonst waere jede Kugel zunaechst die
   // magentafarbene Grundeinstellung gewesen.

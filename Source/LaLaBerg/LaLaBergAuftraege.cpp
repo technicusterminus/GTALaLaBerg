@@ -343,7 +343,15 @@ void ALaLaBergAuftraege::Erledige() {
   Taxifahrten++;
  }
  ULaLaBergKonto* Konto = ULaLaBergKonto::Hole(this);
- if (Konto) { Konto->Gutschrift(Lohn + Trinkgeld); Konto->ZaehleAuftrag(); }
+ if (Konto) {
+  Konto->Gutschrift(Lohn + Trinkgeld);
+  Konto->ZaehleAuftrag();
+  // Ruf: ein erledigter Auftrag zaehlt, ein Rennen und eine Verfolgung
+  // doppelt - davon spricht man in der Stadt.
+  Konto->Uebe(ULaLaBergKonto::EWert::Ruf,
+              Art == ELaLaBergAuftragsart::Lieferung ? 14.0f
+            : Art == ELaLaBergAuftragsart::Taxi ? 18.0f : 32.0f);
+ }
  Erledigt++;
  bUnterwegs = false;
  const FZiel Hier = Ziele[AktZiel];

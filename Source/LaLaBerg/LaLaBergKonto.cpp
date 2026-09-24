@@ -68,6 +68,47 @@ void ULaLaBergKonto::SetzeLack(const FLinearColor& Farbe) {
  Speichere();
 }
 
+void ULaLaBergKonto::Uebe(EWert Wert, float Punkte) {
+ if (!Stand || Punkte <= 0.0f) return;
+ int32* Ziel = Wert == EWert::Ausdauer ? &Stand->Ausdauer
+             : Wert == EWert::Zielsicherheit ? &Stand->Zielsicherheit
+             : Wert == EWert::Fahren ? &Stand->Fahren
+                                     : &Stand->Ruf;
+ const int32 Vorher = *Ziel;
+ *Ziel = FMath::Clamp(*Ziel + FMath::RoundToInt(Punkte), 0, 1000);
+ // Nur beim Stufenwechsel speichern und melden - sonst schriebe jeder
+ // Schritt auf die Platte.
+ if (Vorher / 200 != *Ziel / 200) {
+  UE_LOG(LogTemp, Display, TEXT("LALABERG_WERT %d stufe=%d"), static_cast<int32>(Wert), *Ziel / 200 + 1);
+  Speichere();
+ }
+}
+
+int32 ULaLaBergKonto::HoleWert(EWert Wert) const {
+ if (!Stand) return 0;
+ switch (Wert) {
+  case EWert::Ausdauer: return Stand->Ausdauer;
+  case EWert::Zielsicherheit: return Stand->Zielsicherheit;
+  case EWert::Fahren: return Stand->Fahren;
+  case EWert::Ruf: return Stand->Ruf;
+ }
+ return 0;
+}
+
+void ULaLaBergKonto::NimmRevier(int32 Nummer) {
+ if (!Stand || HatRevier(Nummer)) return;
+ Stand->Reviere |= (1 << Nummer);
+ UE_LOG(LogTemp, Display, TEXT("LALABERG_REVIER genommen=%d alle=%d"), Nummer, Stand->Reviere);
+ Speichere();
+}
+
+void ULaLaBergKonto::SetzeKapitel(int32 Neu) {
+ if (!Stand || Neu <= Stand->Kapitel) return;
+ Stand->Kapitel = Neu;
+ UE_LOG(LogTemp, Display, TEXT("LALABERG_KAPITEL %d"), Neu);
+ Speichere();
+}
+
 void ULaLaBergKonto::ZaehleAuftrag() {
  Stand->Erledigt++;
  Speichere();

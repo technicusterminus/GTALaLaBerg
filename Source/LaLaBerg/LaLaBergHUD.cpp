@@ -398,7 +398,54 @@ void ALaLaBergHUD::Vollkarte() {
  const FVector2D Ich = Bildort(Figur->GetActorLocation());
  Pfeil(Ich + FVector2D(1, 1) * S, Figur->GetActorRotation().Yaw + 90.0f, 13 * S, FLinearColor(0, 0, 0, 0.7f));
  Pfeil(Ich, Figur->GetActorRotation().Yaw + 90.0f, 13 * S, Weiss);
+ Figurblatt();
  Tastenleiste(TEXT("M  Karte schließen"));
+}
+
+// Das Blatt zur Figur, unten links auf der Vollkarte: was sie kann, was sie
+// hat und wie weit sie in der Stadt gekommen ist. Die Werte wachsen durch
+// Benutzung (siehe ULaLaBergKonto::Uebe).
+void ALaLaBergHUD::Figurblatt() {
+ const auto* Konto = ULaLaBergKonto::Hole(this);
+ if (!Konto) return;
+ const float S = Massstab;
+ // Hoch genug fuer die Revierzeile - bei 216 stiess sie unten an den Rand.
+ const float B = 300 * S, H = 248 * S;
+ const float X = 40 * S, Y = Canvas->ClipY - H - 40 * S;
+ Tafel(X, Y, B, H, FLinearColor(0.02f, 0.025f, 0.035f, 0.88f));
+ Tafel(X, Y, 5 * S, H, FLinearColor(0.95f, 0.72f, 0.12f));
+ Schrift(TEXT("FIGUR"), X + 22 * S, Y + 16 * S, 12, Leise, true);
+ const FString Geld = FString::Printf(TEXT("%d €"), Konto->HoleGeld());
+ Schrift(Geld, X + B - 22 * S - Breite(Geld, 18, true), Y + 12 * S, 18, Weiss, true);
+
+ struct FZeile { const TCHAR* Name; ULaLaBergKonto::EWert Wert; };
+ static const FZeile ZEILEN[] = {
+  { TEXT("Ausdauer"), ULaLaBergKonto::EWert::Ausdauer },
+  { TEXT("Zielsicherheit"), ULaLaBergKonto::EWert::Zielsicherheit },
+  { TEXT("Fahren"), ULaLaBergKonto::EWert::Fahren },
+  { TEXT("Ruf"), ULaLaBergKonto::EWert::Ruf },
+ };
+ float ZY = Y + 46 * S;
+ for (const FZeile& Z : ZEILEN) {
+  Schrift(Z.Name, X + 22 * S, ZY, 14, Weiss);
+  // Fuenf Kaestchen: gefuellte fuer die erreichte Stufe.
+  const int32 Stufe = Konto->Stufe(Z.Wert);
+  for (int32 i = 0; i < 5; i++) {
+   const float KX = X + 168 * S + i * 24 * S;
+   Tafel(KX, ZY + 2 * S, 18 * S, 12 * S, FLinearColor(1, 1, 1, 0.12f));
+   if (i < Stufe) Tafel(KX, ZY + 2 * S, 18 * S, 12 * S, FLinearColor(0.95f, 0.72f, 0.12f));
+  }
+  ZY += 30 * S;
+ }
+ const FString Auftraege = FString::Printf(TEXT("%d Aufträge erledigt"), Konto->HoleErledigt());
+ Schrift(Auftraege, X + 22 * S, ZY + 6 * S, 13, Leise);
+ // Reviere: vier Kaestchen, gefuellt, was einem gehoert.
+ Schrift(TEXT("Reviere"), X + 22 * S, ZY + 30 * S, 13, Leise);
+ for (int32 i = 0; i < 4; i++) {
+  const float KX = X + 168 * S + i * 24 * S;
+  Tafel(KX, ZY + 32 * S, 18 * S, 12 * S, FLinearColor(1, 1, 1, 0.12f));
+  if (Konto->HatRevier(i)) Tafel(KX, ZY + 32 * S, 18 * S, 12 * S, FLinearColor(0.2f, 0.78f, 0.34f));
+ }
 }
 
 void ALaLaBergHUD::Leben() {
