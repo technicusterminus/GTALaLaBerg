@@ -691,6 +691,19 @@ void ALaLaBergGameMode::BeginPlay() {
    PC->ConsoleCommand(TEXT("HighResShot 1600x900"));
    UE_LOG(LogTemp,Display,TEXT("LALABERG_LECH_FOTO ort=%s"),*Ort.ToString());
   },8.0f,false);
+  // Zweites Bild flach ueber dem Wasser: erst im streifenden Blick zeigt
+  // sich, was das Wassermaterial kann (Fresnel, Spiegelung, Brechung).
+  FTimerHandle LechFlach;
+  GetWorldTimerManager().SetTimer(LechFlach,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   APawn* Pawn=PC?PC->GetPawn():nullptr;
+   if(!PC||!Pawn) return;
+   const FVector Ort(-14500.0f,22000.0f,420.0f);
+   Pawn->SetActorLocation(Ort,false,nullptr,ETeleportType::TeleportPhysics);
+   PC->SetControlRotation(FRotator(-4.0f,35.0f,0.0f));
+   PC->ConsoleCommand(TEXT("HighResShot 1600x900"));
+   UE_LOG(LogTemp,Display,TEXT("LALABERG_LECH_FOTO flach ort=%s"),*Ort.ToString());
+  },10.5f,false);
   FTimerHandle LechEnde;
   GetWorldTimerManager().SetTimer(LechEnde,[]() { FPlatformMisc::RequestExitWithStatus(false,0); },13.0f,false);
  }
