@@ -537,6 +537,7 @@ Saved/Screenshots/WindowsEditor
 | `-LaLaBergNacht` | Setzt die Tageszeit auf Mitternacht | Für Nachtbildtests |
 | `-LaLaBergGpu` | GPU-Zeiten pro Renderphase | Profilingdaten im Log |
 | `-LaLaBergWaffentest` | Alle Waffen plus Treffer auf Fahrzeug und Wand | `LALABERG_WAFFENTEST PASS` |
+| `-LaLaBergRevierTest` | Reviere: Säulen an den Wahrzeichen, Treffer zählt, Übernahme erst bei genug Ruf | `LALABERG_REVIERTEST PASS marken=4 offen=0 ohne_ruf=1 mit_ruf=3 kapitel=3` |
 | `-LaLaBergFigurTest` | Charakterwerte: Üben hebt die Stufe, Ausdauer macht schneller, alles überlebt den Speicherlauf | `LALABERG_FIGURTEST PASS stufe=1->4 platte=620 tempo=450->542` |
 | `-LaLaBergRennTest` | Rennen annehmen und die Kontrollpunkte der Reihe nach abfahren | `LALABERG_RENNTEST PASS art=1 punkte=4 gewonnen=1` |
 | `-LaLaBergJagdTest` | Verfolgung annehmen und den flüchtenden Wagen mit Farbe stellen | `LALABERG_JAGDTEST PASS art=1 gestellt=1` |

@@ -36,6 +36,7 @@
 #include "LaLaBergWagen.h"
 #include "LaLaBergAuftraege.h"
 #include "LaLaBergPolizei.h"
+#include "LaLaBergRevier.h"
 #include "LaLaBergLaeden.h"
 #include "LaLaBergKonto.h"
 #include "LaLaBergHUD.h"
@@ -394,6 +395,9 @@ void ALaLaBergGameMode::InitGame(const FString& MapName,const FString& Options,F
   GetWorldTimerManager().SetTimer(H,[this,Mitte]() {
    // Die Polizei gleich mit - sie braucht keinen Ort, nur das Strassennetz.
    GetWorld()->SpawnActor<ALaLaBergPolizei>();
+   // Die Reviere des Farbkriegs: brauchen die Stadtkollision, weil ihre
+   // Saeulen auf dem Boden stehen (siehe Docs/Geschichte.md).
+   GetWorld()->SpawnActor<ALaLaBergRevier>();
    auto* Auftraege=GetWorld()->SpawnActor<ALaLaBergAuftraege>();
    bool bFrei=false;
    if(Auftraege) Auftraege->SetzeStartOrt(SucheFahrbahn(Mitte,bFrei).GetLocation());
@@ -551,6 +555,7 @@ void ALaLaBergGameMode::BeginPlay() {
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergSchadenTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergTaxiTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergFigurTest")) ||
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergRevierTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergRennTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergJagdTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergZielFoto"));
@@ -1063,6 +1068,50 @@ void ALaLaBergGameMode::BeginPlay() {
  // je gleichzeitig Gruen zeigen. Ohne diesen Test waere "kreuzende Strassen
  // haben nie gleichzeitig Gruen" nur eine Behauptung ueber den Code, der die
  // Zeitrechnung dafuer aufstellt, nicht ueber das tatsaechliche Verhalten.
+ // Reviere: stehen die Saeulen an den Wahrzeichen, zaehlt ein Treffer, und
+ // wechselt das Revier erst bei genug Ruf den Besitzer?
+ if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergRevierTest"))) {
+  static int32 Marken=0, OhneRuf=-1, MitRuf=-1, Kapitel=-1, Offen=-1;
+  FTimerHandle Erst;
+  GetWorldTimerManager().SetTimer(Erst,[this]() {
+   auto* R=ALaLaBergRevier::Instanz.Get();
+   auto* Konto=ULaLaBergKonto::Hole(this);
+   if(!R||!Konto) return;
+   Offen=R->HoleOffenes();
+   Marken=R->HoleReviere().IsValidIndex(0)?R->HoleReviere()[0].Marken.Num():0;
+   // Erst ohne Ruf: markieren zaehlt, das Revier wechselt aber nicht.
+   R->TestMarkiereAlle();
+   OhneRuf=Konto->HoleReviere();
+   // Das erste Revier verlangt keinen Ruf (0 * 150) - fuer den Test wird
+   // deshalb gleich das zweite geprueft: Ruf geben und weitermachen.
+   Konto->Uebe(ULaLaBergKonto::EWert::Ruf,200.0f);
+   R->TestMarkiereAlle();
+   MitRuf=Konto->HoleReviere();
+   Kapitel=Konto->HoleKapitel();
+   // Blick auf die erste Saeule des naechsten Reviers.
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   const int32 Jetzt=R->HoleOffenes();
+   if(PC&&PC->GetPawn()&&R->HoleReviere().IsValidIndex(Jetzt)&&R->HoleReviere()[Jetzt].Marken.Num()) {
+    const FVector Ziel=R->HoleReviere()[Jetzt].Marken[0].Ort;
+    const FVector Ort=Ziel+FVector(4200,4200,2600);
+    PC->GetPawn()->SetActorLocation(Ort,false,nullptr,ETeleportType::TeleportPhysics);
+    PC->SetControlRotation((Ziel+FVector(0,0,1500)-Ort).Rotation());
+    if(auto* Anzeige=Cast<ALaLaBergHUD>(PC->GetHUD())) Anzeige->OrtSofort();
+   }
+  },4.0f,false);
+  FTimerHandle Bild;
+  GetWorldTimerManager().SetTimer(Bild,[this]() {
+   if(auto* PC=GetWorld()->GetFirstPlayerController()) PC->ConsoleCommand(TEXT("HighResShot 1600x900"));
+  },5.0f,false);
+  FTimerHandle Ende;
+  GetWorldTimerManager().SetTimer(Ende,[this]() {
+   // Revier 0 faellt ohne Ruf (verlangt 0), Revier 1 erst mit Ruf 150.
+   const bool bPass=Marken==4&&Offen==0&&OhneRuf==1&&MitRuf==3&&Kapitel>=3;
+   Beleg(FString::Printf(TEXT("LALABERG_REVIERTEST %s marken=%d offen=%d ohne_ruf=%d mit_ruf=%d kapitel=%d"),
+                         bPass?TEXT("PASS"):TEXT("FAIL"),Marken,Offen,OhneRuf,MitRuf,Kapitel));
+   FPlatformMisc::RequestExitWithStatus(false,bPass?0:1);
+  },6.0f,false);
+ }
  // Charakterwerte: waechst der Wert durch Uebung, stimmt die Stufe, wirkt
  // die Ausdauer aufs Lauftempo, und ueberlebt alles einen Speicherlauf?
  // Dazu ein Bild der Vollkarte mit dem Figurblatt.

@@ -10,6 +10,8 @@
 #include "LaLaBergFarbbar.h"
 #include "LaLaBergVerletzbar.h"
 #include "LaLaBergKonto.h"
+#include "LaLaBergRevier.h"
+#include "Components/StaticMeshComponent.h"
 #include "LaLaBergGameMode.h"
 #include "LaLaBergEinschlagblitz.h"
 #include "Sound/SoundBase.h"
@@ -115,6 +117,10 @@ void ALaLaBergFarbkugel::Aufprall(UPrimitiveComponent* TroffeneKomponente, AActo
   UGameplayStatics::PlaySoundAtLocation(this, Sound, Treffer.Location, 1.0f, FMath::FRandRange(0.92f, 1.08f));
  if (auto* Blitz = GetWorld()->SpawnActor<ALaLaBergEinschlagblitz>(Treffer.Location, FRotator::ZeroRotator))
   Blitz->Einrichten(Farbe, 3500.0f, 220.0f, 0.10f);
+ // Wahrzeichen des Farbkriegs: eine getroffene Saeule gilt als markiert
+ // (siehe LaLaBergRevier und Docs/Geschichte.md).
+ if (auto* Revier = ALaLaBergRevier::Instanz.Get())
+  if (auto* Getroffen = Cast<UStaticMeshComponent>(AndereKomponente)) Revier->Markiere(Getroffen, Farbe);
  if (auto* Reaktion = Cast<ILaLaBergFarbbar>(AndererActor)) {
   Reaktion->ErhalteFarbe(Farbe, GetVelocity());
   // Getroffen zu haben uebt das Zielen - eine Hauswand zaehlt nicht.
