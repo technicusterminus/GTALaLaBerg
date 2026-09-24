@@ -45,6 +45,12 @@ public:
  UPROPERTY() int32 Verfolgungen = 0;
  // Je Mission des Drehbuchs ein Bit (siehe LaLaBergDrehbuch).
  UPROPERTY() int32 Missionen = 0;
+ // Die fuenfzig versteckten Farbdosen: zwei Maskenhaelften zu je 25 Bit
+ // (siehe LaLaBergFarbdosen).
+ UPROPERTY() int32 DosenA = 0;
+ UPROPERTY() int32 DosenB = 0;
+ // Bestleistung an der Schiessbude (Treffer je Runde).
+ UPROPERTY() int32 BesteBude = 0;
 };
 
 // Konto, gekaufte Waffen und Lack des eigenen Wagens - ein Subsystem der
@@ -102,6 +108,12 @@ public:
  // Geschaffte Missionen des Drehbuchs.
  bool HatMission(int32 Nummer) const { return Stand && Nummer >= 0 && Nummer < 32 && (Stand->Missionen & (1 << Nummer)); }
  void SetzeMission(int32 Nummer);
+ // Versteckte Farbdosen.
+ bool HatDose(int32 Nummer) const;
+ void NimmDose(int32 Nummer);
+ int32 HoleDosen() const;
+ int32 HoleBesteBude() const { return Stand ? Stand->BesteBude : 0; }
+ void SetzeBesteBude(int32 Treffer);
 
  void Speichere();
  const FString& HoleSlot() const { return Slot; }

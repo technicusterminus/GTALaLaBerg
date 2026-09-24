@@ -38,6 +38,8 @@
 #include "LaLaBergPolizei.h"
 #include "LaLaBergRevier.h"
 #include "LaLaBergDrehbuch.h"
+#include "LaLaBergFarbdosen.h"
+#include "LaLaBergSchiessbude.h"
 #include "LaLaBergLaeden.h"
 #include "LaLaBergKonto.h"
 #include "LaLaBergHUD.h"
@@ -401,6 +403,8 @@ void ALaLaBergGameMode::InitGame(const FString& MapName,const FString& Options,F
    GetWorld()->SpawnActor<ALaLaBergRevier>();
    // Das Drehbuch: Missionen als Daten (Content/SourceData/Story).
    GetWorld()->SpawnActor<ALaLaBergDrehbuch>();
+   // Die fuenfzig versteckten Farbdosen (Minispiel neben der Geschichte).
+   GetWorld()->SpawnActor<ALaLaBergFarbdosen>();
    auto* Auftraege=GetWorld()->SpawnActor<ALaLaBergAuftraege>();
    bool bFrei=false;
    if(Auftraege) Auftraege->SetzeStartOrt(SucheFahrbahn(Mitte,bFrei).GetLocation());
@@ -410,7 +414,12 @@ void ALaLaBergGameMode::InitGame(const FString& MapName,const FString& Options,F
    // Fahrbahn, nicht die Absetzhoehe eines Wagens (SucheFahrbahn: +92 cm).
    if(auto* Laeden=GetWorld()->SpawnActor<ALaLaBergLaeden>()) {
     Laeden->Stelle(ALaLaBergLaeden::LACKIEREREI,SucheFahrbahn(FVector(-150000.0f,12000.0f,Mitte.Z),bFrei).GetLocation()-FVector(0,0,92.0f));
-    Laeden->Stelle(ALaLaBergLaeden::PAINTBALL,SucheFahrbahn(FVector(-37630.0f,26000.0f,Mitte.Z),bFrei).GetLocation()-FVector(0,0,92.0f));
+    const FVector PaintballOrt=SucheFahrbahn(FVector(-37630.0f,26000.0f,Mitte.Z),bFrei).GetLocation()-FVector(0,0,92.0f);
+    Laeden->Stelle(ALaLaBergLaeden::PAINTBALL,PaintballOrt);
+    // Die Schiessbude steht neben dem Paintball-Laden - 25 m weiter, damit
+    // man nicht gleichzeitig im Laden und in der Bude steht.
+    if(auto* Bude=GetWorld()->SpawnActor<ALaLaBergSchiessbude>())
+     Bude->Stelle(PaintballOrt+FVector(2500.0f,0,0));
    }
   },2.5f,false);
  }
@@ -561,6 +570,8 @@ void ALaLaBergGameMode::BeginPlay() {
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergRevierTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergKopfTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergStoryTest")) ||
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergDosenTest")) ||
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergBudeTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergRennTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergJagdTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergZielFoto"));
@@ -1073,6 +1084,60 @@ void ALaLaBergGameMode::BeginPlay() {
  // je gleichzeitig Gruen zeigen. Ohne diesen Test waere "kreuzende Strassen
  // haben nie gleichzeitig Gruen" nur eine Behauptung ueber den Code, der die
  // Zeitrechnung dafuer aufstellt, nicht ueber das tatsaechliche Verhalten.
+ // Die Schiessbude: startet sie, zaehlt sie Treffer, zahlt sie aus und
+ // merkt sie sich die Bestleistung?
+ if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergBudeTest"))) {
+  static int32 Treffer=0, Geld=0, Beste=0; static bool bLief=false;
+  FTimerHandle Start;
+  GetWorldTimerManager().SetTimer(Start,[this]() {
+   auto* B=ALaLaBergSchiessbude::Instanz.Get();
+   if(!B) return;
+   B->TestStarte();
+   bLief=B->Laeuft();
+   for(int32 i=0;i<7;i++) B->TestTrefferAufErste();
+   Treffer=B->HoleTreffer();
+  },4.0f,false);
+  FTimerHandle Ende;
+  GetWorldTimerManager().SetTimer(Ende,[this]() {
+   // Die Runde laeuft 45 s; fuer den Test reicht es, sie ablaufen zu sehen,
+   // deshalb wird hier nur der Zwischenstand geprueft und dann beendet.
+   // Die Runde laeuft 45 s - fuer den Pruefllauf sofort abrechnen.
+   auto* B=ALaLaBergSchiessbude::Instanz.Get();
+   if(B) B->TestBeende();
+   auto* Konto=ULaLaBergKonto::Hole(this);
+   if(Konto) { Geld=Konto->HoleGeld(); Beste=Konto->HoleBesteBude(); }
+   const bool bPass=bLief&&Treffer==7&&Geld==7*40&&Beste==7;
+   Beleg(FString::Printf(TEXT("LALABERG_BUDETEST %s lief=%d treffer=%d geld=%d beste=%d"),
+                         bPass?TEXT("PASS"):TEXT("FAIL"),bLief?1:0,Treffer,Geld,Beste));
+   FPlatformMisc::RequestExitWithStatus(false,bPass?0:1);
+  },6.0f,false);
+ }
+ // Die versteckten Farbdosen: stehen fuenfzig in der Stadt, zaehlt das
+ // Einsammeln, ueberlebt der Stand einen Speicherlauf, und kommt die
+ // Staffelbelohnung bei zehn?
+ if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergDosenTest"))) {
+  static int32 Gestellt=0, Gesammelt=0, Platte=-1, Geld=0;
+  FTimerHandle Sammeln;
+  GetWorldTimerManager().SetTimer(Sammeln,[this]() {
+   auto* D=ALaLaBergFarbdosen::Instanz.Get();
+   auto* Konto=ULaLaBergKonto::Hole(this);
+   if(!D||!Konto) return;
+   Gestellt=ALaLaBergFarbdosen::ANZAHL;
+   for(int32 i=0;i<10;i++) D->TestSammle();
+   Gesammelt=D->HoleGefunden();
+   Geld=Konto->HoleGeld();
+   if(auto* Stand=Konto->LadeVonPlatte()) Platte=FMath::CountBits(static_cast<uint32>(Stand->DosenA))
+                                                +FMath::CountBits(static_cast<uint32>(Stand->DosenB));
+  },4.0f,false);
+  FTimerHandle Ende;
+  GetWorldTimerManager().SetTimer(Ende,[this]() {
+   // Zehn Dosen zu 120 € plus 2000 € Staffelpreis.
+   const bool bPass=Gestellt==50&&Gesammelt==10&&Platte==10&&Geld==10*120+2000;
+   Beleg(FString::Printf(TEXT("LALABERG_DOSENTEST %s gestellt=%d gesammelt=%d platte=%d geld=%d"),
+                         bPass?TEXT("PASS"):TEXT("FAIL"),Gestellt,Gesammelt,Platte,Geld));
+   FPlatformMisc::RequestExitWithStatus(false,bPass?0:1);
+  },5.5f,false);
+ }
  // Das Drehbuch: laedt es die Missionen, bietet es die erste des Kapitels
  // an, laeuft sie Stufe fuer Stufe durch, und zahlt sie am Ende aus?
  if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergStoryTest"))) {

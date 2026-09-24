@@ -537,6 +537,8 @@ Saved/Screenshots/WindowsEditor
 | `-LaLaBergNacht` | Setzt die Tageszeit auf Mitternacht | Für Nachtbildtests |
 | `-LaLaBergGpu` | GPU-Zeiten pro Renderphase | Profilingdaten im Log |
 | `-LaLaBergWaffentest` | Alle Waffen plus Treffer auf Fahrzeug und Wand | `LALABERG_WAFFENTEST PASS` |
+| `-LaLaBergDosenTest` | Versteckte Farbdosen: 50 stehen, Einsammeln zählt, Staffelpreis bei 10 | `LALABERG_DOSENTEST PASS gestellt=50 gesammelt=10 platte=10 geld=3200` |
+| `-LaLaBergBudeTest` | Schießbude: Runde starten, Treffer zählen, auszahlen, Bestleistung merken | `LALABERG_BUDETEST PASS lief=1 treffer=7 geld=280 beste=7` |
 | `-LaLaBergStoryTest` | Drehbuch: Missionen laden, annehmen, Stufe für Stufe durchlaufen, auszahlen | `LALABERG_STORYTEST PASS gestartet=1 stufen=3 geschafft=1 geld=0->500` |
 | `-LaLaBergKopfTest` | Bewährung, Kopf der Mannschaft rufen, stellen, Revier und Fundstück kassieren | `LALABERG_KOPFTEST PASS ohne_bewaehrung=0 jagd=1 fund=0->1 reviere=1 kapitel=2` |
 | `-LaLaBergRevierTest` | Reviere: Säulen an den Wahrzeichen, Treffer zählt, Übernahme erst bei genug Ruf | `LALABERG_REVIERTEST PASS marken=4 offen=0 ohne_ruf=1 mit_ruf=3 kapitel=3` |

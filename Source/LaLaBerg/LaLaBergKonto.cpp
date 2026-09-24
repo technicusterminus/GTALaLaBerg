@@ -125,6 +125,29 @@ int32 ULaLaBergKonto::HoleArtZahl(int32 Art) const {
  return 0;
 }
 
+bool ULaLaBergKonto::HatDose(int32 Nummer) const {
+ if (!Stand || Nummer < 0 || Nummer >= 50) return false;
+ return Nummer < 25 ? (Stand->DosenA & (1 << Nummer)) != 0 : (Stand->DosenB & (1 << (Nummer - 25))) != 0;
+}
+
+void ULaLaBergKonto::NimmDose(int32 Nummer) {
+ if (!Stand || Nummer < 0 || Nummer >= 50 || HatDose(Nummer)) return;
+ if (Nummer < 25) Stand->DosenA |= (1 << Nummer);
+ else Stand->DosenB |= (1 << (Nummer - 25));
+ Speichere();
+}
+
+int32 ULaLaBergKonto::HoleDosen() const {
+ if (!Stand) return 0;
+ return FMath::CountBits(static_cast<uint32>(Stand->DosenA)) + FMath::CountBits(static_cast<uint32>(Stand->DosenB));
+}
+
+void ULaLaBergKonto::SetzeBesteBude(int32 Treffer) {
+ if (!Stand || Treffer <= Stand->BesteBude) return;
+ Stand->BesteBude = Treffer;
+ Speichere();
+}
+
 void ULaLaBergKonto::SetzeMission(int32 Nummer) {
  if (!Stand || Nummer < 0 || Nummer >= 32 || HatMission(Nummer)) return;
  Stand->Missionen |= (1 << Nummer);
