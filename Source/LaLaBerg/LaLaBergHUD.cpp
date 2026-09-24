@@ -162,6 +162,12 @@ void ALaLaBergHUD::Tacho(ALaLaBergWagen* Wagen) {
  const float X = Canvas->ClipX - B - 40 * S, Y = Canvas->ClipY - H - 70 * S;
  Tafel(X, Y, B, H, Tinte);
 
+ // Der laufende Sender ueber dem Tacho - wie ein Display im Armaturenbrett.
+ if (Wagen->HoleSender() > 0) {
+  const FString Sender = FString::Printf(TEXT("♪  %s"), *Wagen->HoleSendername());
+  Tafel(X, Y - 26 * S, B, 22 * S, Tinte);
+  Schrift(Sender, X + 22 * S, Y - 23 * S, 13, FLinearColor(0.95f, 0.72f, 0.12f), true);
+ }
  const FString Zahl = FString::Printf(TEXT("%d"), FMath::RoundToInt(FMath::Abs(Kmh)));
  const float ZB = Schrift(Zahl, X + 22 * S, Y + 8 * S, 46, Weiss, true);
  // Grundlinie der Einheit auf die der Zahl: 46 pt gegen 16 pt

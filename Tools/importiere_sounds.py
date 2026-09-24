@@ -20,10 +20,13 @@ NAMEN = ["SFX_Schuss_Pistole", "SFX_Schuss_Maschine", "SFX_Schuss_Schrot", "SFX_
          "SFX_Klecks", "SFX_Schritt", "SFX_Schritt_Gras", "SFX_Motor",
          # Dauerklaenge: Martinshorn, Rotor und Panzerdiesel laufen in der
          # Schleife, solange die Quelle da ist.
-         "SFX_Sirene", "SFX_Rotor", "SFX_Panzer", "SFX_Panzer_Schuss"]
+         "SFX_Sirene", "SFX_Rotor", "SFX_Panzer", "SFX_Panzer_Schuss",
+         # Die drei Radiosender (siehe erzeuge_musik.py) - sie laufen in der
+         # Schleife wie die uebrigen Dauerklaenge.
+         "SFX_Radio_Lech", "SFX_Radio_Blasmusik", "SFX_Radio_Klassik"]
 # Nur die Dauerklaenge laufen in der Schleife - der Panzerschuss nicht,
 # obwohl er "Panzer" heisst.
-SCHLEIFE = ("Motor", "Sirene", "Rotor")
+SCHLEIFE = ("Motor", "Sirene", "Rotor", "Radio")
 
 importiert = []
 for name in NAMEN:

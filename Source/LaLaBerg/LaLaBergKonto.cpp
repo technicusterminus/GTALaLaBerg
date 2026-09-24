@@ -142,6 +142,12 @@ int32 ULaLaBergKonto::HoleDosen() const {
  return FMath::CountBits(static_cast<uint32>(Stand->DosenA)) + FMath::CountBits(static_cast<uint32>(Stand->DosenB));
 }
 
+void ULaLaBergKonto::SetzeSender(int32 Nummer) {
+ if (!Stand || Stand->Sender == Nummer) return;
+ Stand->Sender = Nummer;
+ Speichere();
+}
+
 void ULaLaBergKonto::SetzeBesteBude(int32 Treffer) {
  if (!Stand || Treffer <= Stand->BesteBude) return;
  Stand->BesteBude = Treffer;

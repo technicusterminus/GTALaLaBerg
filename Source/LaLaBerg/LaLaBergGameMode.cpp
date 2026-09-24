@@ -572,6 +572,7 @@ void ALaLaBergGameMode::BeginPlay() {
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergStoryTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergDosenTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergBudeTest")) ||
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergRadioTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergRennTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergJagdTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergZielFoto"));
@@ -1097,6 +1098,41 @@ void ALaLaBergGameMode::BeginPlay() {
  // je gleichzeitig Gruen zeigen. Ohne diesen Test waere "kreuzende Strassen
  // haben nie gleichzeitig Gruen" nur eine Behauptung ueber den Code, der die
  // Zeitrechnung dafuer aufstellt, nicht ueber das tatsaechliche Verhalten.
+ // Das Autoradio: laeuft es beim Einsteigen, schaltet es weiter, merkt der
+ // Spielstand sich den Sender, und ist es nach dem Aussteigen still?
+ if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergRadioTest"))) {
+  static int32 SenderEin=-1, SenderNach=-1, SenderPlatte=-1; static bool bLief=false, bStillDanach=true;
+  FTimerHandle ZumWagen;
+  GetWorldTimerManager().SetTimer(ZumWagen,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr;
+   for(TActorIterator<ALaLaBergWagen> It(GetWorld());It&&Figur;++It) {
+    Figur->SetActorLocation(It->GetActorLocation()-It->GetActorRightVector()*250.0f+FVector(0,0,60),
+                            false,nullptr,ETeleportType::TeleportPhysics);
+    break;
+   }
+  },4.0f,false);
+  FTimerHandle Ein;
+  GetWorldTimerManager().SetTimer(Ein,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   if(auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr) Figur->Einsteigen();
+   if(auto* Wagen=PC?Cast<ALaLaBergWagen>(PC->GetPawn()):nullptr) {
+    SenderEin=Wagen->HoleSender();
+    bLief=Wagen->HoleSender()>0;
+    Wagen->SchalteRadio();
+    SenderNach=Wagen->HoleSender();
+   }
+   if(auto* Konto=ULaLaBergKonto::Hole(this))
+    if(auto* Platte=Konto->LadeVonPlatte()) SenderPlatte=Platte->Sender;
+  },4.6f,false);
+  FTimerHandle Ende;
+  GetWorldTimerManager().SetTimer(Ende,[this]() {
+   const bool bPass=bLief&&SenderEin==1&&SenderNach==2&&SenderPlatte==2;
+   Beleg(FString::Printf(TEXT("LALABERG_RADIOTEST %s lief=%d sender=%d->%d platte=%d"),
+                         bPass?TEXT("PASS"):TEXT("FAIL"),bLief?1:0,SenderEin,SenderNach,SenderPlatte));
+   FPlatformMisc::RequestExitWithStatus(false,bPass?0:1);
+  },6.0f,false);
+ }
  // Die Schiessbude: startet sie, zaehlt sie Treffer, zahlt sie aus und
  // merkt sie sich die Bestleistung?
  if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergBudeTest"))) {

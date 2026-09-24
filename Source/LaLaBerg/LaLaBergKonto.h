@@ -51,6 +51,8 @@ public:
  UPROPERTY() int32 DosenB = 0;
  // Bestleistung an der Schiessbude (Treffer je Runde).
  UPROPERTY() int32 BesteBude = 0;
+ // Welcher Radiosender zuletzt lief (0 = aus, siehe ALaLaBergWagen).
+ UPROPERTY() int32 Sender = 1;
 };
 
 // Konto, gekaufte Waffen und Lack des eigenen Wagens - ein Subsystem der
@@ -114,6 +116,8 @@ public:
  int32 HoleDosen() const;
  int32 HoleBesteBude() const { return Stand ? Stand->BesteBude : 0; }
  void SetzeBesteBude(int32 Treffer);
+ int32 HoleSender() const { return Stand ? Stand->Sender : 1; }
+ void SetzeSender(int32 Nummer);
 
  void Speichere();
  const FString& HoleSlot() const { return Slot; }

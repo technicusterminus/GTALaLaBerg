@@ -44,6 +44,11 @@ public:
  int32 HoleFahrzeugTyp() const { return FahrzeugTyp; }
  // Wer eingestiegen ist, steigt auch wieder aus - der Wagen haelt die Figur.
  void SetzeFahrer(class ACharacter* Figur);
+ // Autoradio: 0 = aus, sonst der Sender (siehe SENDER in der .cpp).
+ // Umschalten mit der Radiotaste; der Stand haelt im Spielstand.
+ void SchalteRadio();
+ int32 HoleSender() const { return Sender; }
+ FString HoleSendername() const;
  // Fuer den Fahrtest: Gas und Lenkung ohne Tastatur setzen.
  // Fuer den Fahrtest: Gas und Lenkung ohne Tastatur setzen. Solange das
  // gilt, ueberschreibt die Eingabeachse die Werte nicht - sonst stellte die
@@ -99,6 +104,8 @@ private:
  // gewaehlte Modell nur um, wuerfelt nicht neu.
  int32 FahrzeugTyp = -2;
  float Leben = 100.0f;
+ int32 Sender = 0;
+ UPROPERTY() TObjectPtr<class UAudioComponent> Radio = nullptr;
  UPROPERTY() TObjectPtr<class USpringArmComponent> Ausleger = nullptr;
  UPROPERTY() TObjectPtr<class UCameraComponent> Kamera = nullptr;
  UPROPERTY() TObjectPtr<class UAudioComponent> Motorklang = nullptr;

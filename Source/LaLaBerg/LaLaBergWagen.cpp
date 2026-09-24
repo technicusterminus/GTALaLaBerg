@@ -163,6 +163,14 @@ ALaLaBergWagen::ALaLaBergWagen() {
  MotorRaum.FalloffDistance = 4500.0f;
  Motorklang->AdjustAttenuation(MotorRaum);
 
+ // Autoradio: haengt am Rumpf wie der Motor, ist aber nicht raeumlich -
+ // man sitzt ja drin. Es laeuft nur, solange jemand faehrt.
+ Radio = CreateDefaultSubobject<UAudioComponent>(TEXT("Radio"));
+ Radio->SetupAttachment(Rumpf);
+ Radio->bAutoActivate = false;
+ Radio->bAllowSpatialization = false;
+ Radio->SetVolumeMultiplier(0.55f);
+
  // Chaos-Vehicle statt vier Federstrahlen: echtes Motor-/Getriebe-Kennfeld,
  // Vorderradlenkung, Hinterradantrieb, eigene Reifenreibung je Rad statt
  // einer pauschalen Seitenfuehrungskraft. Nabenpositionen laengs/quer wie
@@ -443,6 +451,7 @@ void ALaLaBergWagen::SetupPlayerInputComponent(UInputComponent* Eingabe) {
  // Aus- wie Einsteigen mit E; R bleibt als gewohnte zweite Taste.
  Eingabe->BindAction("Einsteigen", IE_Pressed, this, &ALaLaBergWagen::Aussteigen);
  Eingabe->BindAction("Recover", IE_Pressed, this, &ALaLaBergWagen::Aussteigen);
+ Eingabe->BindAction("Radio", IE_Pressed, this, &ALaLaBergWagen::SchalteRadio);
 }
 
 void ALaLaBergWagen::Gas(float Wert) { if (!bTest) GasWert = FMath::Clamp(Wert, -1.0f, 1.0f); }
@@ -454,11 +463,53 @@ void ALaLaBergWagen::Nicken(float Wert) {
  R.Pitch = FMath::Clamp(R.Pitch - Wert * 1.5f, -60.0f, 15.0f);
  Ausleger->SetRelativeRotation(R);
 }
+namespace {
+ // Die Sender des Autoradios. Der erste Eintrag ist "aus".
+ struct FSender { const TCHAR* Name; const TCHAR* Pfad; };
+ const FSender SENDER[] = {
+  { TEXT("Radio aus"), nullptr },
+  { TEXT("Lech FM"), TEXT("/Game/Audio/SFX_Radio_Lech.SFX_Radio_Lech") },
+  { TEXT("Blasmusik Landsberg"), TEXT("/Game/Audio/SFX_Radio_Blasmusik.SFX_Radio_Blasmusik") },
+  { TEXT("Klinik Klassik"), TEXT("/Game/Audio/SFX_Radio_Klassik.SFX_Radio_Klassik") },
+ };
+}
+
+FString ALaLaBergWagen::HoleSendername() const {
+ return SENDER[FMath::Clamp(Sender, 0, UE_ARRAY_COUNT(SENDER) - 1)].Name;
+}
+
+// Einmal weiterschalten - durch alle Sender und wieder auf "aus".
+void ALaLaBergWagen::SchalteRadio() {
+ Sender = (Sender + 1) % UE_ARRAY_COUNT(SENDER);
+ if (auto* Konto = ULaLaBergKonto::Hole(this)) Konto->SetzeSender(Sender);
+ if (!Radio) return;
+ Radio->Stop();
+ if (const TCHAR* Pfad = SENDER[Sender].Pfad) {
+  if (auto* Ton = LoadObject<USoundBase>(nullptr, Pfad)) {
+   Radio->SetSound(Ton);
+   // Mitten im Stueck einsteigen: ein Sender laeuft weiter, auch wenn
+   // niemand zuhoert.
+   Radio->Play(FMath::FRandRange(0.0f, 20.0f));
+  }
+ }
+ if (auto* PC = Cast<APlayerController>(GetController()))
+  if (auto* HUD = Cast<ALaLaBergHUD>(PC->GetHUD()))
+   HUD->ZeigeRueckmeldung(FString::Printf(TEXT("Radio: %s"), *HoleSendername()));
+ UE_LOG(LogTemp, Display, TEXT("LALABERG_RADIO sender=%d %s"), Sender, *HoleSendername());
+}
+
 void ALaLaBergWagen::SetzeFahrer(ACharacter* Figur) {
  GasWert = LenkWert = Lenkung = 0.0f;
  bBremse = bTest = false;
  Fahrer = Figur;
  EinstiegZeit = GetWorld()->GetTimeSeconds();
+ // Der zuletzt gehoerte Sender laeuft wieder an - einmal weniger schalten,
+ // als man zurueckdrehen muesste.
+ if (const auto* Konto = ULaLaBergKonto::Hole(this)) {
+  Sender = FMath::Clamp(Konto->HoleSender(), 0, 3) - 1;
+  if (Sender < 0) Sender = 3;
+  SchalteRadio();
+ }
 }
 
 // Getrennt statt umschalten: wer die Leertaste noch als Figur drueckte und im
@@ -519,6 +570,7 @@ void ALaLaBergWagen::Aussteigen() {
  if (auto* FahrerBewegung = Fahrer->GetCharacterMovement()) FahrerBewegung->SetMovementMode(MOVE_Walking);
  PC->Possess(Fahrer);
  PC->SetControlRotation(FRotator(0, GetActorRotation().Yaw, 0));
+ if (Radio && Radio->IsPlaying()) Radio->Stop();      // die Tuer geht zu
  Meldung(TEXT("Ausgestiegen - WASD zum Gehen."));
  Fahrer = nullptr;
  GasWert = LenkWert = Lenkung = 0.0f;

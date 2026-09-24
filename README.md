@@ -330,6 +330,9 @@ Tools/importiere_waffen.py
 Tools/importiere_npc.py
     → /Game/Art/People
 
+Tools/erzeuge_musik.py
+    → Tools/Sounds/SFX_Radio_*.wav   (die drei Radiosender)
+
 Tools/erzeuge_sounds.py
 Tools/importiere_sounds.py
     → /Game/Audio
@@ -537,6 +540,7 @@ Saved/Screenshots/WindowsEditor
 | `-LaLaBergNacht` | Setzt die Tageszeit auf Mitternacht | Für Nachtbildtests |
 | `-LaLaBergGpu` | GPU-Zeiten pro Renderphase | Profilingdaten im Log |
 | `-LaLaBergWaffentest` | Alle Waffen plus Treffer auf Fahrzeug und Wand | `LALABERG_WAFFENTEST PASS` |
+| `-LaLaBergRadioTest` | Autoradio: läuft beim Einsteigen, schaltet weiter, Sender überlebt den Speicherlauf | `LALABERG_RADIOTEST PASS lief=1 sender=1->2 platte=2` |
 | `-LaLaBergDosenTest` | Versteckte Farbdosen: 50 stehen, Einsammeln zählt, Staffelpreis bei 10 | `LALABERG_DOSENTEST PASS gestellt=50 gesammelt=10 platte=10 geld=3200` |
 | `-LaLaBergBudeTest` | Schießbude: Runde starten, Treffer zählen, auszahlen, Bestleistung merken | `LALABERG_BUDETEST PASS lief=1 treffer=7 geld=280 beste=7` |
 | `-LaLaBergStoryTest` | Drehbuch: Missionen laden, annehmen, Stufe für Stufe durchlaufen, auszahlen | `LALABERG_STORYTEST PASS gestartet=1 stufen=3 geschafft=1 geld=0->500` |
