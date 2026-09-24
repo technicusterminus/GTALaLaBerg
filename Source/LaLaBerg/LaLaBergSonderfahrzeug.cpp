@@ -81,10 +81,14 @@ void ALaLaBergSonderfahrzeug::BeginPlay() {
  Koerper->SetStaticMesh(Lade(bPanzer ? TEXT("SM_Panzer_Wanne") : TEXT("SM_Heli_Rumpf")));
  Koerper->SetRelativeLocation(FVector(0, 0, bPanzer ? -PANZER_HALBHOCH : -HELI_HALBHOCH));
  Dreher->SetStaticMesh(Lade(bPanzer ? TEXT("SM_Panzer_Turm") : TEXT("SM_Heli_Rotor")));
- Dreher->SetRelativeLocation(bPanzer ? FVector(0, 0, 80.0f) : FVector(20.0f, 0, 165.0f));
+ // Nabe und Ringkanal sitzen dort, wo das Modell sie hat (Blender:
+ // Rotormast bei x 0,35 / z 2,72, Heckrotor bei x -5,55 / z 1,88) - die
+ // Zelle haengt um HELI_HALBHOCH tiefer am Rumpf.
+ Dreher->SetRelativeLocation(bPanzer ? FVector(0, 0, 80.0f)
+                                     : FVector(35.0f, 0, 272.0f - HELI_HALBHOCH));
  if (!bPanzer) {
   Heckrotor->SetStaticMesh(Lade(TEXT("SM_Heli_Heckrotor")));
-  Heckrotor->SetRelativeLocation(FVector(-640.0f, 25.0f, 115.0f));
+  Heckrotor->SetRelativeLocation(FVector(-555.0f, 0.0f, 188.0f - HELI_HALBHOCH));
  } else {
   Heckrotor->SetVisibility(false);
  }
@@ -217,7 +221,9 @@ void ALaLaBergSonderfahrzeug::Tick(float Zeit) {
   const float Umdrehung = bFaehrt ? 900.0f : 90.0f;
   Drehphase = FMath::Fmod(Drehphase + Umdrehung * Zeit, 360.0f);
   if (Dreher) Dreher->SetRelativeRotation(FRotator(0, Drehphase, 0));
-  if (Heckrotor) Heckrotor->SetRelativeRotation(FRotator(Drehphase * 1.6f, 0, 0));
+  // Der Heckrotor liegt im Ringkanal und dreht sich um die Querachse; er
+  // laeuft schneller als der Hauptrotor (beim Vorbild rund viermal).
+  if (Heckrotor) Heckrotor->SetRelativeRotation(FRotator(0, 0, Drehphase * 3.8f));
  }
 
  if (Klang) {

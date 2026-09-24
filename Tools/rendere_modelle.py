@@ -15,8 +15,8 @@ ORDNER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Modelle")
 
 # Turm und Rotor haben ihren Ursprung im Drehpunkt; im Spiel setzt sie das
 # Fahrzeug auf ihre Hoehe. Fuer das Bild dieselbe Hoehe von Hand.
-HOEHE = {"SM_Panzer_Turm": 1.90, "SM_Heli_Rotor": 3.15, "SM_Heli_Heckrotor": 2.90}
-VERSATZ_X = {"SM_Heli_Rotor": 0.2, "SM_Heli_Heckrotor": -6.4}
+HOEHE = {"SM_Panzer_Turm": 1.90, "SM_Heli_Rotor": 2.72, "SM_Heli_Heckrotor": 1.88}
+VERSATZ_X = {"SM_Heli_Rotor": 0.35, "SM_Heli_Heckrotor": -5.55}
 
 
 def szene(dateien, name, abstand, hoehe, ziel_z):

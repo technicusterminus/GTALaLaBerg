@@ -340,44 +340,129 @@ def panzer():
 
 
 # ------------------------------------------------------------ Hubschrauber
-# Leichter Hubschrauber: 9,5 m ueber alles, Rotor 9,8 m.
+# Vorbild ist der Rettungshubschrauber, wie er auf jedem Klinikumsdach steht
+# (Zelle rund 10 m lang, Rotor 10 m, Hoehe 3,5 m): runde Kabine mit weit
+# heruntergezogener Kanzel, Triebwerksdeck darueber, schlanker Heckausleger
+# und der ummantelte Heckrotor im Ringkanal - die Bauform, an der man einen
+# solchen Hubschrauber auf hundert Meter erkennt.
+#
+# Der erste Versuch war ein Kasten mit Ausleger und vier Brettern; hier
+# entstehen Kabine und Ausleger aus Umrissen mit geneigten Waenden, der
+# Ringkanal aus einer echten Kreisscheibe mit Loch.
+def scheibe_mit_loch(name, r_aussen, r_innen, dicke, ort=(0, 0, 0), segmente=28):
+    """Kreisring als Koerper - fuer den Ringkanal des Heckrotors. Achse Y."""
+    ob, me = neu(name)
+    punkte, flaechen = [], []
+    for seite, y in ((0, -dicke / 2), (1, dicke / 2)):
+        for i in range(segmente):
+            w = i / segmente * 2 * math.pi
+            punkte.append((math.cos(w) * r_aussen, y, math.sin(w) * r_aussen))
+            punkte.append((math.cos(w) * r_innen, y, math.sin(w) * r_innen))
+    for i in range(segmente):
+        j = (i + 1) % segmente
+        a0, a1 = 2 * i, 2 * i + 1
+        b0, b1 = 2 * j, 2 * j + 1
+        c0, c1 = a0 + 2 * segmente, a1 + 2 * segmente
+        d0, d1 = b0 + 2 * segmente, b1 + 2 * segmente
+        flaechen.append((a0, b0, b1, a1))          # vorn
+        flaechen.append((c1, d1, d0, c0))          # hinten
+        flaechen.append((a0, c0, d0, b0))          # aussen
+        flaechen.append((b1, d1, c1, a1))          # innen
+    me.from_pydata([(p[0] + ort[0], p[1] + ort[1], p[2] + ort[2]) for p in punkte], [], flaechen)
+    me.validate()
+    me.update()
+    return ob
+
+
 def helikopter():
     leere_szene()
-    teile = [kasten("Rumpf", 4.2, 1.7, 1.55, (0, 0, 1.75))]
-    teile.append(keil("Nase", [
-        (2.1, -0.85, -0.775), (3.3, -0.5, -0.55), (3.3, -0.5, 0.25), (2.1, -0.85, 0.775),
-        (2.1, 0.85, -0.775), (3.3, 0.5, -0.55), (3.3, 0.5, 0.25), (2.1, 0.85, 0.775),
-    ], (0, 0, 1.75)))
-    teile.append(keil("Heck", [
-        (-2.1, -0.7, -0.45), (-6.4, -0.18, 0.15), (-6.4, -0.18, 0.5), (-2.1, -0.7, 0.6),
-        (-2.1, 0.7, -0.45), (-6.4, 0.18, 0.15), (-6.4, 0.18, 0.5), (-2.1, 0.7, 0.6),
-    ], (0, 0, 1.75)))
-    teile.append(kasten("Heckflosse", 0.9, 0.12, 1.5, (-6.2, 0, 2.7)))
-    teile.append(kasten("Hoehenflosse", 0.7, 2.2, 0.1, (-5.4, 0, 2.15)))
-    teile.append(zylinder("Mast", 0.22, 0.6, (0.2, 0, 2.85), achse="Z", segmente=12))
+
+    # ------------------------------------------------------------- Zelle
+    # Kabine: unten schmal, in Fensterhoehe am breitesten, zum Dach wieder
+    # eingezogen - deshalb drei Umrisse uebereinander.
+    KABINE_UNTEN = [(2.05, -0.62), (2.45, 0.0), (2.05, 0.62), (0.2, 0.78),
+                    (-1.5, 0.66), (-1.9, 0.0), (-1.5, -0.66), (0.2, -0.78)]
+    KABINE_MITTE = [(2.35, -0.72), (2.80, 0.0), (2.35, 0.72), (0.2, 0.92),
+                    (-1.6, 0.80), (-2.05, 0.0), (-1.6, -0.80), (0.2, -0.92)]
+    KABINE_OBEN = [(1.45, -0.55), (1.75, 0.0), (1.45, 0.55), (0.2, 0.74),
+                   (-1.5, 0.66), (-1.85, 0.0), (-1.5, -0.66), (0.2, -0.74)]
+    zelle = [profil("KabineUnten", KABINE_UNTEN, 0.62, KABINE_MITTE, 1.52),
+             profil("KabineOben", KABINE_MITTE, 1.52, KABINE_OBEN, 2.18)]
+    # Kanzel: die weit heruntergezogene Frontscheibe als eigene, flache
+    # Platte ueber der Kabinenspitze.
+    zelle.append(profil("Kanzel",
+                        [(2.45, -0.62), (2.72, 0.0), (2.45, 0.62), (1.6, 0.66),
+                         (1.3, 0.0), (1.6, -0.66)], 0.75,
+                        [(1.9, -0.52), (2.10, 0.0), (1.9, 0.52), (1.35, 0.56),
+                         (1.15, 0.0), (1.35, -0.56)], 1.75))
+    # Triebwerksdeck mit zwei Auspuffstutzen, dahinter der Rotormast.
+    zelle.append(profil("Triebwerksdeck",
+                        [(0.95, -0.72), (0.95, 0.72), (-1.45, 0.66), (-1.45, -0.66)], 2.12,
+                        [(0.75, -0.56), (0.75, 0.56), (-1.35, 0.52), (-1.35, -0.52)], 2.46))
     for seite in (-1, 1):
-        teile.append(zylinder("Kufe", 0.09, 3.6, (0.1, seite * 1.15, 0.42), achse="X", segmente=10))
-        for x in (1.1, -1.1):
-            teile.append(zylinder("Strebe", 0.07, 0.95, (x, seite * 0.95, 0.9), achse="Z", segmente=8))
-    rumpf_ganz = vereine("SM_Heli_Rumpf", teile)
+        zelle.append(zylinder("Auspuff", 0.14, 0.5, (-1.35, seite * 0.42, 2.34), achse="X", segmente=14))
+    zelle.append(zylinder("Mast", 0.17, 0.5, (0.35, 0, 2.42), achse="Z", segmente=16))
 
-    # Hauptrotor: Nabe und vier Blaetter, Drehpunkt im Ursprung.
-    blaetter = [zylinder("Nabe", 0.28, 0.24, (0, 0, 0), achse="Z", segmente=14)]
+    # Heckausleger: langer, sich verjuengender Koerper bis zum Ringkanal.
+    zelle.append(profil("Heckausleger",
+                        [(-1.45, -0.42), (-1.45, 0.42), (-5.15, 0.24), (-5.15, -0.24)], 1.62,
+                        [(-1.45, -0.40), (-1.45, 0.40), (-5.15, 0.22), (-5.15, -0.22)], 2.12))
+    # Ringkanal (Fenestron) mit Blaettern darin - das auffaelligste Merkmal.
+    zelle.append(scheibe_mit_loch("Ringkanal", 0.78, 0.60, 0.34, (-5.55, 0.0, 1.88)))
+    zelle.append(zylinder("Kanalnabe", 0.14, 0.36, (-5.55, 0, 1.88), achse="Y", segmente=14))
+    # Seitenleitwerk ueber dem Kanal, Hoehenflosse mit Endscheiben davor.
+    zelle.append(profil("Seitenflosse",
+                        [(-5.0, -0.09), (-5.0, 0.09), (-5.95, 0.07), (-5.95, -0.07)], 2.40,
+                        [(-5.25, -0.07), (-5.25, 0.07), (-5.95, 0.06), (-5.95, -0.06)], 3.15))
+    zelle.append(kasten("Hoehenflosse", 0.62, 2.20, 0.09, (-4.35, 0, 1.95)))
+    for seite in (-1, 1):
+        zelle.append(kasten("Endscheibe", 0.55, 0.07, 0.62, (-4.35, seite * 1.06, 2.22)))
+    # Kufen: zwei Laengsrohre auf zwei Querbuegeln.
+    for seite in (-1, 1):
+        zelle.append(zylinder("Kufe", 0.075, 3.30, (0.15, seite * 1.05, 0.26), achse="X", segmente=12))
+        zelle.append(zylinder("Kufenspitze", 0.075, 0.5, (1.85, seite * 1.05, 0.38), achse="X", segmente=12))
+    for x in (1.05, -0.85):
+        zelle.append(zylinder("Querbuegel", 0.085, 2.10, (x, 0, 0.55), achse="Y", segmente=12))
+        for seite in (-1, 1):
+            strebe = zylinder("Strebe", 0.075, 0.42, (0, 0, 0), achse="Z", segmente=10)
+            strebe.rotation_euler = (math.radians(seite * 22), 0, 0)
+            strebe.location = (x, seite * 0.92, 0.38)
+            zelle.append(strebe)
+    # Landescheinwerfer unter der Nase, Antenne auf dem Ausleger.
+    zelle.append(zylinder("Landelicht", 0.13, 0.12, (2.25, 0, 0.72), achse="Z", segmente=14))
+    zelle.append(kasten("Antenne", 0.5, 0.05, 0.14, (-3.2, 0, 2.18)))
+    rumpf_ganz = vereine("SM_Heli_Rumpf", zelle)
+    kanten_brechen(rumpf_ganz, 0.015)
+
+    # ------------------------------------------------------------- Rotor
+    # Nabe mit Taumelscheibe und vier leicht verjuengten Blaettern.
+    rotor = [zylinder("Nabe", 0.26, 0.30, (0, 0, 0), achse="Z", segmente=20),
+             zylinder("Taumelscheibe", 0.34, 0.08, (0, 0, -0.16), achse="Z", segmente=20)]
     for i in range(4):
-        blatt = kasten("Blatt", 4.9, 0.34, 0.07, (2.45, 0, 0))
+        blatt = profil("Blatt",
+                       [(0.30, -0.16), (5.05, -0.11), (5.05, 0.11), (0.30, 0.16)], -0.035,
+                       [(0.30, -0.16), (5.05, -0.11), (5.05, 0.11), (0.30, 0.16)], 0.035)
+        # Das Netz liegt schon aussen am Blattansatz, gedreht wird um den
+        # Ursprung - so wandert der Halter mit dem Blatt mit. Ein .location
+        # wuerde nicht mitgedreht und liesse alle vier an derselben Stelle.
+        halter = kasten("Blatthalter", 0.34, 0.14, 0.12, (0.28, 0, 0))
         blatt.rotation_euler = (0, 0, math.radians(90 * i))
-        blaetter.append(blatt)
-    rotor = vereine("SM_Heli_Rotor", blaetter)
+        halter.rotation_euler = (0, 0, math.radians(90 * i))
+        rotor.append(blatt)
+        rotor.append(halter)
+    rotor_ganz = vereine("SM_Heli_Rotor", rotor)
+    kanten_brechen(rotor_ganz, 0.008)
 
-    heckteile = [zylinder("Hecknabe", 0.14, 0.2, (0, 0, 0), achse="Y", segmente=10)]
-    for i in range(2):
-        blatt = kasten("Heckblatt", 1.25, 0.06, 0.18, (0.62, 0, 0))
-        blatt.rotation_euler = (math.radians(90 * i), 0, 0)
-        heckteile.append(blatt)
-    heckrotor = vereine("SM_Heli_Heckrotor", heckteile)
+    # Heckrotor im Kanal: acht kurze Blaetter, Achse quer.
+    heck = [zylinder("Hecknabe", 0.12, 0.26, (0, 0, 0), achse="Y", segmente=14)]
+    for i in range(8):
+        blatt = kasten("Heckblatt", 0.50, 0.05, 0.11, (0.30, 0, 0))
+        blatt.rotation_euler = (math.radians(45 * i), 0, 0)
+        heck.append(blatt)
+    heckrotor = vereine("SM_Heli_Heckrotor", heck)
 
     exportiere("SM_Heli_Rumpf", rumpf_ganz)
-    exportiere("SM_Heli_Rotor", rotor)
+    exportiere("SM_Heli_Rotor", rotor_ganz)
     exportiere("SM_Heli_Heckrotor", heckrotor)
 
 
