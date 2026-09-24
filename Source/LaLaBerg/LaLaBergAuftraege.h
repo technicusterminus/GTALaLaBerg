@@ -9,6 +9,14 @@
 // und findet die naechste blaue Saeule an einem Ort in der Naehe. Laeuft die
 // Zeit ab, bleibt die blaue Saeule, wo sie war, und man kann es noch einmal
 // versuchen.
+//
+// Was an der blauen Saeule wartet. Die Lieferung war die erste Art; das
+// Taxi verlangt einen Wagen und zahlt nach Strecke, mit Trinkgeld fuer eine
+// zuegige Fahrt.
+UENUM()
+enum class ELaLaBergAuftragsart : uint8 { Lieferung, Taxi };
+
+// Verwaltet Angebot, laufenden Auftrag, Frist und Lohn - siehe oben.
 UCLASS()
 class LALABERG_API ALaLaBergAuftraege : public AActor {
  GENERATED_BODY()
@@ -30,6 +38,9 @@ public:
  FVector HoleWegpunkt() const { return bUnterwegs ? Ziele[AktZiel].Ort : StartOrt; }
  FString HoleZielName() const { return bUnterwegs ? Ziele[AktZiel].N : FString(); }
  float HoleRestzeit() const;
+ // Fuer das HUD: welche Art gerade laeuft oder angeboten wird.
+ ELaLaBergAuftragsart HoleArt() const { return Art; }
+ int32 HoleTaxifahrten() const { return Taxifahrten; }
  // Das Geld liegt im Konto (ULaLaBergKonto) und ueberdauert das Spielende.
  int32 HoleGeld() const;
  int32 HoleLohn() const { return Lohn; }
@@ -43,6 +54,11 @@ public:
  void Abbrechen();
  int32 Strafe(int32 Betrag);
 
+ // Fuer -LaLaBergTaxiTest: die naechste Annahme ist ein Taxiauftrag, statt
+ // die Art zu wuerfeln.
+ void TestErzwingeTaxi() { bTaxiErzwungen = true; }
+ // Wohin der laufende Auftrag geht - der Test setzt den Wagen dorthin.
+ FVector HoleZielOrt() const { return bUnterwegs ? Ziele[AktZiel].Ort : StartOrt; }
  // Fuer -LaLaBergAuftragTest: die Frist sofort ablaufen lassen.
  void TestAblaufen() { Frist = GetWorld()->GetTimeSeconds() - 0.01; }
 
@@ -61,7 +77,13 @@ private:
  int32 AktZiel = INDEX_NONE;
  bool bAngebot = false, bUnterwegs = false, bErstHinaus = false;
  double Frist = 0.0;
- int32 Lohn = 0, Erledigt = 0, Gescheitert = 0;
+ int32 Lohn = 0, Erledigt = 0, Gescheitert = 0, Taxifahrten = 0;
+ ELaLaBergAuftragsart Art = ELaLaBergAuftragsart::Lieferung;
+ // Ein Taxi nimmt man nur mit dem Wagen an; ohne Wagen bleibt es beim
+ // Hinweis, und die Meldung soll nicht in jedem Bild neu kommen.
+ double LetzterHinweis = -10.0;
+ bool bTaxiErzwungen = false;
+ float GesamtZeit = 1.0f;          // fuer den Trinkgeldanteil
 
  // Je Marke ein flacher Ring am Boden und eine hohe Saeule, die man ueber
  // die Daecher sieht.

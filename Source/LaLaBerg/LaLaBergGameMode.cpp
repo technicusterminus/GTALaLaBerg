@@ -549,6 +549,7 @@ void ALaLaBergGameMode::BeginPlay() {
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergSperrTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergSonderTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergSchadenTest")) ||
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergTaxiTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergZielFoto"));
  if(bAutomatisch) Beleg(FString::Printf(TEXT("LALABERG_SPIELBEGINN nach %.1fs Programmlaufzeit, %d Gebaeude"),FPlatformTime::Seconds()-GStartTime,BuildingCount));
  if(!bAutomatisch) {
@@ -1059,6 +1060,52 @@ void ALaLaBergGameMode::BeginPlay() {
  // je gleichzeitig Gruen zeigen. Ohne diesen Test waere "kreuzende Strassen
  // haben nie gleichzeitig Gruen" nur eine Behauptung ueber den Code, der die
  // Zeitrechnung dafuer aufstellt, nicht ueber das tatsaechliche Verhalten.
+ // Taxi: einsteigen, an der blauen Saeule halten, Fahrgast aufnehmen, zum
+ // Ziel fahren. Geprueft wird, dass die Art wirklich Taxi ist, dass die
+ // Fahrt zaehlt und dass Lohn samt Trinkgeld auf dem Konto landet.
+ if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergTaxiTest"))) {
+  static int32 GeldVorher=0, GeldNachher=0, Fahrten=0; static bool bArtTaxi=false;
+  // Erst zum Wagen: Einsteigen greift nur in neun Metern Umkreis, und am
+  // Startpunkt steht die Figur nicht neben ihm.
+  FTimerHandle ZumWagen;
+  GetWorldTimerManager().SetTimer(ZumWagen,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr;
+   for(TActorIterator<ALaLaBergWagen> It(GetWorld());It&&Figur;++It) {
+    Figur->SetActorLocation(It->GetActorLocation()-It->GetActorRightVector()*250.0f+FVector(0,0,60),
+                            false,nullptr,ETeleportType::TeleportPhysics);
+    break;
+   }
+  },4.0f,false);
+  FTimerHandle Ein;
+  GetWorldTimerManager().SetTimer(Ein,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   if(auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr) Figur->Einsteigen();
+   if(auto* A=ALaLaBergAuftraege::Instanz.Get()) {
+    A->TestErzwingeTaxi();
+    GeldVorher=A->HoleGeld();
+    // Mit dem Wagen auf die blaue Saeule stellen - das nimmt den Auftrag an.
+    if(APawn* Wagen=PC?PC->GetPawn():nullptr)
+     Wagen->SetActorLocation(A->HoleZielOrt()+FVector(0,0,120),false,nullptr,ETeleportType::TeleportPhysics);
+   }
+  },4.5f,false);
+  FTimerHandle Hin;
+  GetWorldTimerManager().SetTimer(Hin,[this]() {
+   auto* A=ALaLaBergAuftraege::Instanz.Get();
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   if(!A||!PC||!PC->GetPawn()) return;
+   bArtTaxi=A->HoleArt()==ELaLaBergAuftragsart::Taxi&&A->IstUnterwegs();
+   PC->GetPawn()->SetActorLocation(A->HoleZielOrt()+FVector(0,0,120),false,nullptr,ETeleportType::TeleportPhysics);
+  },6.0f,false);
+  FTimerHandle Ende;
+  GetWorldTimerManager().SetTimer(Ende,[this]() {
+   if(auto* A=ALaLaBergAuftraege::Instanz.Get()) { GeldNachher=A->HoleGeld(); Fahrten=A->HoleTaxifahrten(); }
+   const bool bPass=bArtTaxi&&Fahrten==1&&GeldNachher>GeldVorher;
+   Beleg(FString::Printf(TEXT("LALABERG_TAXITEST %s art_taxi=%d fahrten=%d geld=%d->%d"),
+                         bPass?TEXT("PASS"):TEXT("FAIL"),bArtTaxi?1:0,Fahrten,GeldVorher,GeldNachher));
+   FPlatformMisc::RequestExitWithStatus(false,bPass?0:1);
+  },7.5f,false);
+ }
  // Schaden: Lebenspunkte bei Passanten, Spieler und Fahrzeugen. Geprueft
  // wird die Rechnung (halber Schaden, halbes Leben), der Zusammenbruch mit
  // Aufwachen im Klinikum und der Weg, den die Panzerkanone nimmt: Einschlag,

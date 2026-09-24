@@ -537,6 +537,7 @@ Saved/Screenshots/WindowsEditor
 | `-LaLaBergNacht` | Setzt die Tageszeit auf Mitternacht | Für Nachtbildtests |
 | `-LaLaBergGpu` | GPU-Zeiten pro Renderphase | Profilingdaten im Log |
 | `-LaLaBergWaffentest` | Alle Waffen plus Treffer auf Fahrzeug und Wand | `LALABERG_WAFFENTEST PASS` |
+| `-LaLaBergTaxiTest` | Einsteigen, Fahrgast an der blauen Säule aufnehmen, zum Ziel fahren | `LALABERG_TAXITEST PASS art_taxi=1 fahrten=1 geld=0->896` |
 | `-LaLaBergSchadenTest` | Lebenspunkte: halber Schaden = halbes Leben, Passant faellt um, Auto steht, Spieler wacht im Klinikum auf | `LALABERG_SCHADENTEST PASS passant=0.50 umgefallen=1 auto_aus=1 spieler=60 klinik=1 leben_danach=100 abstand=0m` |
 | `-LaLaBergSonderTest` | Panzer im Wald und Hubschrauber auf dem Klinikumsdach: hinstellen, einsteigen, fahren bzw. steigen, Kanone feuern | `LALABERG_SONDERTEST PASS panzer_weg=31m heli_stieg=25m schuesse=1` |
 | `-LaLaBergSperrTest` | Vier Sterne, losfahren: steht die Strassensperre voraus auf der Strasse? | `LALABERG_SPERRTEST PASS steht=1 abstand=168m` |

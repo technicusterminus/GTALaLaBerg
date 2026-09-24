@@ -521,7 +521,9 @@ void ALaLaBergHUD::Auftrag() {
  Pfeil(FVector2D(PX, PY), (Ziel - Wo).Rotation().Yaw - Kamera, R, Farbe);
 
  const float TX = X + 100 * S;
- Schrift(bUnterwegs ? TEXT("LIEFERUNG NACH") : TEXT("AUFTRAG VERFÜGBAR"), TX, Y + 12 * S, 11, Leise, true);
+ const bool bTaxi = A->HoleArt() == ELaLaBergAuftragsart::Taxi;
+ Schrift(bUnterwegs ? (bTaxi ? TEXT("FAHRGAST NACH") : TEXT("LIEFERUNG NACH")) : TEXT("AUFTRAG VERFÜGBAR"),
+         TX, Y + 12 * S, 11, Leise, true);
  const FString Titel = bUnterwegs ? A->HoleZielName() : FString(TEXT("Zur blauen Säule"));
  const float Platz = B - (TX - X) - 16 * S;
  const float Punkt = 19.0f * FMath::Min(1.0f, Platz / FMath::Max(1.0f, Breite(Titel, 19, true)));

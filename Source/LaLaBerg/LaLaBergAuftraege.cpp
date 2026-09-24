@@ -1,6 +1,7 @@
 #include "LaLaBergAuftraege.h"
 #include "LaLaBergHUD.h"
 #include "LaLaBergKonto.h"
+#include "LaLaBergWagen.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
@@ -173,6 +174,20 @@ void ALaLaBergAuftraege::Melde(const FString& Text) const {
 }
 
 void ALaLaBergAuftraege::NimmAn() {
+ // Jede zweite Saeule ist ein Taxiauftrag - aber nur, wer im Wagen sitzt,
+ // kann einen Fahrgast mitnehmen.
+ Art = (bTaxiErzwungen || FMath::RandBool()) ? ELaLaBergAuftragsart::Taxi : ELaLaBergAuftragsart::Lieferung;
+ bTaxiErzwungen = false;
+ auto* PC = GetWorld()->GetFirstPlayerController();
+ const bool bImWagen = PC && PC->GetPawn() && PC->GetPawn()->IsA<ALaLaBergWagen>();
+ if (Art == ELaLaBergAuftragsart::Taxi && !bImWagen) {
+  Art = ELaLaBergAuftragsart::Lieferung;
+  const double Jetzt = GetWorld()->GetTimeSeconds();
+  if (Jetzt - LetzterHinweis > 12.0) {
+   LetzterHinweis = Jetzt;
+   Melde(TEXT("Hier wartet auch ein Fahrgast – mit dem Wagen vorfahren"));
+  }
+ }
  TArray<int32> Moeglich;
  for (int32 i = 0; i < Ziele.Num(); i++) {
   const float D = Waagerecht(Ziele[i].Ort, StartOrt);
@@ -184,21 +199,41 @@ void ALaLaBergAuftraege::NimmAn() {
  // Die Strassen sind laenger als die Luftlinie; 10 m/s ist gemaechliches
  // Stadttempo, dazu eine halbe Minute fuers Einsteigen.
  const float Zeit = FMath::RoundToFloat(Meter * 1.5f / 10.0f + 30.0f);
- Lohn = 100 + FMath::RoundToInt(Meter / 5.0f / 10.0f) * 10;
+ // Taxi: Grundpreis plus Streckenanteil, deutlich mehr als eine Lieferung -
+ // dafuer sitzt jemand im Wagen, der es eilig hat (Trinkgeld, siehe
+ // Erledige).
+ Lohn = Art == ELaLaBergAuftragsart::Taxi
+  ? 160 + FMath::RoundToInt(Meter / 100.0f) * 24
+  : 100 + FMath::RoundToInt(Meter / 5.0f / 10.0f) * 10;
  Frist = GetWorld()->GetTimeSeconds() + Zeit;
+ GesamtZeit = Zeit;
  bUnterwegs = true;
  bAngebot = false;
  Zeige(true, false, StartOrt);
  Zeige(false, true, Ziele[AktZiel].Ort);
- Melde(FString::Printf(TEXT("Lieferung zu %s – %d:%02d Minuten, %d €"), *Ziele[AktZiel].N,
-                       FMath::FloorToInt(Zeit / 60.0f), FMath::FloorToInt(Zeit) % 60, Lohn));
- UE_LOG(LogTemp, Display, TEXT("LALABERG_AUFTRAG start ziel=%s luftlinie=%.0fm zeit=%.0fs lohn=%d"),
+ // Zwei getrennte Aufrufe: Printf prueft die Formatzeichenkette zur
+ // Uebersetzungszeit und nimmt keine, die erst zur Laufzeit feststeht.
+ const int32 Min = FMath::FloorToInt(Zeit / 60.0f), Sek = FMath::FloorToInt(Zeit) % 60;
+ Melde(Art == ELaLaBergAuftragsart::Taxi
+       ? FString::Printf(TEXT("Fahrgast nach %s – %d:%02d Minuten, %d € plus Trinkgeld"), *Ziele[AktZiel].N, Min, Sek, Lohn)
+       : FString::Printf(TEXT("Lieferung zu %s – %d:%02d Minuten, %d €"), *Ziele[AktZiel].N, Min, Sek, Lohn));
+ UE_LOG(LogTemp, Display, TEXT("LALABERG_AUFTRAG start art=%s ziel=%s luftlinie=%.0fm zeit=%.0fs lohn=%d"),
+        Art == ELaLaBergAuftragsart::Taxi ? TEXT("taxi") : TEXT("lieferung"),
         *Ziele[AktZiel].N, Meter, Zeit, Lohn);
 }
 
 void ALaLaBergAuftraege::Erledige() {
+ // Trinkgeld beim Taxi: wer die Haelfte der Frist noch uebrig hat, bekommt
+ // 40 Prozent obendrauf, linear abnehmend bis auf null.
+ int32 Trinkgeld = 0;
+ if (Art == ELaLaBergAuftragsart::Taxi) {
+  const float Rest = FMath::Max(0.0f, HoleRestzeit());
+  const float Anteil = FMath::Clamp(Rest / FMath::Max(1.0f, GesamtZeit) / 0.5f, 0.0f, 1.0f);
+  Trinkgeld = FMath::RoundToInt(Lohn * 0.4f * Anteil);
+  Taxifahrten++;
+ }
  ULaLaBergKonto* Konto = ULaLaBergKonto::Hole(this);
- if (Konto) { Konto->Gutschrift(Lohn); Konto->ZaehleAuftrag(); }
+ if (Konto) { Konto->Gutschrift(Lohn + Trinkgeld); Konto->ZaehleAuftrag(); }
  Erledigt++;
  bUnterwegs = false;
  const FZiel Hier = Ziele[AktZiel];
@@ -216,7 +251,10 @@ void ALaLaBergAuftraege::Erledige() {
  }
  bAngebot = true;
  Zeige(true, true, StartOrt);
- Melde(FString::Printf(TEXT("Geliefert! +%d € – nächster Auftrag an der blauen Säule"), Lohn));
+ Melde(Art == ELaLaBergAuftragsart::Taxi
+       ? FString::Printf(TEXT("Angekommen! +%d €%s – nächster Auftrag an der blauen Säule"), Lohn + Trinkgeld,
+                         Trinkgeld > 0 ? *FString::Printf(TEXT(" (davon %d %s Trinkgeld)"), Trinkgeld, TEXT("€")) : TEXT(""))
+       : FString::Printf(TEXT("Geliefert! +%d € – nächster Auftrag an der blauen Säule"), Lohn));
  UE_LOG(LogTemp, Display, TEXT("LALABERG_AUFTRAG erledigt ziel=%s geld=%d naechster=%s"), *Hier.N, HoleGeld(),
         StartZiel != INDEX_NONE ? *Ziele[StartZiel].N : TEXT("-"));
  AktZiel = INDEX_NONE;
