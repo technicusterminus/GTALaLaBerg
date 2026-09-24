@@ -37,6 +37,7 @@
 #include "LaLaBergAuftraege.h"
 #include "LaLaBergPolizei.h"
 #include "LaLaBergRevier.h"
+#include "LaLaBergDrehbuch.h"
 #include "LaLaBergLaeden.h"
 #include "LaLaBergKonto.h"
 #include "LaLaBergHUD.h"
@@ -398,6 +399,8 @@ void ALaLaBergGameMode::InitGame(const FString& MapName,const FString& Options,F
    // Die Reviere des Farbkriegs: brauchen die Stadtkollision, weil ihre
    // Saeulen auf dem Boden stehen (siehe Docs/Geschichte.md).
    GetWorld()->SpawnActor<ALaLaBergRevier>();
+   // Das Drehbuch: Missionen als Daten (Content/SourceData/Story).
+   GetWorld()->SpawnActor<ALaLaBergDrehbuch>();
    auto* Auftraege=GetWorld()->SpawnActor<ALaLaBergAuftraege>();
    bool bFrei=false;
    if(Auftraege) Auftraege->SetzeStartOrt(SucheFahrbahn(Mitte,bFrei).GetLocation());
@@ -557,6 +560,7 @@ void ALaLaBergGameMode::BeginPlay() {
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergFigurTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergRevierTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergKopfTest")) ||
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergStoryTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergRennTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergJagdTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergZielFoto"));
@@ -1069,6 +1073,36 @@ void ALaLaBergGameMode::BeginPlay() {
  // je gleichzeitig Gruen zeigen. Ohne diesen Test waere "kreuzende Strassen
  // haben nie gleichzeitig Gruen" nur eine Behauptung ueber den Code, der die
  // Zeitrechnung dafuer aufstellt, nicht ueber das tatsaechliche Verhalten.
+ // Das Drehbuch: laedt es die Missionen, bietet es die erste des Kapitels
+ // an, laeuft sie Stufe fuer Stufe durch, und zahlt sie am Ende aus?
+ if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergStoryTest"))) {
+  static bool bGestartet=false; static int32 Stufen=0, Geschafft=0, GeldVorher=0, GeldNachher=0;
+  FTimerHandle Start;
+  GetWorldTimerManager().SetTimer(Start,[this]() {
+   auto* D=ALaLaBergDrehbuch::Instanz.Get();
+   auto* Konto=ULaLaBergKonto::Hole(this);
+   if(!D||!Konto) return;
+   GeldVorher=Konto->HoleGeld();
+   bGestartet=D->TestStarte();
+   Stufen=D->HoleStufen();
+  },4.0f,false);
+  // Stufe fuer Stufe durchschalten - eine je halbe Sekunde.
+  FTimerHandle Weiter;
+  GetWorldTimerManager().SetTimer(Weiter,[this]() {
+   if(auto* D=ALaLaBergDrehbuch::Instanz.Get()) if(D->Laeuft()) D->TestStufeGeschafft();
+  },0.5f,true,4.5f);
+  FTimerHandle Ende;
+  GetWorldTimerManager().SetTimer(Ende,[this]() {
+   auto* D=ALaLaBergDrehbuch::Instanz.Get();
+   auto* Konto=ULaLaBergKonto::Hole(this);
+   if(D) Geschafft=D->HoleGeschafft();
+   if(Konto) GeldNachher=Konto->HoleGeld();
+   const bool bPass=bGestartet&&Stufen>=2&&Geschafft>=1&&GeldNachher>GeldVorher;
+   Beleg(FString::Printf(TEXT("LALABERG_STORYTEST %s gestartet=%d stufen=%d geschafft=%d geld=%d->%d"),
+                         bPass?TEXT("PASS"):TEXT("FAIL"),bGestartet?1:0,Stufen,Geschafft,GeldVorher,GeldNachher));
+   FPlatformMisc::RequestExitWithStatus(false,bPass?0:1);
+  },9.0f,false);
+ }
  // Der Kopf der Mannschaft: markieren ruft ihn, stellen gibt das Revier
  // samt Fundstueck. Geprueft wird die ganze Kette bis zum verschlossenen
  // Hubschrauber, der sich danach oeffnet.

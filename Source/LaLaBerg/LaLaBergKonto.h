@@ -43,6 +43,8 @@ public:
  UPROPERTY() int32 Taxifahrten = 0;
  UPROPERTY() int32 Rennen = 0;
  UPROPERTY() int32 Verfolgungen = 0;
+ // Je Mission des Drehbuchs ein Bit (siehe LaLaBergDrehbuch).
+ UPROPERTY() int32 Missionen = 0;
 };
 
 // Konto, gekaufte Waffen und Lack des eigenen Wagens - ein Subsystem der
@@ -97,6 +99,9 @@ public:
  // ELaLaBergAuftragsart (Lieferung, Taxi, Rennen, Verfolgung).
  void ZaehleArt(int32 Art);
  int32 HoleArtZahl(int32 Art) const;
+ // Geschaffte Missionen des Drehbuchs.
+ bool HatMission(int32 Nummer) const { return Stand && Nummer >= 0 && Nummer < 32 && (Stand->Missionen & (1 << Nummer)); }
+ void SetzeMission(int32 Nummer);
 
  void Speichere();
  const FString& HoleSlot() const { return Slot; }

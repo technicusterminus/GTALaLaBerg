@@ -125,6 +125,12 @@ int32 ULaLaBergKonto::HoleArtZahl(int32 Art) const {
  return 0;
 }
 
+void ULaLaBergKonto::SetzeMission(int32 Nummer) {
+ if (!Stand || Nummer < 0 || Nummer >= 32 || HatMission(Nummer)) return;
+ Stand->Missionen |= (1 << Nummer);
+ Speichere();
+}
+
 void ULaLaBergKonto::GibFund(EFund Fund) {
  if (!Stand || HatFund(Fund)) return;
  Stand->Funde |= (1 << static_cast<int32>(Fund));

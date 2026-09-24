@@ -10,6 +10,7 @@
 #include "LaLaBergLaeden.h"
 #include "LaLaBergKonto.h"
 #include "LaLaBergRevier.h"
+#include "LaLaBergDrehbuch.h"
 #include "ImageUtils.h"
 #include "Engine/Texture2D.h"
 #include "InputCoreTypes.h"
@@ -108,6 +109,7 @@ void ALaLaBergHUD::DrawHUD() {
   Fahndung();
   Leben();
   Kapitel();
+  Mission();
   Laden();
  }
  if (auto* Wagen = Cast<ALaLaBergWagen>(Figur)) {
@@ -534,6 +536,49 @@ void ALaLaBergHUD::Kapitel() {
   const float KX = X + B - 24 * S - (Ganz - i) * 26 * S;
   Tafel(KX, Y + 30 * S, 20 * S, 12 * S, FLinearColor(1, 1, 1, 0.14f));
   if (i < Stand) Tafel(KX, Y + 30 * S, 20 * S, 12 * S, FLinearColor(0.95f, 0.45f, 0.05f));
+ }
+}
+
+// Die laufende Mission, unter der Kapitelzeile: was gerade zu tun ist, die
+// wievielte Stufe von wie vielen, die Frist und ein Pfeil zum Ziel. Ohne
+// laufende Mission steht dort, wo die naechste wartet.
+void ALaLaBergHUD::Mission() {
+ const ALaLaBergDrehbuch* D = ALaLaBergDrehbuch::Instanz.Get();
+ APawn* Figur = PlayerOwner->GetPawn();
+ if (!D || !Figur) return;
+ const bool bLaeuft = D->Laeuft();
+ if (!bLaeuft && D->HoleAngebot() == INDEX_NONE) return;
+ const float S = Massstab;
+ const float B = 340 * S, H = 76 * S;
+ const float X = Canvas->ClipX - B - 40 * S;
+ const float Y = 40 * S + 116 * S + 76 * S;      // unter der Kapitelzeile
+ const FLinearColor Farbe = bLaeuft ? FLinearColor(0.12f, 0.85f, 0.42f) : FLinearColor(0.12f, 0.6f, 0.34f);
+ Tafel(X, Y, B, H, FLinearColor(0.02f, 0.025f, 0.035f, 0.78f));
+ Tafel(X, Y, 5 * S, H, Farbe);
+ const FVector Ziel = bLaeuft ? D->HoleStufenort() : D->HoleAngebotsort();
+ const float Kamera = PlayerOwner->PlayerCameraManager ? PlayerOwner->PlayerCameraManager->GetCameraRotation().Yaw
+                                                        : PlayerOwner->GetControlRotation().Yaw;
+ Pfeil(FVector2D(X + B - 34 * S, Y + H * 0.5f), (Ziel - Figur->GetActorLocation()).Rotation().Yaw - Kamera, 16 * S, Farbe);
+ if (!bLaeuft) {
+  Schrift(TEXT("MISSION WARTET"), X + 24 * S, Y + 10 * S, 11, Leise, true);
+  Schrift(D->HoleAngebotsname(), X + 24 * S, Y + 26 * S, 16, Weiss, true);
+  const float Meter = FVector::Dist2D(Figur->GetActorLocation(), Ziel) / 100.0f;
+  Schrift(Meter >= 1000.0f ? FString::Printf(TEXT("%.1f km"), Meter / 1000.0f).Replace(TEXT("."), TEXT(","))
+                           : FString::Printf(TEXT("%d m"), FMath::RoundToInt(Meter)),
+          X + 24 * S, Y + 50 * S, 13, Leise);
+  return;
+ }
+ Schrift(FString::Printf(TEXT("%s · STUFE %d/%d"), *D->HoleMissionsname().ToUpper(), D->HoleStufe(), D->HoleStufen()),
+         X + 24 * S, Y + 10 * S, 11, Leise, true);
+ const FString Text = D->HoleStufentext();
+ const float Platz = B - 80 * S;
+ const float Punkt = 15.0f * FMath::Min(1.0f, Platz / FMath::Max(1.0f, Breite(Text, 15, true)));
+ Schrift(Text, X + 24 * S, Y + 28 * S, Punkt, Weiss, true);
+ const float Rest = D->HoleRestzeit();
+ if (Rest > 0.0f) {
+  const int32 R = FMath::CeilToInt(Rest);
+  Schrift(FString::Printf(TEXT("%d:%02d"), R / 60, R % 60), X + 24 * S, Y + 50 * S, 14,
+          R <= 15 ? FLinearColor(1.0f, 0.42f, 0.32f) : Leise, true);
  }
 }
 

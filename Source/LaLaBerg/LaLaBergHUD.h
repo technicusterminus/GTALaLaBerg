@@ -59,6 +59,8 @@ private:
  void Leben();
  // Kapitel und Stand des offenen Reviers, oben rechts.
  void Kapitel();
+ // Laufende Mission des Drehbuchs: Stufe, Text, Frist, Pfeil.
+ void Mission();
  // Auf der Vollkarte: die Werte der Figur, Geld und erledigte Auftraege.
  void Figurblatt();
  // Im Laden: Warenliste mit Preisen, Auswahl, Kontostand.
