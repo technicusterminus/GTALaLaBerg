@@ -55,14 +55,20 @@ ALaLaBergAuftraege::ALaLaBergAuftraege() {
  RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Wurzel"));
 }
 
-UStaticMeshComponent* ALaLaBergAuftraege::BaueTeil(const TCHAR* Name, const FLinearColor& Farbe) {
+UStaticMeshComponent* ALaLaBergAuftraege::BaueTeil(const TCHAR* Name, const FLinearColor& Farbe, bool bDurchsichtig) {
  auto* Teil = NewObject<UStaticMeshComponent>(this, Name);
  Teil->SetupAttachment(RootComponent);
  Teil->SetMobility(EComponentMobility::Movable);
  Teil->SetUsingAbsoluteLocation(true);
  Teil->SetUsingAbsoluteScale(true);
  Teil->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder")));
- Teil->SetMaterial(0, LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial")));
+ // Eine Saeule ist ein Zeichen, kein Bauwerk: durchscheinend und
+ // selbstleuchtend (M_Saeule, siehe Tools/baue_saeule.py). Die Ringe am
+ // Boden behalten das feste Grundmaterial.
+ auto* Stoff = bDurchsichtig ? LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Art/Materials/M_Saeule.M_Saeule"))
+                             : nullptr;
+ if (!Stoff) Stoff = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+ Teil->SetMaterial(0, Stoff);
  Teil->SetCollisionEnabled(ECollisionEnabled::NoCollision);
  Teil->SetCastShadow(false);
  Teil->SetVisibility(false);
@@ -75,10 +81,10 @@ void ALaLaBergAuftraege::BeginPlay() {
  Super::BeginPlay();
  Instanz = this;
  // Der Zylinder der Engine: 1 m Durchmesser, 1 m hoch, Mitte im Mittelpunkt.
- StartRing = BaueTeil(TEXT("StartRing"), BLAU);
- StartSaeule = BaueTeil(TEXT("StartSaeule"), BLAU);
- ZielRing = BaueTeil(TEXT("ZielRing"), GELB);
- ZielSaeule = BaueTeil(TEXT("ZielSaeule"), GELB);
+ StartRing = BaueTeil(TEXT("StartRing"), BLAU, false);
+ StartSaeule = BaueTeil(TEXT("StartSaeule"), BLAU, true);
+ ZielRing = BaueTeil(TEXT("ZielRing"), GELB, false);
+ ZielSaeule = BaueTeil(TEXT("ZielSaeule"), GELB, true);
  LadeZiele();
 }
 

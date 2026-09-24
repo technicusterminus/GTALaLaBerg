@@ -115,5 +115,7 @@ private:
  UPROPERTY() TObjectPtr<class UStaticMeshComponent> StartSaeule = nullptr;
  UPROPERTY() TObjectPtr<class UStaticMeshComponent> ZielRing = nullptr;
  UPROPERTY() TObjectPtr<class UStaticMeshComponent> ZielSaeule = nullptr;
- class UStaticMeshComponent* BaueTeil(const TCHAR* Name, const FLinearColor& Farbe);
+ // bDurchsichtig: die hohen Saeulen scheinen durch, die flachen Ringe am
+ // Boden nicht.
+ class UStaticMeshComponent* BaueTeil(const TCHAR* Name, const FLinearColor& Farbe, bool bDurchsichtig);
 };

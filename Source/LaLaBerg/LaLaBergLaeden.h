@@ -46,6 +46,7 @@ private:
  // Nach dem Verlassen erst wieder oeffnen, wenn man ganz draussen war.
  bool bErstHinaus = false;
  UPROPERTY() TArray<TObjectPtr<class UStaticMeshComponent>> Teile;
- class UStaticMeshComponent* BaueTeil(const FLinearColor& Farbe);
+ // bDurchsichtig: siehe ALaLaBergAuftraege::BaueTeil.
+ class UStaticMeshComponent* BaueTeil(const FLinearColor& Farbe, bool bDurchsichtig);
  void Melde(const FString& Text) const;
 };

@@ -64,7 +64,9 @@ void ALaLaBergRevier::LadeMarken() {
   return;
  }
  auto* Wuerfel = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
- auto* Basis = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+ // Durchscheinend wie die Auftrags- und Ladensaeulen (Tools/baue_saeule.py).
+ auto* Basis = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Art/Materials/M_Saeule.M_Saeule"));
+ if (!Basis) Basis = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
  const auto& Marken = Wurzel->GetArrayField(TEXT("marken"));
  for (const FVorgabe& V : VORGABEN) {
   FRevier R;

@@ -24,14 +24,20 @@ ALaLaBergLaeden::ALaLaBergLaeden() {
  RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Wurzel"));
 }
 
-UStaticMeshComponent* ALaLaBergLaeden::BaueTeil(const FLinearColor& Farbe) {
+UStaticMeshComponent* ALaLaBergLaeden::BaueTeil(const FLinearColor& Farbe, bool bDurchsichtig) {
  auto* Teil = NewObject<UStaticMeshComponent>(this);
  Teil->SetMobility(EComponentMobility::Movable);
  Teil->SetupAttachment(RootComponent);
  Teil->SetUsingAbsoluteLocation(true);
  Teil->SetUsingAbsoluteScale(true);
  Teil->SetStaticMesh(LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder")));
- Teil->SetMaterial(0, LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial")));
+ // Eine Saeule ist ein Zeichen, kein Bauwerk: durchscheinend und
+ // selbstleuchtend (M_Saeule, siehe Tools/baue_saeule.py). Die Ringe am
+ // Boden behalten das feste Grundmaterial.
+ auto* Stoff = bDurchsichtig ? LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Art/Materials/M_Saeule.M_Saeule"))
+                             : nullptr;
+ if (!Stoff) Stoff = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+ Teil->SetMaterial(0, Stoff);
  Teil->SetCollisionEnabled(ECollisionEnabled::NoCollision);
  Teil->SetCastShadow(false);
  Teil->SetVisibility(false);
@@ -62,7 +68,7 @@ void ALaLaBergLaeden::BeginPlay() {
        { TEXT("Tannengruen"), FLinearColor(0.03f, 0.18f, 0.07f) }, { TEXT("Rapsgelb"), FLinearColor(0.8f, 0.6f, 0.03f) } })
   Lack.Waren.Add({ Name, 150, EArt::Lack, 0, Farbe });
  Laeden = { Paintball, Lack };
- for (FLaden& L : Laeden) { L.Ring = BaueTeil(GRUEN); L.Saeule = BaueTeil(GRUEN); }
+ for (FLaden& L : Laeden) { L.Ring = BaueTeil(GRUEN, false); L.Saeule = BaueTeil(GRUEN, true); }
 }
 
 void ALaLaBergLaeden::EndPlay(const EEndPlayReason::Type Grund) {
