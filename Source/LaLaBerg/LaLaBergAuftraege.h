@@ -14,7 +14,10 @@
 // Taxi verlangt einen Wagen und zahlt nach Strecke, mit Trinkgeld fuer eine
 // zuegige Fahrt.
 UENUM()
-enum class ELaLaBergAuftragsart : uint8 { Lieferung, Taxi };
+// Rennen: vier Kontrollpunkte der Reihe nach gegen die Uhr, mit Einsatz und
+// Preisgeld. Verfolgung: ein Wagen faehrt davon und muss gestellt werden -
+// mit Farbe beschiessen oder rammen, bis er steht.
+enum class ELaLaBergAuftragsart : uint8 { Lieferung, Taxi, Rennen, Verfolgung };
 
 // Verwaltet Angebot, laufenden Auftrag, Frist und Lohn - siehe oben.
 UCLASS()
@@ -35,8 +38,14 @@ public:
  bool IstUnterwegs() const { return bUnterwegs; }
  bool HatAngebot() const { return bAngebot; }
  // Wohin der Pfeil zeigt: im Auftrag das Ziel, sonst die blaue Saeule.
- FVector HoleWegpunkt() const { return bUnterwegs ? Ziele[AktZiel].Ort : StartOrt; }
- FString HoleZielName() const { return bUnterwegs ? Ziele[AktZiel].N : FString(); }
+ // Bei der Verfolgung ist das Ziel der fluechtende Wagen und bewegt sich.
+ FVector HoleWegpunkt() const;
+ FString HoleZielName() const;
+ // Rennen: der wievielte von wie vielen Kontrollpunkten.
+ int32 HolePunkt() const { return Punkt + 1; }
+ int32 HolePunkte() const { return Strecke.Num(); }
+ int32 HoleRennen() const { return Rennen; }
+ int32 HoleVerfolgungen() const { return Verfolgungen; }
  float HoleRestzeit() const;
  // Fuer das HUD: welche Art gerade laeuft oder angeboten wird.
  ELaLaBergAuftragsart HoleArt() const { return Art; }
@@ -57,6 +66,10 @@ public:
  // Fuer -LaLaBergTaxiTest: die naechste Annahme ist ein Taxiauftrag, statt
  // die Art zu wuerfeln.
  void TestErzwingeTaxi() { bTaxiErzwungen = true; }
+ // Fuer -LaLaBergRennTest / -LaLaBergJagdTest.
+ void TestErzwinge(ELaLaBergAuftragsart NeueArt) { ErzwungeneArt = NeueArt; bArtErzwungen = true; }
+ // Der fluechtende Wagen der laufenden Verfolgung, sonst nullptr.
+ class ALaLaBergVerkehrsauto* TestHoleBeute() const { return Beute.Get(); }
  // Wohin der laufende Auftrag geht - der Test setzt den Wagen dorthin.
  FVector HoleZielOrt() const { return bUnterwegs ? Ziele[AktZiel].Ort : StartOrt; }
  // Fuer -LaLaBergAuftragTest: die Frist sofort ablaufen lassen.
@@ -69,6 +82,9 @@ private:
  void NimmAn();
  void Erledige();
  void Scheitere();
+ // Siehe NimmAn: Rennstrecke aufbauen bzw. einen Wagen zur Beute erklaeren.
+ void BereiteRennen(float& Zeit);
+ bool SucheBeute();
  void Melde(const FString& Text) const;
  void Zeige(bool bStart, bool bSichtbar, const FVector& Ort);
 
@@ -83,6 +99,14 @@ private:
  // Hinweis, und die Meldung soll nicht in jedem Bild neu kommen.
  double LetzterHinweis = -10.0;
  bool bTaxiErzwungen = false;
+ bool bArtErzwungen = false;
+ ELaLaBergAuftragsart ErzwungeneArt = ELaLaBergAuftragsart::Lieferung;
+ // Rennen: die Kontrollpunkte (Indizes in Ziele) und der naechste davon.
+ TArray<int32> Strecke;
+ int32 Punkt = 0, Einsatz = 0, Rennen = 0, Verfolgungen = 0;
+ // Verfolgung: der fluechtende Wagen. TWeakObjectPtr, weil er unterwegs
+ // eingesammelt werden kann (siehe ALaLaBergAutoPool).
+ TWeakObjectPtr<class ALaLaBergVerkehrsauto> Beute;
  float GesamtZeit = 1.0f;          // fuer den Trinkgeldanteil
 
  // Je Marke ein flacher Ring am Boden und eine hohe Saeule, die man ueber

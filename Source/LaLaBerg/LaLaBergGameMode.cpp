@@ -550,6 +550,8 @@ void ALaLaBergGameMode::BeginPlay() {
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergSonderTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergSchadenTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergTaxiTest")) ||
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergRennTest")) ||
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergJagdTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergZielFoto"));
  if(bAutomatisch) Beleg(FString::Printf(TEXT("LALABERG_SPIELBEGINN nach %.1fs Programmlaufzeit, %d Gebaeude"),FPlatformTime::Seconds()-GStartTime,BuildingCount));
  if(!bAutomatisch) {
@@ -1060,6 +1062,59 @@ void ALaLaBergGameMode::BeginPlay() {
  // je gleichzeitig Gruen zeigen. Ohne diesen Test waere "kreuzende Strassen
  // haben nie gleichzeitig Gruen" nur eine Behauptung ueber den Code, der die
  // Zeitrechnung dafuer aufstellt, nicht ueber das tatsaechliche Verhalten.
+ // Rennen und Verfolgung: derselbe Ablauf wie beim Taxi - zum Wagen,
+ // einsteigen, an der blauen Saeule annehmen -, danach je nach Art die
+ // Kontrollpunkte abfahren oder den fluechtenden Wagen stellen.
+ if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergRennTest"))||FParse::Param(FCommandLine::Get(),TEXT("LaLaBergJagdTest"))) {
+  const bool bJagd=FParse::Param(FCommandLine::Get(),TEXT("LaLaBergJagdTest"));
+  static int32 Punkte=0, Gewonnen=0, Gestellt=0, Geld=0; static bool bArt=false;
+  FTimerHandle ZumWagen;
+  GetWorldTimerManager().SetTimer(ZumWagen,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr;
+   for(TActorIterator<ALaLaBergWagen> It(GetWorld());It&&Figur;++It) {
+    Figur->SetActorLocation(It->GetActorLocation()-It->GetActorRightVector()*250.0f+FVector(0,0,60),
+                            false,nullptr,ETeleportType::TeleportPhysics);
+    break;
+   }
+  },4.0f,false);
+  FTimerHandle Ein;
+  GetWorldTimerManager().SetTimer(Ein,[this,bJagd]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   if(auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr) Figur->Einsteigen();
+   if(auto* A=ALaLaBergAuftraege::Instanz.Get()) {
+    A->TestErzwinge(bJagd?ELaLaBergAuftragsart::Verfolgung:ELaLaBergAuftragsart::Rennen);
+    if(APawn* Wagen=PC?PC->GetPawn():nullptr)
+     Wagen->SetActorLocation(A->HoleWegpunkt()+FVector(0,0,120),false,nullptr,ETeleportType::TeleportPhysics);
+   }
+  },4.5f,false);
+  // Rennen: alle 0,6 s zum naechsten Kontrollpunkt springen. Jagd: den
+  // fluechtenden Wagen mit Farbe stellen.
+  FTimerHandle Fahren;
+  GetWorldTimerManager().SetTimer(Fahren,[this,bJagd]() {
+   auto* A=ALaLaBergAuftraege::Instanz.Get();
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   if(!A||!A->IstUnterwegs()||!PC||!PC->GetPawn()) return;
+   bArt=A->HoleArt()==(bJagd?ELaLaBergAuftragsart::Verfolgung:ELaLaBergAuftragsart::Rennen);
+   if(bJagd) {
+    if(auto* Beute=A->TestHoleBeute()) Beute->Verletze(40.0f,FVector(1,0,0),ELaLaBergSchaden::Beschuss);
+   } else {
+    Punkte=FMath::Max(Punkte,A->HolePunkt());
+    PC->GetPawn()->SetActorLocation(A->HoleWegpunkt()+FVector(0,0,120),false,nullptr,ETeleportType::TeleportPhysics);
+   }
+  },0.6f,true,5.2f);
+  FTimerHandle Ende;
+  GetWorldTimerManager().SetTimer(Ende,[this,bJagd]() {
+   if(auto* A=ALaLaBergAuftraege::Instanz.Get()) {
+    Gewonnen=A->HoleRennen(); Gestellt=A->HoleVerfolgungen(); Geld=A->HoleGeld();
+   }
+   const bool bPass=bArt&&Geld>0&&(bJagd?Gestellt==1:(Gewonnen==1&&Punkte>=2));
+   Beleg(FString::Printf(TEXT("LALABERG_%s %s art=%d punkte=%d gewonnen=%d gestellt=%d geld=%d"),
+                         bJagd?TEXT("JAGDTEST"):TEXT("RENNTEST"),bPass?TEXT("PASS"):TEXT("FAIL"),
+                         bArt?1:0,Punkte,Gewonnen,Gestellt,Geld));
+   FPlatformMisc::RequestExitWithStatus(false,bPass?0:1);
+  },12.0f,false);
+ }
  // Taxi: einsteigen, an der blauen Saeule halten, Fahrgast aufnehmen, zum
  // Ziel fahren. Geprueft wird, dass die Art wirklich Taxi ist, dass die
  // Fahrt zaehlt und dass Lohn samt Trinkgeld auf dem Konto landet.

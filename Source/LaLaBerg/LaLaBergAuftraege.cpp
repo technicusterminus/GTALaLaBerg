@@ -2,6 +2,7 @@
 #include "LaLaBergHUD.h"
 #include "LaLaBergKonto.h"
 #include "LaLaBergWagen.h"
+#include "LaLaBergVerkehrsauto.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
@@ -173,21 +174,102 @@ void ALaLaBergAuftraege::Melde(const FString& Text) const {
   if (auto* HUD = Cast<ALaLaBergHUD>(PC->GetHUD())) HUD->ZeigeRueckmeldung(Text);
 }
 
+// Rennstrecke: vier Kontrollpunkte, jeder 300 bis 900 m vom vorigen weg -
+// so entsteht ein Rundkurs durch die Stadt statt einer Geraden. Einsatz und
+// Preisgeld haengen an der Gesamtlaenge.
+void ALaLaBergAuftraege::BereiteRennen(float& Zeit) {
+ Strecke.Reset();
+ int32 Von = AktZiel;
+ float Laenge = 0.0f;
+ for (int32 Runde = 0; Runde < 4; Runde++) {
+  TArray<int32> Moeglich;
+  for (int32 i = 0; i < Ziele.Num(); i++) {
+   if (i == Von || Strecke.Contains(i) || i == StartZiel) continue;
+   const float D = Waagerecht(Ziele[i].Ort, Ziele[Von].Ort);
+   if (D >= 30000.0f && D <= 90000.0f) Moeglich.Add(i);
+  }
+  if (Moeglich.IsEmpty()) break;
+  const int32 Naechster = Moeglich[FMath::RandRange(0, Moeglich.Num() - 1)];
+  Laenge += Waagerecht(Ziele[Naechster].Ort, Ziele[Von].Ort);
+  Strecke.Add(Naechster);
+  Von = Naechster;
+ }
+ if (Strecke.IsEmpty()) { Art = ELaLaBergAuftragsart::Lieferung; return; }
+ AktZiel = Strecke[0];
+ Punkt = 0;
+ // 14 m/s ist zuegiges Stadttempo; der Umweg ueber die Strassen kostet die
+ // Haelfte obendrauf, dazu zwanzig Sekunden Anlauf.
+ Zeit = FMath::RoundToFloat(Laenge / 100.0f * 1.5f / 14.0f + 20.0f);
+ Frist = GetWorld()->GetTimeSeconds() + Zeit;
+ GesamtZeit = Zeit;
+ Einsatz = 150;
+ Lohn = 150 + FMath::RoundToInt(Laenge / 100.0f / 100.0f) * 45;
+ if (ULaLaBergKonto* Konto = ULaLaBergKonto::Hole(this)) Konto->Bezahle(FMath::Min(Einsatz, Konto->HoleGeld()));
+ Zeige(false, true, Ziele[AktZiel].Ort);
+}
+
+// Verfolgung: ein fahrendes Auto in 300 bis 1200 m Entfernung, moeglichst
+// weit weg vom Spieler. Es wird auffaellig lackiert, damit man weiss, wen
+// man sucht.
+bool ALaLaBergAuftraege::SucheBeute() {
+ auto* PC = GetWorld()->GetFirstPlayerController();
+ const FVector Wo = PC && PC->GetPawn() ? PC->GetPawn()->GetActorLocation() : StartOrt;
+ ALaLaBergVerkehrsauto* Beste = nullptr;
+ float BesteD = 0.0f;
+ for (ALaLaBergVerkehrsauto* Auto : ALaLaBergVerkehrsauto::Alle) {
+  if (!Auto || Auto->IstGeparkt() || Auto->IstAusgeschaltet()) continue;
+  const float D = FVector::Dist2D(Auto->GetActorLocation(), Wo);
+  if (D < 30000.0f || D > 120000.0f) continue;
+  if (D > BesteD) { BesteD = D; Beste = Auto; }
+ }
+ if (!Beste) return false;
+ Beute = Beste;
+ Beste->SetzeLack(FLinearColor(0.85f, 0.05f, 0.55f));
+ Lohn = 450 + FMath::RoundToInt(BesteD / 100.0f / 10.0f) * 10;
+ return true;
+}
+
+FVector ALaLaBergAuftraege::HoleWegpunkt() const {
+ if (!bUnterwegs) return StartOrt;
+ if (Art == ELaLaBergAuftragsart::Verfolgung) return Beute.IsValid() ? Beute->GetActorLocation() : StartOrt;
+ return Ziele.IsValidIndex(AktZiel) ? Ziele[AktZiel].Ort : StartOrt;
+}
+
+FString ALaLaBergAuftraege::HoleZielName() const {
+ if (!bUnterwegs) return FString();
+ if (Art == ELaLaBergAuftragsart::Verfolgung) return TEXT("Der flüchtende Wagen");
+ return Ziele.IsValidIndex(AktZiel) ? Ziele[AktZiel].N : FString();
+}
+
 void ALaLaBergAuftraege::NimmAn() {
  // Jede zweite Saeule ist ein Taxiauftrag - aber nur, wer im Wagen sitzt,
  // kann einen Fahrgast mitnehmen.
- Art = (bTaxiErzwungen || FMath::RandBool()) ? ELaLaBergAuftragsart::Taxi : ELaLaBergAuftragsart::Lieferung;
+ // Vier Arten, gleich haeufig - bis auf die Lieferung, die als einzige
+ // auch zu Fuss geht und deshalb immer einspringt.
+ static const ELaLaBergAuftragsart ARTEN[] = { ELaLaBergAuftragsart::Lieferung, ELaLaBergAuftragsart::Taxi,
+                                               ELaLaBergAuftragsart::Rennen, ELaLaBergAuftragsart::Verfolgung };
+ Art = bTaxiErzwungen ? ELaLaBergAuftragsart::Taxi
+     : bArtErzwungen  ? ErzwungeneArt
+                      : ARTEN[FMath::RandRange(0, UE_ARRAY_COUNT(ARTEN) - 1)];
  bTaxiErzwungen = false;
+ bArtErzwungen = false;
  auto* PC = GetWorld()->GetFirstPlayerController();
  const bool bImWagen = PC && PC->GetPawn() && PC->GetPawn()->IsA<ALaLaBergWagen>();
- if (Art == ELaLaBergAuftragsart::Taxi && !bImWagen) {
+ if (Art != ELaLaBergAuftragsart::Lieferung && !bImWagen) {
+  const ELaLaBergAuftragsart Gewollt = Art;
   Art = ELaLaBergAuftragsart::Lieferung;
   const double Jetzt = GetWorld()->GetTimeSeconds();
   if (Jetzt - LetzterHinweis > 12.0) {
    LetzterHinweis = Jetzt;
-   Melde(TEXT("Hier wartet auch ein Fahrgast – mit dem Wagen vorfahren"));
+   Melde(Gewollt == ELaLaBergAuftragsart::Taxi ? TEXT("Hier wartet auch ein Fahrgast – mit dem Wagen vorfahren")
+        : Gewollt == ELaLaBergAuftragsart::Rennen ? TEXT("Hier startet auch ein Rennen – mit dem Wagen vorfahren")
+                                                  : TEXT("Hier gäbe es auch eine Verfolgung – mit dem Wagen vorfahren"));
   }
  }
+ Strecke.Reset();
+ Punkt = 0;
+ Einsatz = 0;
+ Beute.Reset();
  TArray<int32> Moeglich;
  for (int32 i = 0; i < Ziele.Num(); i++) {
   const float D = Waagerecht(Ziele[i].Ort, StartOrt);
@@ -198,7 +280,9 @@ void ALaLaBergAuftraege::NimmAn() {
  const float Meter = Waagerecht(Ziele[AktZiel].Ort, StartOrt) / 100.0f;
  // Die Strassen sind laenger als die Luftlinie; 10 m/s ist gemaechliches
  // Stadttempo, dazu eine halbe Minute fuers Einsteigen.
- const float Zeit = FMath::RoundToFloat(Meter * 1.5f / 10.0f + 30.0f);
+ // Nicht const: das Rennen rechnet die Frist nach seiner eigenen Strecke
+ // neu (siehe BereiteRennen).
+ float Zeit = FMath::RoundToFloat(Meter * 1.5f / 10.0f + 30.0f);
  // Taxi: Grundpreis plus Streckenanteil, deutlich mehr als eine Lieferung -
  // dafuer sitzt jemand im Wagen, der es eilig hat (Trinkgeld, siehe
  // Erledige).
@@ -207,6 +291,11 @@ void ALaLaBergAuftraege::NimmAn() {
   : 100 + FMath::RoundToInt(Meter / 5.0f / 10.0f) * 10;
  Frist = GetWorld()->GetTimeSeconds() + Zeit;
  GesamtZeit = Zeit;
+ if (Art == ELaLaBergAuftragsart::Rennen) BereiteRennen(Zeit);
+ else if (Art == ELaLaBergAuftragsart::Verfolgung && !SucheBeute()) {
+  // Kein Wagen in Reichweite: dann eben eine Lieferung.
+  Art = ELaLaBergAuftragsart::Lieferung;
+ }
  bUnterwegs = true;
  bAngebot = false;
  Zeige(true, false, StartOrt);
@@ -214,18 +303,39 @@ void ALaLaBergAuftraege::NimmAn() {
  // Zwei getrennte Aufrufe: Printf prueft die Formatzeichenkette zur
  // Uebersetzungszeit und nimmt keine, die erst zur Laufzeit feststeht.
  const int32 Min = FMath::FloorToInt(Zeit / 60.0f), Sek = FMath::FloorToInt(Zeit) % 60;
- Melde(Art == ELaLaBergAuftragsart::Taxi
+ if (Art == ELaLaBergAuftragsart::Rennen)
+  Melde(FString::Printf(TEXT("Rennen gewonnen! +%d € (Einsatz %d €)"), Lohn, Einsatz));
+ else if (Art == ELaLaBergAuftragsart::Verfolgung)
+  Melde(FString::Printf(TEXT("Gestellt! +%d €"), Lohn));
+ else Melde(Art == ELaLaBergAuftragsart::Taxi
        ? FString::Printf(TEXT("Fahrgast nach %s – %d:%02d Minuten, %d € plus Trinkgeld"), *Ziele[AktZiel].N, Min, Sek, Lohn)
        : FString::Printf(TEXT("Lieferung zu %s – %d:%02d Minuten, %d €"), *Ziele[AktZiel].N, Min, Sek, Lohn));
+ // Alle vier Arten benennen - die Zeile stand sonst auch bei einem Rennen
+ // auf "lieferung" und log dabei.
+ const TCHAR* ArtName = Art == ELaLaBergAuftragsart::Taxi ? TEXT("taxi")
+                      : Art == ELaLaBergAuftragsart::Rennen ? TEXT("rennen")
+                      : Art == ELaLaBergAuftragsart::Verfolgung ? TEXT("verfolgung")
+                                                                : TEXT("lieferung");
  UE_LOG(LogTemp, Display, TEXT("LALABERG_AUFTRAG start art=%s ziel=%s luftlinie=%.0fm zeit=%.0fs lohn=%d"),
-        Art == ELaLaBergAuftragsart::Taxi ? TEXT("taxi") : TEXT("lieferung"),
-        *Ziele[AktZiel].N, Meter, Zeit, Lohn);
+        ArtName, *Ziele[AktZiel].N, Meter, Zeit, Lohn);
 }
 
 void ALaLaBergAuftraege::Erledige() {
+ // Rennen: erst der letzte Kontrollpunkt zahlt aus, die davor schalten nur
+ // weiter.
+ if (Art == ELaLaBergAuftragsart::Rennen && Punkt + 1 < Strecke.Num()) {
+  Zeige(false, false, Ziele[AktZiel].Ort);
+  Punkt++;
+  AktZiel = Strecke[Punkt];
+  Zeige(false, true, Ziele[AktZiel].Ort);
+  Melde(FString::Printf(TEXT("Kontrollpunkt %d von %d – weiter zu %s"), Punkt, Strecke.Num(), *Ziele[AktZiel].N));
+  return;
+ }
  // Trinkgeld beim Taxi: wer die Haelfte der Frist noch uebrig hat, bekommt
  // 40 Prozent obendrauf, linear abnehmend bis auf null.
  int32 Trinkgeld = 0;
+ if (Art == ELaLaBergAuftragsart::Rennen) Rennen++;
+ if (Art == ELaLaBergAuftragsart::Verfolgung) Verfolgungen++;
  if (Art == ELaLaBergAuftragsart::Taxi) {
   const float Rest = FMath::Max(0.0f, HoleRestzeit());
   const float Anteil = FMath::Clamp(Rest / FMath::Max(1.0f, GesamtZeit) / 0.5f, 0.0f, 1.0f);
@@ -291,7 +401,12 @@ void ALaLaBergAuftraege::Tick(float DeltaSeconds) {
  APawn* Figur = PC ? PC->GetPawn() : nullptr;
  if (!Figur) return;
  const FVector Wo = Figur->GetActorLocation();
- if (bUnterwegs) {
+ if (bUnterwegs && Art == ELaLaBergAuftragsart::Verfolgung) {
+  // Gestellt ist, wer steht: ausgeschaltet durch Farbe oder Rammen.
+  if (!Beute.IsValid()) Scheitere();
+  else if (Beute->IstAusgeschaltet()) Erledige();
+  else if (GetWorld()->GetTimeSeconds() > Frist) Scheitere();
+ } else if (bUnterwegs) {
   const FVector& Ziel = Ziele[AktZiel].Ort;
   if (Waagerecht(Wo, Ziel) < ZIEL_RADIUS && FMath::Abs(Wo.Z - Ziel.Z) < HOEHE_SPIEL) Erledige();
   else if (GetWorld()->GetTimeSeconds() > Frist) Scheitere();

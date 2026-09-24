@@ -615,6 +615,10 @@ void ALaLaBergVerkehrsauto::Tick(float Zeit) {
 // ILaLaBergFarbbar: nur kurz abbremsen. Der Klecks ist schon das Decal der
 // Kugel - der Wagen behaelt seinen Lack, ein Treffer faerbt ihn nicht um.
 void ALaLaBergVerkehrsauto::ErhalteFarbe(const FLinearColor& Farbe, const FVector& AusRichtung) {
+ // Ein Paintball beult nicht, aber er nimmt Sicht und Lack: zehn Treffer
+ // setzen einen Wagen ausser Gefecht. Ohne das liesse sich eine Verfolgung
+ // nicht anders beenden als durch Rammen.
+ Verletze(11.0f, AusRichtung, ELaLaBergSchaden::Beschuss);
  if (bPolizei) { ALaLaBergPolizei::Melde(ELaLaBergTat::PolizeiBeschossen); return; }
  StoerungBis = GetWorld()->GetTimeSeconds() + 1.4f;
 }
