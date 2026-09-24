@@ -32,20 +32,21 @@ namespace {
  struct FVorgabe {
   const TCHAR* Revier; const TCHAR* Mannschaft; const TCHAR* Kopf;
   FLinearColor Farbe; float Leben; float Tempo; bool bPolizei;
+  int32 Bewaehrungsart; int32 Bewaehrungszahl;
   const TCHAR* Marken[4];
  };
  const FVorgabe VORGABEN[] = {
   { TEXT("Vorstadt-Nord"), TEXT("Die Gelben"), TEXT("Der Dispatcher"),
-    FLinearColor(0.95f, 0.78f, 0.10f), 100.0f, 58.0f, false,
+    FLinearColor(0.95f, 0.78f, 0.10f), 100.0f, 58.0f, false, 1, 3,
     { TEXT("Bahnhof"), TEXT("Polizeiinspektion"), TEXT("Sankt Katharina"), TEXT("Stadtverwaltung") } },
   { TEXT("Lechviertel"), TEXT("Die Blauen"), TEXT("Die Fährfrau"),
-    FLinearColor(0.10f, 0.35f, 0.92f), 160.0f, 72.0f, false,
+    FLinearColor(0.10f, 0.35f, 0.92f), 160.0f, 72.0f, false, 2, 3,
     { TEXT("Mutterturm"), TEXT("Johanniskirche"), TEXT("Färbertor"), TEXT("Stadttheater") } },
   { TEXT("Klinikum und Süd"), TEXT("Die Grünen"), TEXT("Der Förster"),
-    FLinearColor(0.10f, 0.62f, 0.24f), 220.0f, 64.0f, true,
+    FLinearColor(0.10f, 0.62f, 0.24f), 220.0f, 64.0f, true, 3, 3,
     { TEXT("Klinikum"), TEXT("kbo-Lech-Mangfall-Klinik"), TEXT("Christuskirche"), TEXT("Friedhofskirche zur Heiligen Dreifaltigkeit") } },
   { TEXT("Altstadt"), TEXT("Die Weißen"), TEXT("Der Wirt vom Hauptplatz"),
-    FLinearColor(0.92f, 0.92f, 0.90f), 300.0f, 68.0f, true,
+    FLinearColor(0.92f, 0.92f, 0.90f), 300.0f, 68.0f, true, 0, 8,
     { TEXT("Historisches Rathaus"), TEXT("Schmalzturm"), TEXT("Bayertor"), TEXT("Stadtpfarrkirche Mariae Himmelfahrt") } },
  };
 }
@@ -92,6 +93,8 @@ void ALaLaBergRevier::LadeMarken() {
   R.Leben = V.Leben;
   R.Tempo = V.Tempo;
   R.bRuftPolizei = V.bPolizei;
+  R.Bewaehrungsart = V.Bewaehrungsart;
+  R.Bewaehrungszahl = V.Bewaehrungszahl;
   for (const TCHAR* Gesucht : V.Marken) {
    for (const auto& Wert : Marken) {
     const auto Obj = Wert->AsObject();
@@ -176,6 +179,15 @@ int32 ALaLaBergRevier::HoleMarkiert(int32 Revier) const {
  return Zahl;
 }
 
+void ALaLaBergRevier::HoleBewaehrung(int32 Revier, int32& Erledigt, int32& Noetig) const {
+ Erledigt = 0;
+ Noetig = 0;
+ if (!Reviere.IsValidIndex(Revier)) return;
+ Noetig = Reviere[Revier].Bewaehrungszahl;
+ if (const auto* Konto = ULaLaBergKonto::Hole(this))
+  Erledigt = FMath::Min(Noetig, Konto->HoleArtZahl(Reviere[Revier].Bewaehrungsart));
+}
+
 void ALaLaBergRevier::Melde(const FString& Text) const {
  if (auto* PC = GetWorld()->GetFirstPlayerController())
   if (auto* HUD = Cast<ALaLaBergHUD>(PC->GetHUD())) HUD->ZeigeRueckmeldung(Text);
@@ -207,6 +219,15 @@ void ALaLaBergRevier::PruefeUebernahme(int32 Revier) {
  auto* Konto = ULaLaBergKonto::Hole(this);
  if (!Konto || !Reviere.IsValidIndex(Revier)) return;
  if (HoleMarkiert(Revier) < Reviere[Revier].Marken.Num()) return;
+ // Bewaehrung: das Revier gibt erst nach, wenn man dort gearbeitet hat.
+ static const TCHAR* ARTNAMEN[] = { TEXT("Lieferungen"), TEXT("Taxifahrten"), TEXT("Rennen"), TEXT("Verfolgungen") };
+ int32 Erledigt = 0, Noetig = 0;
+ HoleBewaehrung(Revier, Erledigt, Noetig);
+ if (Erledigt < Noetig) {
+  Melde(FString::Printf(TEXT("%s markiert – aber erst %d von %d %s"), *Reviere[Revier].Name, Erledigt, Noetig,
+                        ARTNAMEN[FMath::Clamp(Reviere[Revier].Bewaehrungsart, 0, 3)]));
+  return;
+ }
  const int32 NoetigerRuf = Revier * 150;
  if (Konto->HoleWert(ULaLaBergKonto::EWert::Ruf) < NoetigerRuf) {
   Melde(FString::Printf(TEXT("%s markiert – aber %s nehmen dich noch nicht ernst (Ruf %d von %d)"),
@@ -253,7 +274,22 @@ void ALaLaBergRevier::RufeKopf(int32 Revier) {
  Beste->SetzeLack(R.Farbe);
  Beste->SetzeLeben(R.Leben);
  if (R.bRuftPolizei)
-  if (auto* Polizei = ALaLaBergPolizei::Instanz.Get()) Polizei->TestSetzeSterne(2);
+  if (auto* Polizei = ALaLaBergPolizei::Instanz.Get()) Polizei->TestSetzeSterne(Revier == 3 ? 4 : 2);
+ // Die Belagerung des Hauptplatzes: der Wirt faehrt nicht allein. Drei
+ // Wagen der Weissen in seiner Naehe werden mitgefaerbt und zaeher - sie
+ // stehen im Weg, sie jagen nicht.
+ if (Revier == 3) {
+  int32 Begleitung = 0;
+  for (ALaLaBergVerkehrsauto* Auto : ALaLaBergVerkehrsauto::Alle) {
+   if (Begleitung >= 3 || !Auto || Auto == Beste || Auto->IstGeparkt() || Auto->IstAusgeschaltet()) continue;
+   if (FVector::Dist2D(Auto->GetActorLocation(), Beste->GetActorLocation()) > 30000.0f) continue;
+   Auto->SetzeLack(R.Farbe);
+   Auto->SetzeLeben(140.0f);
+   Begleitung++;
+  }
+  Melde(TEXT("Die Weißen halten den Hauptplatz – und sie sind nicht allein"));
+  UE_LOG(LogTemp, Display, TEXT("LALABERG_KOPF belagerung begleitung=%d"), Begleitung);
+ }
  Melde(FString::Printf(TEXT("%s ist unterwegs – stell ihn, dann gehört dir %s"), *R.Kopf, *R.Name));
  UE_LOG(LogTemp, Display, TEXT("LALABERG_KOPF %s revier=%d leben=%.0f abstand=%.0fm"),
         *R.Kopf, Revier, R.Leben, BesteD / 100.0f);
@@ -290,6 +326,9 @@ void ALaLaBergRevier::TestMarkiereAlle() {
  const int32 Offen = HoleOffenes();
  if (Offen == INDEX_NONE) return;
  for (FMarke& M : Reviere[Offen].Marken) if (M.Saeule) Markiere(M.Saeule, FLinearColor(0.95f, 0.45f, 0.05f));
+ // Auch wenn schon alles markiert war: noch einmal nachsehen, ob es jetzt
+ // reicht (die Bewaehrung kann inzwischen erfuellt sein).
+ PruefeUebernahme(Offen);
 }
 
 void ALaLaBergRevier::Tick(float Zeit) {

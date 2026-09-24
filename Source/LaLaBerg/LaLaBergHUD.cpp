@@ -516,6 +516,19 @@ void ALaLaBergHUD::Kapitel() {
   return;
  }
  Schrift(Revier.Name, X + 24 * S, Y + 26 * S, 16, Weiss, true);
+ // Sind alle Wahrzeichen markiert, fehlt nur noch die Bewaehrung - dann
+ // steht sie hier statt der Kaestchen.
+ if (Stand >= Ganz) {
+  int32 Erledigt = 0, Noetig = 0;
+  R->HoleBewaehrung(Offen, Erledigt, Noetig);
+  if (Erledigt < Noetig) {
+   static const TCHAR* ARTNAMEN[] = { TEXT("Lieferungen"), TEXT("Taxifahrten"), TEXT("Rennen"), TEXT("Verfolgungen") };
+   const FString Text = FString::Printf(TEXT("%d/%d %s"), Erledigt, Noetig,
+                                        ARTNAMEN[FMath::Clamp(Revier.Bewaehrungsart, 0, 3)]);
+   Schrift(Text, X + B - 24 * S - Breite(Text, 14, true), Y + 28 * S, 14, FLinearColor(0.95f, 0.72f, 0.12f), true);
+   return;
+  }
+ }
  // Vier Kaestchen fuer die vier Wahrzeichen.
  for (int32 i = 0; i < Ganz; i++) {
   const float KX = X + B - 24 * S - (Ganz - i) * 26 * S;

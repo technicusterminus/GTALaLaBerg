@@ -1073,7 +1073,7 @@ void ALaLaBergGameMode::BeginPlay() {
  // samt Fundstueck. Geprueft wird die ganze Kette bis zum verschlossenen
  // Hubschrauber, der sich danach oeffnet.
  if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergKopfTest"))) {
-  static bool bKopfLaeuft=false, bFundVorher=false, bFundNachher=false;
+  static bool bKopfLaeuft=false, bFundVorher=false, bFundNachher=false, bOhneBewaehrung=true;
   static int32 Reviere=0, Kapitel=0;
   FTimerHandle Markieren;
   GetWorldTimerManager().SetTimer(Markieren,[this]() {
@@ -1081,7 +1081,12 @@ void ALaLaBergGameMode::BeginPlay() {
    auto* Konto=ULaLaBergKonto::Hole(this);
    if(!R||!Konto) return;
    bFundVorher=Konto->HatFund(ULaLaBergKonto::EFund::Werkstatt);
-   R->TestMarkiereAlle();            // ruft den Kopf (Revier 0 braucht keinen Ruf)
+   // Ohne Bewaehrung kommt kein Kopf: das Revier der Gelben verlangt drei
+   // Taxifahrten.
+   R->TestMarkiereAlle();
+   bOhneBewaehrung=R->KopfLaeuft();
+   for(int32 i=0;i<3;i++) Konto->ZaehleArt(1);
+   R->TestMarkiereAlle();            // markiert ist schon alles - ruft jetzt den Kopf
    bKopfLaeuft=R->KopfLaeuft();
   },4.0f,false);
   FTimerHandle Stellen;
@@ -1095,10 +1100,10 @@ void ALaLaBergGameMode::BeginPlay() {
     Reviere=Konto->HoleReviere();
     Kapitel=Konto->HoleKapitel();
    }
-   const bool bPass=bKopfLaeuft&&!bFundVorher&&bFundNachher&&Reviere==1&&Kapitel>=2;
-   Beleg(FString::Printf(TEXT("LALABERG_KOPFTEST %s jagd=%d fund=%d->%d reviere=%d kapitel=%d"),
-                         bPass?TEXT("PASS"):TEXT("FAIL"),bKopfLaeuft?1:0,bFundVorher?1:0,bFundNachher?1:0,
-                         Reviere,Kapitel));
+   const bool bPass=!bOhneBewaehrung&&bKopfLaeuft&&!bFundVorher&&bFundNachher&&Reviere==1&&Kapitel>=2;
+   Beleg(FString::Printf(TEXT("LALABERG_KOPFTEST %s ohne_bewaehrung=%d jagd=%d fund=%d->%d reviere=%d kapitel=%d"),
+                         bPass?TEXT("PASS"):TEXT("FAIL"),bOhneBewaehrung?1:0,bKopfLaeuft?1:0,bFundVorher?1:0,
+                         bFundNachher?1:0,Reviere,Kapitel));
    FPlatformMisc::RequestExitWithStatus(false,bPass?0:1);
   },6.5f,false);
  }
@@ -1115,6 +1120,9 @@ void ALaLaBergGameMode::BeginPlay() {
    Marken=R->HoleReviere().IsValidIndex(0)?R->HoleReviere()[0].Marken.Num():0;
    // Erst ohne Ruf: markieren zaehlt, danach muss noch der Kopf der
    // Mannschaft gestellt werden - erst dann wechselt das Revier.
+   // Bewaehrung fuer beide Reviere gleich mitgeben (drei Taxifahrten,
+   // drei Rennen) - hier geht es um Marken, Ruf und Uebernahme.
+   for(int32 i=0;i<3;i++) { Konto->ZaehleArt(1); Konto->ZaehleArt(2); }
    R->TestMarkiereAlle();
    R->TestStelleKopf();
    OhneRuf=Konto->HoleReviere();

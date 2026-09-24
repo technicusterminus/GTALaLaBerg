@@ -102,6 +102,29 @@ void ULaLaBergKonto::NimmRevier(int32 Nummer) {
  Speichere();
 }
 
+void ULaLaBergKonto::ZaehleArt(int32 Art) {
+ if (!Stand) return;
+ switch (Art) {
+  case 0: Stand->Lieferungen++; break;
+  case 1: Stand->Taxifahrten++; break;
+  case 2: Stand->Rennen++; break;
+  case 3: Stand->Verfolgungen++; break;
+  default: return;
+ }
+ Speichere();
+}
+
+int32 ULaLaBergKonto::HoleArtZahl(int32 Art) const {
+ if (!Stand) return 0;
+ switch (Art) {
+  case 0: return Stand->Lieferungen;
+  case 1: return Stand->Taxifahrten;
+  case 2: return Stand->Rennen;
+  case 3: return Stand->Verfolgungen;
+ }
+ return 0;
+}
+
 void ULaLaBergKonto::GibFund(EFund Fund) {
  if (!Stand || HatFund(Fund)) return;
  Stand->Funde |= (1 << static_cast<int32>(Fund));

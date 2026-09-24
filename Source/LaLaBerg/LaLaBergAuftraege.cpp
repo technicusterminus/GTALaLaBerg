@@ -354,6 +354,7 @@ void ALaLaBergAuftraege::Erledige() {
   Konto->ZaehleAuftrag();
   // Ruf: ein erledigter Auftrag zaehlt, ein Rennen und eine Verfolgung
   // doppelt - davon spricht man in der Stadt.
+  Konto->ZaehleArt(static_cast<int32>(Art));
   Konto->Uebe(ULaLaBergKonto::EWert::Ruf,
               Art == ELaLaBergAuftragsart::Lieferung ? 14.0f
             : Art == ELaLaBergAuftragsart::Taxi ? 18.0f : 32.0f);

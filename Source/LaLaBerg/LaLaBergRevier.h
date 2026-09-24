@@ -42,6 +42,10 @@ public:
   float Tempo = 55.0f;
   // Der Foerster ruft die Polizei, sobald er auftaucht.
   bool bRuftPolizei = false;
+  // Bewaehrung: welche Auftragsart (0 Lieferung, 1 Taxi, 2 Rennen,
+  // 3 Verfolgung) wie oft erledigt sein muss, bevor das Revier nachgibt.
+  int32 Bewaehrungsart = 0;
+  int32 Bewaehrungszahl = 3;
  };
 
  const TArray<FRevier>& HoleReviere() const { return Reviere; }
@@ -50,6 +54,8 @@ public:
  int32 HoleOffenes() const;
  // Wie viele Wahrzeichen des offenen Reviers schon markiert sind.
  int32 HoleMarkiert(int32 Revier) const;
+ // Wie weit die Bewaehrung des Reviers gediehen ist (erledigt, noetig).
+ void HoleBewaehrung(int32 Revier, int32& Erledigt, int32& Noetig) const;
  // Von der Farbkugel gerufen: ein Treffer auf diese Saeule.
  void Markiere(class UStaticMeshComponent* Saeule, const FLinearColor& Farbe);
  // Fuer -LaLaBergRevierTest: alle Wahrzeichen des offenen Reviers treffen.

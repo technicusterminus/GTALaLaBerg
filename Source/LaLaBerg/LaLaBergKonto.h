@@ -37,6 +37,12 @@ public:
  // Rotor- und Zuendschluessel. Sie liegen nicht im Rucksack, sie sind
  // Schalter in der Welt.
  UPROPERTY() int32 Funde = 0;
+ // Wie viele Auftraege welcher Art erledigt sind - die Bewaehrung der
+ // Kapitel haengt daran (siehe Docs/Geschichte.md).
+ UPROPERTY() int32 Lieferungen = 0;
+ UPROPERTY() int32 Taxifahrten = 0;
+ UPROPERTY() int32 Rennen = 0;
+ UPROPERTY() int32 Verfolgungen = 0;
 };
 
 // Konto, gekaufte Waffen und Lack des eigenen Wagens - ein Subsystem der
@@ -87,6 +93,10 @@ public:
  enum class EFund : uint8 { Werkstatt, Rotor, Zuendung };
  bool HatFund(EFund Fund) const { return Stand && (Stand->Funde & (1 << static_cast<int32>(Fund))); }
  void GibFund(EFund Fund);
+ // Erledigte Auftraege nach Art. Die Reihenfolge ist die von
+ // ELaLaBergAuftragsart (Lieferung, Taxi, Rennen, Verfolgung).
+ void ZaehleArt(int32 Art);
+ int32 HoleArtZahl(int32 Art) const;
 
  void Speichere();
  const FString& HoleSlot() const { return Slot; }
