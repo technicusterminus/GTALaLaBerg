@@ -52,6 +52,10 @@ public:
  // Rechnung aus Abstand und Annaeherung, die im Spiel jedes Bild laeuft.
  void TestSchubAuf(const FVector& TempoCmS);
  void TestZusammenstoss() { LetzterStoss = -10.0f; PruefeZusammenstoss(); }
+ void ZeigeInsasse(bool bSichtbar);
+ void RichteInsassenAus(bool bGedreht);
+ // Fuer -LaLaBergInsassenTest: sitzt jemand sichtbar am Steuer?
+ bool InsasseSichtbar() const;
  void SchalteRadio();
  int32 HoleSender() const { return Sender; }
  FString HoleSendername() const;
@@ -126,6 +130,10 @@ private:
  bool bSchaltet = false;
  void SpieleTitel(int32 Nummer, bool bMittendrin);
  UPROPERTY() TObjectPtr<class UAudioComponent> Radio = nullptr;
+ // Wer am Steuer sitzt: dieselbe Sitzfigur wie in den KI-Autos (siehe
+ // Tools/baue_insasse.py). Die Spielfigur selbst wird beim Einsteigen
+ // versteckt - ohne diese hier faehrt ein leerer Wagen durch die Stadt.
+ UPROPERTY() TObjectPtr<class UStaticMeshComponent> Insasse = nullptr;
  UPROPERTY() TObjectPtr<class USpringArmComponent> Ausleger = nullptr;
  UPROPERTY() TObjectPtr<class UCameraComponent> Kamera = nullptr;
  UPROPERTY() TObjectPtr<class UAudioComponent> Motorklang = nullptr;

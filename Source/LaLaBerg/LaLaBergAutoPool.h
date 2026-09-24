@@ -51,6 +51,19 @@ public:
  // wo die prozedurale Form erst gefaerbt werden muss). -1, wenn der Typ kein
  // Fern-Mesh mitbringt (z.B. vehicle07_Car) - der Aufrufer bleibt dann auf
  // dem Detail-Pool oben.
+ // Insassen (Tools/baue_insasse.py): eine sitzende Figur je besetztem Platz.
+ // Vier Pools mit verschiedenen Kleiderfarben, sonst saesse in jedem Auto
+ // derselbe Mensch - ein Zeichenaufruf je Farbe fuer die ganze Stadt.
+ // FuegeInsassenHinzu liefert -1, wenn das Modell fehlt; der Aufrufer laesst
+ // den Platz dann leer, statt den Wagen unsichtbar mitzuschleppen.
+ static constexpr int32 INSASSEN_FARBEN = 4;
+ bool InsassenGueltig() const { return !InsassenPools.IsEmpty(); }
+ int32 FuegeInsassenHinzu(int32 Farbe, const FTransform& Lage);
+ // Fuer -LaLaBergInsassenTest: wie viele Sitzplaetze insgesamt besetzt sind.
+ int32 InsassenZahl() const;
+ void AktualisiereInsassen(int32 Farbe, int32 Index, const FTransform& Lage);
+ void VersteckeInsassen(int32 Farbe, int32 Index);
+
  int32 FuegeTypFernHinzu(int32 TypIndex, const FTransform& Lage);
  void AktualisiereTypFern(int32 TypIndex, int32 Index, const FTransform& Lage);
  void VersteckeTypFern(int32 TypIndex, int32 Index);
@@ -69,4 +82,6 @@ private:
  TArray<int32> TypPoolsStart;
  // Ein HISM je Typ (Index = TypIndex), nullptr wo LadeLod nichts fand.
  UPROPERTY() TArray<TObjectPtr<class UHierarchicalInstancedStaticMeshComponent>> TypFernPools;
+ // Ein Pool je Kleiderfarbe (INSASSEN_FARBEN), leer wenn SM_Insasse fehlt.
+ UPROPERTY() TArray<TObjectPtr<class UHierarchicalInstancedStaticMeshComponent>> InsassenPools;
 };

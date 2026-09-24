@@ -174,6 +174,21 @@ ALaLaBergWagen::ALaLaBergWagen() {
  Radio->SetVolumeMultiplier(0.55f);
  Radio->OnAudioFinished.AddDynamic(this, &ALaLaBergWagen::TitelZuEnde);
 
+ // Der Fahrer auf dem Sitz - dieselben Masse wie in den KI-Autos (siehe
+ // ALaLaBergVerkehrsauto::SitzLage): eine Handbreit hinter der Mitte, links
+ // der Konsole, gut vier Dezimeter ueber dem Wagenursprung. Sichtbar nur,
+ // solange jemand faehrt.
+ Insasse = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Insasse"));
+ // Am Karosseriepunkt, nicht am Rumpf: der Rumpf ist ein auf 4,2 x 1,76 x
+ // 1,1 gezogener Wuerfel, und alles daran Haengende wird mitgezogen - der
+ // Fahrer sass als breitgequetschter Kasten neben dem Wagen. Der
+ // Karosseriepunkt hat absolute Skalierung (siehe oben) und sitzt auf
+ // Strassenhoehe wie der Ursprung der KI-Autos, deshalb dieselbe Sitzhoehe.
+ Insasse->SetupAttachment(Karosseriepunkt);
+ Insasse->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+ Insasse->SetCastShadow(false);
+ Insasse->SetVisibility(false);
+
  // Chaos-Vehicle statt vier Federstrahlen: echtes Motor-/Getriebe-Kennfeld,
  // Vorderradlenkung, Hinterradantrieb, eigene Reifenreibung je Rad statt
  // einer pauschalen Seitenfuehrungskraft. Nabenpositionen laengs/quer wie
@@ -427,6 +442,20 @@ void ALaLaBergWagen::Verletze(float Schaden, const FVector& AusRichtung, ELaLaBe
  UE_LOG(LogTemp, Display, TEXT("LALABERG_WAGEN ausgeschaltet art=%d"), static_cast<int32>(Art));
 }
 
+// Setzt den Fahrersitz in den Rahmen der Karosserie. Ist der
+// Karosseriepunkt gedreht (CarConcept, Laengsachse auf Y), muss der Sitz
+// gegengedreht werden, sonst sitzt der Fahrer quer und neben dem Wagen.
+void ALaLaBergWagen::RichteInsassenAus(bool bGedreht) {
+ if (!Insasse) return;
+ // Im Rahmen der Karosserie: eine Handbreit hinter der Mitte, links der
+ // Konsole, vier Dezimeter ueber der Strasse - dieselben Werte wie bei den
+ // KI-Autos (siehe ALaLaBergVerkehrsauto::SitzLage).
+ const FVector Sitz(-15.0f, -34.0f, 42.0f);
+ Insasse->SetRelativeLocation(bGedreht ? FVector(-Sitz.Y, Sitz.X, Sitz.Z) : Sitz);
+ Insasse->SetRelativeRotation(bGedreht ? FRotator(0, 90, 0) : FRotator::ZeroRotator);
+ Insasse->SetRelativeScale3D(FVector(ALaLaBergVerkehrsauto::INSASSE_MASSSTAB));
+}
+
 void ALaLaBergWagen::BaueKarosserie() {
  if (!CarConceptTeile.IsEmpty()) return;  // schon gebaut - faerbt sich nicht per SetzeLack um
  // Fahrzeugvielfalt wie bei den KI-Autos (siehe LaLaBergVerkehrsauto): einmal
@@ -436,6 +465,7 @@ void ALaLaBergWagen::BaueKarosserie() {
  if (FahrzeugTyp == -2) FahrzeugTyp = FMath::RandRange(-1, LaLaBergWagenTypen::TYPEN_ANZAHL - 1);
  if (FahrzeugTyp >= 0 && LaLaBergWagenTypen::BaueTeile(Karosseriepunkt, LaLaBergWagenTypen::TYPEN[FahrzeugTyp], CarConceptTeile)) {
   Karosseriepunkt->SetRelativeRotation(FRotator::ZeroRotator);
+  RichteInsassenAus(false);
   Netz->SetVisibility(false);
   Netz->ClearAllMeshSections();
   if (bModellLack) FaerbeModell();
@@ -450,6 +480,7 @@ void ALaLaBergWagen::BaueKarosserie() {
  FahrzeugTyp = -1;
  if (LaLaBergWagenForm::BaueCarConceptTeile(Karosseriepunkt, CarConceptTeile)) {
   Karosseriepunkt->SetRelativeRotation(FRotator(0, -90, 0));
+  RichteInsassenAus(true);
   Netz->SetVisibility(false);
   Netz->ClearAllMeshSections();
   if (bModellLack) FaerbeModell();
@@ -614,11 +645,37 @@ void ALaLaBergWagen::SchalteRadio() {
  UE_LOG(LogTemp, Display, TEXT("LALABERG_RADIO sender=%d %s"), Sender, *HoleSendername());
 }
 
+bool ALaLaBergWagen::InsasseSichtbar() const {
+ return Insasse && Insasse->IsVisible() && Insasse->GetStaticMesh() != nullptr;
+}
+
+// Setzt den Fahrer auf den Sitz oder raeumt ihn weg. Das Modell wird erst
+// beim ersten Einsteigen geladen - wer nie faehrt, laedt es nicht.
+void ALaLaBergWagen::ZeigeInsasse(bool bSichtbar) {
+ if (!Insasse) return;
+ if (bSichtbar && !Insasse->GetStaticMesh()) {
+  if (auto* Mesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Art/Vehicles/Sonder/SM_Insasse.SM_Insasse")))
+   Insasse->SetStaticMesh(Mesh);
+  if (auto* Basis = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"))) {
+   if (auto* Stoff = UMaterialInstanceDynamic::Create(Basis, this)) {
+    Stoff->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.10f, 0.12f, 0.18f));
+    Insasse->SetMaterial(0, Stoff);
+   }
+   if (auto* Haut = UMaterialInstanceDynamic::Create(Basis, this)) {
+    Haut->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.62f, 0.45f, 0.36f));
+    Insasse->SetMaterial(1, Haut);
+   }
+  }
+ }
+ Insasse->SetVisibility(bSichtbar && Insasse->GetStaticMesh() != nullptr);
+}
+
 void ALaLaBergWagen::SetzeFahrer(ACharacter* Figur) {
  GasWert = LenkWert = Lenkung = 0.0f;
  bBremse = bTest = false;
  Fahrer = Figur;
  EinstiegZeit = GetWorld()->GetTimeSeconds();
+ ZeigeInsasse(Figur != nullptr);
  // Der zuletzt gehoerte Sender laeuft wieder an - einmal weniger schalten,
  // als man zurueckdrehen muesste.
  if (const auto* Konto = ULaLaBergKonto::Hole(this)) {
@@ -686,6 +743,7 @@ void ALaLaBergWagen::Aussteigen() {
  if (auto* FahrerBewegung = Fahrer->GetCharacterMovement()) FahrerBewegung->SetMovementMode(MOVE_Walking);
  PC->Possess(Fahrer);
  PC->SetControlRotation(FRotator(0, GetActorRotation().Yaw, 0));
+ ZeigeInsasse(false);                                // der Sitz ist wieder leer
  if (Radio && Radio->IsPlaying()) {                   // die Tuer geht zu
   TGuardValue<bool> Sperre(bSchaltet, true);
   Radio->Stop();

@@ -4,6 +4,8 @@
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Components/SceneComponent.h"
 #include "Engine/StaticMesh.h"
+#include "Materials/MaterialInterface.h"
+#include "Materials/MaterialInstanceDynamic.h"
 
 TObjectPtr<ALaLaBergAutoPool> ALaLaBergAutoPool::Instanz = nullptr;
 
@@ -32,6 +34,44 @@ void ALaLaBergAutoPool::BeginPlay() {
   Pools.Add(Pool);
  }
  UE_LOG(LogTemp, Display, TEXT("LALABERG_AUTOPOOL pools=%d von %d Teilen"), Pools.Num(), LaLaBergWagenForm::CARCONCEPT_TEILE_ANZAHL);
+
+ // Die Insassen: ein Pool je Kleiderfarbe. Das Modell hat zwei Slots -
+ // 0 Kleidung, 1 Haut (siehe Tools/baue_insasse.py).
+ if (UStaticMesh* Figur = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Art/Vehicles/Sonder/SM_Insasse.SM_Insasse"))) {
+  auto* Basis = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+  const FLinearColor KLEIDUNG[INSASSEN_FARBEN] = {
+   FLinearColor(0.09f, 0.11f, 0.16f),   // dunkelblau
+   FLinearColor(0.42f, 0.13f, 0.12f),   // rostrot
+   FLinearColor(0.62f, 0.60f, 0.55f),   // hellgrau
+   FLinearColor(0.13f, 0.22f, 0.15f),   // dunkelgruen
+  };
+  const FLinearColor HAUT(0.62f, 0.45f, 0.36f);
+  for (int32 f = 0; f < INSASSEN_FARBEN; f++) {
+   auto* Pool = NewObject<UHierarchicalInstancedStaticMeshComponent>(this,
+    MakeUniqueObjectName(this, UHierarchicalInstancedStaticMeshComponent::StaticClass(),
+     *FString::Printf(TEXT("Insassen%d"), f)));
+   Pool->SetStaticMesh(Figur);
+   Pool->SetupAttachment(Wurzel);
+   Pool->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+   Pool->SetMobility(EComponentMobility::Movable);
+   // Kein eigener Schatten: die Figur steckt in der Karosserie, ihr Schatten
+   // faellt ohnehin in den Innenraum.
+   Pool->SetCastShadow(false);
+   Pool->RegisterComponent();
+   if (Basis) {
+    if (auto* Stoff = UMaterialInstanceDynamic::Create(Basis, Pool)) {
+     Stoff->SetVectorParameterValue(TEXT("Color"), KLEIDUNG[f]);
+     Pool->SetMaterial(0, Stoff);
+    }
+    if (auto* Haut = UMaterialInstanceDynamic::Create(Basis, Pool)) {
+     Haut->SetVectorParameterValue(TEXT("Color"), HAUT);
+     Pool->SetMaterial(1, Haut);
+    }
+   }
+   InsassenPools.Add(Pool);
+  }
+ }
+ UE_LOG(LogTemp, Display, TEXT("LALABERG_AUTOPOOL insassenfarben=%d"), InsassenPools.Num());
 
  // Dieselbe Idee je City-Sample-Fahrzeugtyp: Detail-Teile (5 je Typ, siehe
  // LaLaBergWagenTypen::TEIL_ANZAHL) hintereinander in TypPoolsFlach, plus ein
@@ -98,6 +138,25 @@ void ALaLaBergAutoPool::Aktualisiere(const TArray<int32>& Indizes, const FTransf
 void ALaLaBergAutoPool::Verstecke(const TArray<int32>& Indizes) {
  const FTransform Weg(FQuat::Identity, FVector(0, 0, -500000.0f), FVector::ZeroVector);
  Aktualisiere(Indizes, Weg);
+}
+
+int32 ALaLaBergAutoPool::InsassenZahl() const {
+ int32 Summe = 0;
+ for (const auto& Pool : InsassenPools) if (Pool) Summe += Pool->GetInstanceCount();
+ return Summe;
+}
+
+int32 ALaLaBergAutoPool::FuegeInsassenHinzu(int32 Farbe, const FTransform& Lage) {
+ return InsassenPools.IsValidIndex(Farbe) && InsassenPools[Farbe] ? InsassenPools[Farbe]->AddInstance(Lage, true) : -1;
+}
+
+void ALaLaBergAutoPool::AktualisiereInsassen(int32 Farbe, int32 Index, const FTransform& Lage) {
+ if (Index < 0 || !InsassenPools.IsValidIndex(Farbe) || !InsassenPools[Farbe]) return;
+ InsassenPools[Farbe]->UpdateInstanceTransform(Index, Lage, true, false, true);
+}
+
+void ALaLaBergAutoPool::VersteckeInsassen(int32 Farbe, int32 Index) {
+ AktualisiereInsassen(Farbe, Index, FTransform(FQuat::Identity, FVector(0, 0, -500000.0f), FVector::ZeroVector));
 }
 
 bool ALaLaBergAutoPool::TypGueltig(int32 TypIndex) const {

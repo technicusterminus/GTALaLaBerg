@@ -46,6 +46,7 @@
 #include "LaLaBergWaffe.h"
 #include "LaLaBergVerkehrsauto.h"
 #include "LaLaBergAutoPool.h"
+#include "Camera/CameraActor.h"
 #include "LaLaBergKastenPool.h"
 #include "LaLaBergPassantKI.h"
 #include "LaLaBergVerletzbar.h"
@@ -573,6 +574,7 @@ void ALaLaBergGameMode::BeginPlay() {
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergDosenTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergBudeTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergRadioTest")) ||
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergInsassenTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergRennTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergJagdTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergZielFoto"));
@@ -1145,6 +1147,122 @@ void ALaLaBergGameMode::BeginPlay() {
                          *TitelEin,*TitelNach));
    FPlatformMisc::RequestExitWithStatus(false,bPass?0:1);
   },7.0f,false);
+ }
+ // Die Insassen: sitzt in den fahrenden Autos jemand, sitzt er im Wagen
+ // (und nicht daneben oder auf dem Dach), und sieht man ihn auch?
+ if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergInsassenTest"))) {
+  static int32 Plaetze=-1, MitFahrer=0, MitBeifahrer=0; static float SitzAbstand=-1.0f, SitzHoehe=-1.0f;
+  static ALaLaBergVerkehrsauto* Gezeigt=nullptr; static float KopfLuft=-1.0f;
+  static bool bWagenInsasse=false;
+  // Erst zum fahrbaren Wagen und einsteigen: dort sitzt der Fahrer als
+  // eigenes Bauteil (siehe ALaLaBergWagen::ZeigeInsasse), und die
+  // Verfolgerkamera zeigt ihn durch die Heckscheibe.
+  FTimerHandle ZumWagen;
+  GetWorldTimerManager().SetTimer(ZumWagen,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr;
+   for(TActorIterator<ALaLaBergWagen> It(GetWorld());It&&Figur;++It) {
+    Figur->SetActorLocation(It->GetActorLocation()-It->GetActorRightVector()*250.0f+FVector(0,0,60),
+                            false,nullptr,ETeleportType::TeleportPhysics);
+    break;
+   }
+  },3.6f,false);
+  FTimerHandle Ein;
+  GetWorldTimerManager().SetTimer(Ein,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   if(auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr) Figur->Einsteigen();
+   if(auto* Wagen=PC?Cast<ALaLaBergWagen>(PC->GetPawn()):nullptr) bWagenInsasse=Wagen->InsasseSichtbar();
+  },4.3f,false);
+  FTimerHandle Hin;
+  GetWorldTimerManager().SetTimer(Hin,[this]() {
+   if(auto* Pool=ALaLaBergAutoPool::Instanz.Get()) Plaetze=Pool->InsassenZahl();
+   ALaLaBergVerkehrsauto* Fahrend=nullptr;
+   for(ALaLaBergVerkehrsauto* A:ALaLaBergVerkehrsauto::Alle) {
+    if(!A||A->IstGeparkt()||!A->HatFahrerFigur()) continue;
+    MitFahrer++;
+    if(A->HatBeifahrer()) MitBeifahrer++;
+    if(!Fahrend) Fahrend=A;
+   }
+   if(!Fahrend) return;
+   // Sitzt der Fahrer im Wagen? Abstand zur Wagenmitte waagerecht und Hoehe
+   // ueber dem Wagenursprung - ein Auto ist rund 4,5 m lang und 1,4 m hoch.
+   const FTransform Sitz=Fahrend->SitzLage(true);
+   SitzAbstand=FVector::Dist2D(Sitz.GetLocation(),Fahrend->GetActorLocation());
+   SitzHoehe=Sitz.GetLocation().Z-Fahrend->GetActorLocation().Z;
+   // Der Scheitel der sitzenden Figur (95 cm ueber der Sitzflaeche, mal
+   // Maszstab) muss unter der Dachkante bleiben.
+   KopfLuft=Fahrend->Bauhoehe()-(SitzHoehe+95.0f*Sitz.GetScale3D().Z);
+   Gezeigt=Fahrend;
+   // Messung fuer die Sitzlage: wo liegt die Karosserie relativ zum
+   // Wagenursprung, und wie gross ist die Sitzfigur wirklich?
+   {
+    const FBox Kasten=Fahrend->GetComponentsBoundingBox(false);
+    UE_LOG(LogTemp,Display,TEXT("LALABERG_MASS ki_auto min=%s max=%s ursprung=%s"),
+           *(Kasten.Min-Fahrend->GetActorLocation()).ToString(),*(Kasten.Max-Fahrend->GetActorLocation()).ToString(),
+           *Fahrend->GetActorLocation().ToString());
+   }
+   for(TActorIterator<ALaLaBergWagen> It(GetWorld());It;++It) {
+    const FBox Kasten=It->GetComponentsBoundingBox(false);
+    UE_LOG(LogTemp,Display,TEXT("LALABERG_MASS wagen min=%s max=%s"),
+           *(Kasten.Min-It->GetActorLocation()).ToString(),*(Kasten.Max-It->GetActorLocation()).ToString());
+    break;
+   }
+   if(auto* Figur=LoadObject<UStaticMesh>(nullptr,TEXT("/Game/Art/Vehicles/Sonder/SM_Insasse.SM_Insasse")))
+    UE_LOG(LogTemp,Display,TEXT("LALABERG_MASS insasse=%s"),*Figur->GetBoundingBox().GetSize().ToString());
+  },5.0f,false);
+  // Zwei Bilder: das erste vom eigenen Wagen (Verfolgerkamera, Blick durch
+  // die Heckscheibe), das zweite vom entgegenkommenden KI-Auto. Fuer das
+  // zweite stellt sich die Kamera zwoelf Meter vor das Auto auf den Gehweg
+  // und laesst es auf sich zukommen - hinterherfahren geht nicht, und die
+  // Verfolgerkamera braucht nach einem Versetzen einige Bilder, bis sie
+  // nachgezogen ist.
+  // Die Verfolgerkamera von hinten zeigt nur Sitzlehnen - fuer das Bild
+  // schwenkt sie vor den Wagen und schaut durch die Windschutzscheibe.
+  FTimerHandle Schwenk;
+  GetWorldTimerManager().SetTimer(Schwenk,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   if(auto* Wagen=PC?Cast<ALaLaBergWagen>(PC->GetPawn()):nullptr)
+    PC->SetControlRotation(FRotator(-6.0f,Wagen->GetActorRotation().Yaw+180.0f,0.0f));
+  },5.0f,false);
+  FTimerHandle Bild;
+  GetWorldTimerManager().SetTimer(Bild,[this]() {
+   if(auto* PC=GetWorld()->GetFirstPlayerController()) PC->ConsoleCommand(TEXT("HighResShot 1600x900"));
+  },5.9f,false);
+  FTimerHandle Aufstellen;
+  GetWorldTimerManager().SetTimer(Aufstellen,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   if(!PC||!Gezeigt) return;
+   if(auto* Wagen=Cast<ALaLaBergWagen>(PC->GetPawn())) Wagen->TestAussteigen();
+  },6.4f,false);
+  // Fuer das zweite Bild eine eigene Kamera statt der Spielfigur: die
+  // Verfolgerkamera zieht nach einem Versetzen erst ueber mehrere Bilder
+  // nach, und das Auto ist dann laengst woanders. Die Kamera steht schraeg
+  // vor dem Auto auf Fensterhoehe und schaut ihm entgegen.
+  FTimerHandle Hinstellen;
+  GetWorldTimerManager().SetTimer(Hinstellen,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   if(!PC||!Gezeigt) return;
+   const FVector Vorn=Gezeigt->GetActorForwardVector(), Rechts=Gezeigt->GetActorRightVector();
+   // Dorthin, wo das Auto im Augenblick der Aufnahme sein wird.
+   const FVector Erwartet=Gezeigt->GetActorLocation()+Gezeigt->GetVelocity()*0.2f;
+   const FVector Standpunkt=Erwartet+Vorn*520.0f-Rechts*240.0f+FVector(0,0,95.0f);
+   auto* Kamera=GetWorld()->SpawnActor<ACameraActor>(Standpunkt,
+    (Erwartet+FVector(0,0,45.0f)-Standpunkt).Rotation());
+   if(Kamera) PC->SetViewTarget(Kamera);
+  },7.3f,false);
+  FTimerHandle ZweitesBild;
+  GetWorldTimerManager().SetTimer(ZweitesBild,[this]() {
+   if(auto* PC=GetWorld()->GetFirstPlayerController()) PC->ConsoleCommand(TEXT("HighResShot 1600x900"));
+  },7.5f,false);
+  FTimerHandle Ende;
+  GetWorldTimerManager().SetTimer(Ende,[this]() {
+   const bool bPass=Plaetze>0&&MitFahrer>20&&MitBeifahrer>0&&bWagenInsasse
+                   &&SitzAbstand>0.0f&&SitzAbstand<200.0f&&SitzHoehe>0.0f&&SitzHoehe<150.0f
+                   &&KopfLuft>0.0f&&KopfLuft<40.0f;
+   Beleg(FString::Printf(TEXT("LALABERG_INSASSENTEST %s plaetze=%d fahrer=%d beifahrer=%d sitz_abstand=%.0fcm sitz_hoehe=%.0fcm kopffreiheit=%.0fcm eigener_wagen=%d"),
+                         bPass?TEXT("PASS"):TEXT("FAIL"),Plaetze,MitFahrer,MitBeifahrer,SitzAbstand,SitzHoehe,KopfLuft,bWagenInsasse?1:0));
+   FPlatformMisc::RequestExitWithStatus(false,bPass?0:1);
+  },8.6f,false);
  }
  // Die Schiessbude: startet sie, zaehlt sie Treffer, zahlt sie aus und
  // merkt sie sich die Bestleistung?

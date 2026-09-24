@@ -14,7 +14,15 @@ WURZEL = unreal.Paths.project_dir()
 QUELLE = os.environ.get("LALABERG_NEUTRALE_QUELLE") or os.path.join(WURZEL, "Tools", "Modelle")
 ORDNER = "/Game/Art/Vehicles/Sonder"
 
-NAMEN = ["SM_Panzer_Wanne", "SM_Panzer_Turm", "SM_Heli_Rumpf", "SM_Heli_Rotor", "SM_Heli_Heckrotor"]
+NAMEN = ["SM_Panzer_Wanne", "SM_Panzer_Turm", "SM_Heli_Rumpf", "SM_Heli_Rotor", "SM_Heli_Heckrotor",
+         # Die sitzende Figur in den Autos der Stadt (Tools/baue_insasse.py).
+         "SM_Insasse"]
+# Ein erneuter Import loescht und baut jedes Modell neu. Wer nur eines
+# geaendert hat, nennt es in LALABERG_MODELL_NUR (Namen mit Komma getrennt)
+# und wartet nicht auf die anderen.
+NUR = [n.strip() for n in os.environ.get("LALABERG_MODELL_NUR", "").split(",") if n.strip()]
+if NUR:
+    NAMEN = [n for n in NAMEN if n in NUR]
 
 werkzeuge = unreal.AssetToolsHelpers.get_asset_tools()
 importiert = []

@@ -68,6 +68,18 @@ public:
  // Geschlossener Rundkurs statt Hin-und-Zurueck - siehe
  // FLaLaBergWegfolger::bRund. Nach SetzeRoute setzen.
  void SetzeRundkurs(bool bRund) { Weg.bRund = bRund; }
+ // Sitzplatz in Weltkoordinaten. Der Nullpunkt der Figur liegt auf der
+ // Sitzflaeche (siehe Tools/baue_insasse.py). Oeffentlich fuer
+ // -LaLaBergInsassenTest, der prueft, dass der Platz im Wagen liegt.
+ FTransform SitzLage(bool bFahrer) const;
+ // Siehe SitzLage: die Sitzfigur passt nur verkleinert in diese Autos.
+ static constexpr float INSASSE_MASSSTAB = 0.72f;
+ bool HatFahrerFigur() const { return FahrerIndex >= 0; }
+ // Bauhoehe der Karosserie in cm ueber der Strasse - aus dem Mesh gelesen
+ // (siehe HoleTypMass in der .cpp). Fuer -LaLaBergInsassenTest: der Kopf des
+ // Fahrers muss darunter bleiben.
+ float Bauhoehe() const;
+ bool HatBeifahrer() const { return BeifahrerIndex >= 0; }
  // Wie oft dieses Auto am Routenende auf der Stelle umgekehrt ist - auf
  // einem Rundkurs immer 0 (siehe FLaLaBergWegfolger::Wenden).
  int32 HoleWenden() const { return Weg.Wenden; }
@@ -184,6 +196,15 @@ private:
  // wenn der Typ keins mitbringt (z.B. vehicle07_Car); bTypFernBenutzt haelt
  // fest, ob das der Fall war, ohne bei jeder Pruefung neu nachzusehen.
  int32 TypFernIndex = -1;
+ // Insassen (siehe ALaLaBergAutoPool): welcher Farbpool, und die Instanz je
+ // Platz. -1 heisst "niemand da" - nicht jedes Auto hat einen Beifahrer, und
+ // ohne das Modell SM_Insasse bleibt jedes leer.
+ int32 InsassenFarbe = -1, FahrerIndex = -1, BeifahrerIndex = -1;
+ // Einmal entschieden ist entschieden: ohne dieses Merkmal wuerde jedes Bild
+ // aufs Neue gewuerfelt, ob dieser Wagen einen Beifahrer bekommt.
+ bool bInsassenGeprueft = false;
+ // Setzt beide Plaetze nach - oder raeumt sie weg (bSichtbar = false).
+ void PflegeInsassen(bool bSichtbar);
  bool bTypFernBenutzt = false;
 
  // Eigene Strassenklasse (roads[].c, 0 = wichtigste) und die Indizes der

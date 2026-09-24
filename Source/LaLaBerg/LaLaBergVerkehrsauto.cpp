@@ -419,11 +419,13 @@ void ALaLaBergVerkehrsauto::BeginPlay() {
   PoolIndizes = ALaLaBergAutoPool::Instanz->FuegeHinzu(FTransform(FVector(0, 0, -500000.0f)));
   bPoolGenutzt = true;
  }
+
 }
 
 void ALaLaBergVerkehrsauto::EndPlay(const EEndPlayReason::Type Grund) {
  // Nicht entfernen, nur verstecken - siehe ALaLaBergAutoPool::Verstecke.
  if (bPoolGenutzt && ALaLaBergAutoPool::Instanz) {
+  PflegeInsassen(false);                 // wer drinsass, verschwindet mit dem Wagen
   if (FahrzeugTyp == -1) {
    ALaLaBergAutoPool::Instanz->Verstecke(PoolIndizes);
   } else {
@@ -598,6 +600,7 @@ void ALaLaBergVerkehrsauto::Tick(float Zeit) {
     else ALaLaBergAutoPool::Instanz->AktualisiereTypFern(FahrzeugTyp, TypFernIndex, GetActorTransform());
    }
   }
+  PflegeInsassen(bDetailliert);
   if (FahrzeugTyp == -1) {
    if (bDetailliert) ALaLaBergAutoPool::Instanz->Aktualisiere(PoolIndizes, FTransform(GetActorRotation() + FRotator(0, -90, 0), GetActorLocation()));
   } else {
@@ -609,6 +612,87 @@ void ALaLaBergVerkehrsauto::Tick(float Zeit) {
    // Auto steht ohnehin fest (siehe BeginPlay), braucht das nicht.
    else if (bTypFernBenutzt && Weg.Gueltig()) ALaLaBergAutoPool::Instanz->AktualisiereTypFern(FahrzeugTyp, TypFernIndex, GetActorTransform());
   }
+ }
+}
+
+namespace {
+ // Masse je Fahrzeugtyp (Laenge, Breite, Hoehe der Karosserie in cm, vom
+ // Strassenniveau aus), einmal aus dem Mesh gelesen und dann behalten:
+ // siebzig Autos duerfen dafuer nicht siebzigmal dasselbe Mesh anfassen.
+ // Index wie LaLaBergWagenTypen::TYPEN, ein Nullvektor heisst "unbekannt".
+ TArray<FVector> GTypMass;
+
+ FVector HoleTypMass(int32 TypIndex) {
+  if (TypIndex < 0) return FVector(436.0f, 176.0f, 115.0f);      // CarConcept, gemessen
+  if (GTypMass.Num() != LaLaBergWagenTypen::TYPEN_ANZAHL) GTypMass.SetNum(LaLaBergWagenTypen::TYPEN_ANZAHL);
+  if (!GTypMass.IsValidIndex(TypIndex)) return FVector::ZeroVector;
+  if (!GTypMass[TypIndex].IsZero()) return GTypMass[TypIndex];
+  TArray<FString> Pfade;
+  LaLaBergWagenTypen::TeilPfade(LaLaBergWagenTypen::TYPEN[TypIndex], Pfade);
+  if (Pfade.Num() > 0)
+   if (UStaticMesh* Karosserie = LoadObject<UStaticMesh>(nullptr, *Pfade[0])) {
+    const FBox Kasten = Karosserie->GetBoundingBox();
+    GTypMass[TypIndex] = FVector(Kasten.GetSize().X, Kasten.GetSize().Y, Kasten.Max.Z);
+   }
+  return GTypMass[TypIndex];
+ }
+}
+
+float ALaLaBergVerkehrsauto::Bauhoehe() const {
+ const float Hoehe = HoleTypMass(FahrzeugTyp).Z;
+ return Hoehe > 1.0f ? Hoehe : 115.0f;
+}
+
+FTransform ALaLaBergVerkehrsauto::SitzLage(bool bFahrer) const {
+ // Sitzflaeche: eine Handbreit hinter der Wagenmitte, links bzw. rechts der
+ // Mittelkonsole, gut vier Dezimeter ueber dem Wagenursprung (der liegt bei
+ // den KI-Autos auf der Strasse). Dieselben Werte fuer alle Fahrzeugtypen -
+ // die Karosserien sind verschieden, die Sitze liegen in allen ungefaehr
+ // gleich.
+ //
+ // Der Maszstab: die Figur ist 1,30 m hoch gebaut (sitzend, von der Sohle
+ // bis zum Scheitel), die Autos der Stadt sind aber nur 1,15 m hoch - in
+ // Lebensgroesse ragte der Kopf durchs Dach. 0,72 setzt den Scheitel knapp
+ // unter die Dachkante.
+ // Sitzhoehe und Groesse richten sich nach dem Wagen: ein Kleinwagen ist
+ // 1,15 m hoch, ein Kombi 1,6 - in beiden liegt die Sitzflaeche bei gut
+ // einem Drittel der Bauhoehe.
+ const FVector Masse = HoleTypMass(FahrzeugTyp);
+ const float Hoehe = Masse.Z > 1.0f ? Masse.Z : 115.0f;
+ const FVector Sitzversatz(-0.04f * Hoehe * 3.0f, bFahrer ? -34.0f : 34.0f, 0.36f * Hoehe);
+ const FRotator Lage = GetActorRotation();
+ return FTransform(Lage.Quaternion(), GetActorLocation() + Lage.RotateVector(Sitzversatz),
+                   FVector(INSASSE_MASSSTAB * FMath::Clamp(Hoehe / 115.0f, 1.0f, 1.25f)));
+}
+
+void ALaLaBergVerkehrsauto::PflegeInsassen(bool bSichtbar) {
+ if (!ALaLaBergAutoPool::Instanz) return;
+ // Besetzt wird erst hier, nicht in BeginPlay: die Route kommt erst danach
+ // (siehe SetzeRoute), und vorher ist jedes Auto ein geparktes. Am Steuer
+ // sitzt immer jemand, daneben in einem von drei Wagen. Geparkte Autos
+ // bleiben leer - dort ist niemand eingestiegen.
+ if (InsassenFarbe < 0) {
+  if (bInsassenGeprueft || !bPoolGenutzt || IstGeparkt() || !ALaLaBergAutoPool::Instanz->InsassenGueltig()) return;
+  bInsassenGeprueft = true;
+  // Nur in Autos. Busse, Lastwagen und Feuerwehr fahren vorerst ohne
+  // Fahrer: dort sitzt man nicht auf einem Drittel der Bauhoehe hinter der
+  // Wagenmitte, sondern hoch oben unmittelbar hinter der Scheibe - das
+  // braucht Masse je Modell, nicht eine Faustformel fuer alle.
+  const FVector Masse = HoleTypMass(FahrzeugTyp);
+  if (Masse.Z > 200.0f || FMath::Max(Masse.X, Masse.Y) > 600.0f) return;
+  const FTransform Weit(FQuat::Identity, FVector(0, 0, -500000.0f), FVector::ZeroVector);
+  InsassenFarbe = FMath::RandRange(0, ALaLaBergAutoPool::INSASSEN_FARBEN - 1);
+  FahrerIndex = ALaLaBergAutoPool::Instanz->FuegeInsassenHinzu(InsassenFarbe, Weit);
+  if (FMath::FRand() < 0.34f)
+   BeifahrerIndex = ALaLaBergAutoPool::Instanz->FuegeInsassenHinzu(InsassenFarbe, Weit);
+ }
+ ALaLaBergAutoPool* Pool = ALaLaBergAutoPool::Instanz;
+ if (bSichtbar) {
+  if (FahrerIndex >= 0) Pool->AktualisiereInsassen(InsassenFarbe, FahrerIndex, SitzLage(true));
+  if (BeifahrerIndex >= 0) Pool->AktualisiereInsassen(InsassenFarbe, BeifahrerIndex, SitzLage(false));
+ } else {
+  if (FahrerIndex >= 0) Pool->VersteckeInsassen(InsassenFarbe, FahrerIndex);
+  if (BeifahrerIndex >= 0) Pool->VersteckeInsassen(InsassenFarbe, BeifahrerIndex);
  }
 }
 
