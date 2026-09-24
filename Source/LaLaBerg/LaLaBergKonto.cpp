@@ -102,6 +102,13 @@ void ULaLaBergKonto::NimmRevier(int32 Nummer) {
  Speichere();
 }
 
+void ULaLaBergKonto::GibFund(EFund Fund) {
+ if (!Stand || HatFund(Fund)) return;
+ Stand->Funde |= (1 << static_cast<int32>(Fund));
+ UE_LOG(LogTemp, Display, TEXT("LALABERG_FUND %d alle=%d"), static_cast<int32>(Fund), Stand->Funde);
+ Speichere();
+}
+
 void ULaLaBergKonto::SetzeKapitel(int32 Neu) {
  if (!Stand || Neu <= Stand->Kapitel) return;
  Stand->Kapitel = Neu;

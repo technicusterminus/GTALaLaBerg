@@ -33,6 +33,10 @@ public:
  UPROPERTY() int32 Reviere = 0;
  // Abschnitt der Geschichte, an dem man steht.
  UPROPERTY() int32 Kapitel = 0;
+ // Je Fundstueck ein Bit (siehe ULaLaBergKonto::EFund): Werkstatt-,
+ // Rotor- und Zuendschluessel. Sie liegen nicht im Rucksack, sie sind
+ // Schalter in der Welt.
+ UPROPERTY() int32 Funde = 0;
 };
 
 // Konto, gekaufte Waffen und Lack des eigenen Wagens - ein Subsystem der
@@ -79,6 +83,10 @@ public:
  int32 HoleReviere() const { return Stand ? Stand->Reviere : 0; }
  int32 HoleKapitel() const { return Stand ? Stand->Kapitel : 0; }
  void SetzeKapitel(int32 Neu);
+ // Fundstuecke: was ein geschlagener Kopf hinterlaesst.
+ enum class EFund : uint8 { Werkstatt, Rotor, Zuendung };
+ bool HatFund(EFund Fund) const { return Stand && (Stand->Funde & (1 << static_cast<int32>(Fund))); }
+ void GibFund(EFund Fund);
 
  void Speichere();
  const FString& HoleSlot() const { return Slot; }

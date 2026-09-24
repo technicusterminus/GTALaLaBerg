@@ -556,6 +556,7 @@ void ALaLaBergGameMode::BeginPlay() {
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergTaxiTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergFigurTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergRevierTest")) ||
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergKopfTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergRennTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergJagdTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergZielFoto"));
@@ -1068,6 +1069,39 @@ void ALaLaBergGameMode::BeginPlay() {
  // je gleichzeitig Gruen zeigen. Ohne diesen Test waere "kreuzende Strassen
  // haben nie gleichzeitig Gruen" nur eine Behauptung ueber den Code, der die
  // Zeitrechnung dafuer aufstellt, nicht ueber das tatsaechliche Verhalten.
+ // Der Kopf der Mannschaft: markieren ruft ihn, stellen gibt das Revier
+ // samt Fundstueck. Geprueft wird die ganze Kette bis zum verschlossenen
+ // Hubschrauber, der sich danach oeffnet.
+ if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergKopfTest"))) {
+  static bool bKopfLaeuft=false, bFundVorher=false, bFundNachher=false;
+  static int32 Reviere=0, Kapitel=0;
+  FTimerHandle Markieren;
+  GetWorldTimerManager().SetTimer(Markieren,[this]() {
+   auto* R=ALaLaBergRevier::Instanz.Get();
+   auto* Konto=ULaLaBergKonto::Hole(this);
+   if(!R||!Konto) return;
+   bFundVorher=Konto->HatFund(ULaLaBergKonto::EFund::Werkstatt);
+   R->TestMarkiereAlle();            // ruft den Kopf (Revier 0 braucht keinen Ruf)
+   bKopfLaeuft=R->KopfLaeuft();
+  },4.0f,false);
+  FTimerHandle Stellen;
+  GetWorldTimerManager().SetTimer(Stellen,[this]() {
+   if(auto* R=ALaLaBergRevier::Instanz.Get()) R->TestStelleKopf();
+  },5.0f,false);
+  FTimerHandle Ende;
+  GetWorldTimerManager().SetTimer(Ende,[this]() {
+   if(auto* Konto=ULaLaBergKonto::Hole(this)) {
+    bFundNachher=Konto->HatFund(ULaLaBergKonto::EFund::Werkstatt);
+    Reviere=Konto->HoleReviere();
+    Kapitel=Konto->HoleKapitel();
+   }
+   const bool bPass=bKopfLaeuft&&!bFundVorher&&bFundNachher&&Reviere==1&&Kapitel>=2;
+   Beleg(FString::Printf(TEXT("LALABERG_KOPFTEST %s jagd=%d fund=%d->%d reviere=%d kapitel=%d"),
+                         bPass?TEXT("PASS"):TEXT("FAIL"),bKopfLaeuft?1:0,bFundVorher?1:0,bFundNachher?1:0,
+                         Reviere,Kapitel));
+   FPlatformMisc::RequestExitWithStatus(false,bPass?0:1);
+  },6.5f,false);
+ }
  // Reviere: stehen die Saeulen an den Wahrzeichen, zaehlt ein Treffer, und
  // wechselt das Revier erst bei genug Ruf den Besitzer?
  if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergRevierTest"))) {
@@ -1079,13 +1113,16 @@ void ALaLaBergGameMode::BeginPlay() {
    if(!R||!Konto) return;
    Offen=R->HoleOffenes();
    Marken=R->HoleReviere().IsValidIndex(0)?R->HoleReviere()[0].Marken.Num():0;
-   // Erst ohne Ruf: markieren zaehlt, das Revier wechselt aber nicht.
+   // Erst ohne Ruf: markieren zaehlt, danach muss noch der Kopf der
+   // Mannschaft gestellt werden - erst dann wechselt das Revier.
    R->TestMarkiereAlle();
+   R->TestStelleKopf();
    OhneRuf=Konto->HoleReviere();
    // Das erste Revier verlangt keinen Ruf (0 * 150) - fuer den Test wird
    // deshalb gleich das zweite geprueft: Ruf geben und weitermachen.
    Konto->Uebe(ULaLaBergKonto::EWert::Ruf,200.0f);
    R->TestMarkiereAlle();
+   R->TestStelleKopf();
    MitRuf=Konto->HoleReviere();
    Kapitel=Konto->HoleKapitel();
    // Blick auf die erste Saeule des naechsten Reviers.

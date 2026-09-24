@@ -20,7 +20,10 @@ public:
  // russig und faehrt nicht mehr weiter - kein Wrack, kein Feuer.
  virtual void Verletze(float Schaden, const FVector& AusRichtung, ELaLaBergSchaden Art) override;
  virtual bool IstAusgeschaltet() const override { return Leben <= 0.0f; }
- virtual float Lebensanteil() const override { return FMath::Clamp(Leben / 100.0f, 0.0f, 1.0f); }
+ virtual float Lebensanteil() const override { return FMath::Clamp(Leben / FMath::Max(1.0f, VollesLeben), 0.0f, 1.0f); }
+ // Ein Kopf der Geschichte haelt mehr aus als ein Stadtauto (siehe
+ // ALaLaBergRevier).
+ void SetzeLeben(float Neu) { Leben = Neu; VollesLeben = Neu; }
  ALaLaBergVerkehrsauto();
  virtual void Tick(float Zeit) override;
  // Vor BeginPlay setzen: die Wegpunkte in Unreal-Zentimetern.
@@ -154,7 +157,7 @@ private:
  // unterwegs verschwinden kann (siehe ALaLaBergAutoPool-Verstecken/Zerstoeren).
  TWeakObjectPtr<class ALaLaBergVerkehrsauto> Ueberholt;
  FLinearColor Lack = FLinearColor(0.6f, 0.6f, 0.6f);
- float Leben = 100.0f;
+ float Leben = 100.0f, VollesLeben = 100.0f;
  bool bNetzGebaut = false;
  // Blaulicht (nur bPolizei): zwei Leuchten auf dem Dach, im Wechsel.
  UPROPERTY() TObjectPtr<class UStaticMeshComponent> Blaulicht[2] = {};

@@ -501,6 +501,20 @@ void ALaLaBergHUD::Kapitel() {
  Tafel(X, Y, 5 * S, H, Revier.Farbe);
  Schrift(FString::Printf(TEXT("KAPITEL %d · %s"), Konto->HoleKapitel() + 1, *Revier.Mannschaft),
          X + 24 * S, Y + 10 * S, 11, Leise, true);
+ // Laeuft die Jagd auf den Kopf, steht sein Name da statt des Reviers -
+ // und der Pfeil zeigt, wo er gerade faehrt.
+ if (R->KopfLaeuft()) {
+  Schrift(R->HoleKopfName(), X + 24 * S, Y + 26 * S, 16, FLinearColor(1.0f, 0.42f, 0.32f), true);
+  APawn* Ich = PlayerOwner->GetPawn();
+  if (Ich) {
+   const float Kamera = PlayerOwner->PlayerCameraManager ? PlayerOwner->PlayerCameraManager->GetCameraRotation().Yaw
+                                                          : PlayerOwner->GetControlRotation().Yaw;
+   Pfeil(FVector2D(X + B - 40 * S, Y + H * 0.5f),
+         (R->HoleKopfOrt() - Ich->GetActorLocation()).Rotation().Yaw - Kamera, 18 * S,
+         FLinearColor(1.0f, 0.42f, 0.32f));
+  }
+  return;
+ }
  Schrift(Revier.Name, X + 24 * S, Y + 26 * S, 16, Weiss, true);
  // Vier Kaestchen fuer die vier Wahrzeichen.
  for (int32 i = 0; i < Ganz; i++) {

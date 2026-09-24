@@ -1,6 +1,9 @@
 #include "LaLaBergRevier.h"
 #include "LaLaBergHUD.h"
 #include "LaLaBergKonto.h"
+#include "LaLaBergVerletzbar.h"
+#include "LaLaBergPolizei.h"
+#include "LaLaBergVerkehrsauto.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
@@ -22,15 +25,27 @@ namespace {
  // Welches Wahrzeichen zu welchem Revier gehoert. Die Namen stehen so in
  // orte.json (siehe Docs/Geschichte.md); was dort fehlt, wird still
  // uebersprungen - die Daten sind amtlich und aendern sich.
- struct FVorgabe { const TCHAR* Revier; const TCHAR* Mannschaft; FLinearColor Farbe; const TCHAR* Marken[4]; };
+ // Reihenfolge wie in Docs/Geschichte.md: erst die Gelben an der Bahn, dann
+ // die Blauen am Lech, dann die Gruenen ums Klinikum, zuletzt die Weissen
+ // in der Altstadt. Das eigene Viertel (Klinikum) faellt spaet - man nimmt
+ // es den Gruenen ab, nicht umgekehrt.
+ struct FVorgabe {
+  const TCHAR* Revier; const TCHAR* Mannschaft; const TCHAR* Kopf;
+  FLinearColor Farbe; float Leben; float Tempo; bool bPolizei;
+  const TCHAR* Marken[4];
+ };
  const FVorgabe VORGABEN[] = {
-  { TEXT("Klinikum und Süd"), TEXT("Die Grünen"), FLinearColor(0.10f, 0.62f, 0.24f),
-    { TEXT("Klinikum"), TEXT("kbo-Lech-Mangfall-Klinik"), TEXT("Christuskirche"), TEXT("Friedhofskirche zur Heiligen Dreifaltigkeit") } },
-  { TEXT("Vorstadt-Nord"), TEXT("Die Gelben"), FLinearColor(0.95f, 0.78f, 0.10f),
+  { TEXT("Vorstadt-Nord"), TEXT("Die Gelben"), TEXT("Der Dispatcher"),
+    FLinearColor(0.95f, 0.78f, 0.10f), 100.0f, 58.0f, false,
     { TEXT("Bahnhof"), TEXT("Polizeiinspektion"), TEXT("Sankt Katharina"), TEXT("Stadtverwaltung") } },
-  { TEXT("Lechviertel"), TEXT("Die Blauen"), FLinearColor(0.10f, 0.35f, 0.92f),
+  { TEXT("Lechviertel"), TEXT("Die Blauen"), TEXT("Die Fährfrau"),
+    FLinearColor(0.10f, 0.35f, 0.92f), 160.0f, 72.0f, false,
     { TEXT("Mutterturm"), TEXT("Johanniskirche"), TEXT("Färbertor"), TEXT("Stadttheater") } },
-  { TEXT("Altstadt"), TEXT("Die Weißen"), FLinearColor(0.92f, 0.92f, 0.90f),
+  { TEXT("Klinikum und Süd"), TEXT("Die Grünen"), TEXT("Der Förster"),
+    FLinearColor(0.10f, 0.62f, 0.24f), 220.0f, 64.0f, true,
+    { TEXT("Klinikum"), TEXT("kbo-Lech-Mangfall-Klinik"), TEXT("Christuskirche"), TEXT("Friedhofskirche zur Heiligen Dreifaltigkeit") } },
+  { TEXT("Altstadt"), TEXT("Die Weißen"), TEXT("Der Wirt vom Hauptplatz"),
+    FLinearColor(0.92f, 0.92f, 0.90f), 300.0f, 68.0f, true,
     { TEXT("Historisches Rathaus"), TEXT("Schmalzturm"), TEXT("Bayertor"), TEXT("Stadtpfarrkirche Mariae Himmelfahrt") } },
  };
 }
@@ -72,7 +87,11 @@ void ALaLaBergRevier::LadeMarken() {
   FRevier R;
   R.Name = V.Revier;
   R.Mannschaft = V.Mannschaft;
+  R.Kopf = V.Kopf;
   R.Farbe = V.Farbe;
+  R.Leben = V.Leben;
+  R.Tempo = V.Tempo;
+  R.bRuftPolizei = V.bPolizei;
   for (const TCHAR* Gesucht : V.Marken) {
    for (const auto& Wert : Marken) {
     const auto Obj = Wert->AsObject();
@@ -195,12 +214,76 @@ void ALaLaBergRevier::PruefeUebernahme(int32 Revier) {
                         Konto->HoleWert(ULaLaBergKonto::EWert::Ruf), NoetigerRuf));
   return;
  }
+ // Markiert ist erst die halbe Miete: jetzt kommt der Kopf der Mannschaft.
+ RufeKopf(Revier);
+}
+
+FString ALaLaBergRevier::HoleKopfName() const {
+ return Reviere.IsValidIndex(KopfRevier) ? Reviere[KopfRevier].Kopf : FString();
+}
+
+FVector ALaLaBergRevier::HoleKopfOrt() const {
+ return Kopf.IsValid() ? Kopf->GetActorLocation() : FVector::ZeroVector;
+}
+
+// Der Kopf ist ein fahrender Wagen in der Farbe der Mannschaft: weit genug
+// weg, um ihn suchen zu muessen, zaeh genug, um ihn nicht mit drei Treffern
+// zu erledigen. Der Foerster und der Wirt rufen zusaetzlich die Polizei -
+// sie haben sie auf ihrer Seite.
+void ALaLaBergRevier::RufeKopf(int32 Revier) {
+ if (!Reviere.IsValidIndex(Revier) || Kopf.IsValid()) return;
+ const FRevier& R = Reviere[Revier];
+ auto* PC = GetWorld()->GetFirstPlayerController();
+ const FVector Wo = PC && PC->GetPawn() ? PC->GetPawn()->GetActorLocation() : FVector::ZeroVector;
+ ALaLaBergVerkehrsauto* Beste = nullptr;
+ float BesteD = 0.0f;
+ for (ALaLaBergVerkehrsauto* Auto : ALaLaBergVerkehrsauto::Alle) {
+  if (!Auto || Auto->IstGeparkt() || Auto->IstAusgeschaltet()) continue;
+  const float D = FVector::Dist2D(Auto->GetActorLocation(), Wo);
+  if (D < 20000.0f || D > 150000.0f) continue;
+  if (D > BesteD) { BesteD = D; Beste = Auto; }
+ }
+ if (!Beste) {
+  Melde(TEXT("Kein Wagen der Mannschaft unterwegs – später noch einmal versuchen"));
+  return;
+ }
+ Kopf = Beste;
+ KopfRevier = Revier;
+ KopfFrist = GetWorld()->GetTimeSeconds() + 300.0;
+ Beste->SetzeLack(R.Farbe);
+ Beste->SetzeLeben(R.Leben);
+ if (R.bRuftPolizei)
+  if (auto* Polizei = ALaLaBergPolizei::Instanz.Get()) Polizei->TestSetzeSterne(2);
+ Melde(FString::Printf(TEXT("%s ist unterwegs – stell ihn, dann gehört dir %s"), *R.Kopf, *R.Name));
+ UE_LOG(LogTemp, Display, TEXT("LALABERG_KOPF %s revier=%d leben=%.0f abstand=%.0fm"),
+        *R.Kopf, Revier, R.Leben, BesteD / 100.0f);
+}
+
+void ALaLaBergRevier::KopfGestellt(int32 Revier) {
+ auto* Konto = ULaLaBergKonto::Hole(this);
+ if (!Konto || !Reviere.IsValidIndex(Revier)) return;
  Konto->NimmRevier(Revier);
  Konto->SetzeKapitel(Revier + 2);
  Konto->Uebe(ULaLaBergKonto::EWert::Ruf, 120.0f);
- Melde(FString::Printf(TEXT("%s gehört jetzt dir – %s sind erledigt"), *Reviere[Revier].Name,
-                       *Reviere[Revier].Mannschaft));
- UE_LOG(LogTemp, Display, TEXT("LALABERG_REVIER uebernommen=%d kapitel=%d"), Revier, Konto->HoleKapitel());
+ Konto->Gutschrift(800);
+ // Was der Kopf hinterlaesst - kein Gegenstand, ein Schalter in der Welt.
+ static const TCHAR* FUNDNAMEN[] = { TEXT("den Werkstattschlüssel"), TEXT("den Rotorschlüssel"),
+                                     TEXT("den Zündschlüssel"), TEXT("die Stadt") };
+ if (Revier < 3) Konto->GibFund(static_cast<ULaLaBergKonto::EFund>(Revier));
+ Melde(FString::Printf(TEXT("%s gestellt – %s gehört dir, und du hast %s"), *Reviere[Revier].Kopf,
+                       *Reviere[Revier].Name, FUNDNAMEN[FMath::Min(Revier, 3)]));
+ UE_LOG(LogTemp, Display, TEXT("LALABERG_KOPF gestellt revier=%d kapitel=%d funde=%d"),
+        Revier, Konto->HoleKapitel(), Konto->HatFund(ULaLaBergKonto::EFund::Werkstatt) ? 1 : 0);
+ Kopf.Reset();
+ KopfRevier = INDEX_NONE;
+}
+
+void ALaLaBergRevier::TestStelleKopf() {
+ if (!Kopf.IsValid()) return;
+ Kopf->Verletze(9999.0f, FVector(1, 0, 0), ELaLaBergSchaden::Beschuss);
+ // Sofort abrechnen statt auf den naechsten Tick zu warten - ein Test
+ // liest das Ergebnis im selben Bild.
+ if (Kopf->IstAusgeschaltet() && Reviere.IsValidIndex(KopfRevier)) KopfGestellt(KopfRevier);
 }
 
 void ALaLaBergRevier::TestMarkiereAlle() {
@@ -212,6 +295,17 @@ void ALaLaBergRevier::TestMarkiereAlle() {
 void ALaLaBergRevier::Tick(float Zeit) {
  Super::Tick(Zeit);
  if (!bGeladen) return;
+ // Laeuft eine Jagd? Der Kopf gilt als gestellt, sobald sein Wagen steht.
+ if (Kopf.IsValid() && Reviere.IsValidIndex(KopfRevier)) {
+  if (Kopf->IstAusgeschaltet()) KopfGestellt(KopfRevier);
+  else if (GetWorld()->GetTimeSeconds() > KopfFrist) {
+   Melde(FString::Printf(TEXT("%s ist entkommen – die Wahrzeichen bleiben markiert"), *Reviere[KopfRevier].Kopf));
+   Kopf.Reset();
+   KopfRevier = INDEX_NONE;
+  }
+ } else if (!Kopf.IsValid() && KopfRevier != INDEX_NONE) {
+  KopfRevier = INDEX_NONE;
+ }
  // Nur die Saeulen des offenen Reviers stehen sichtbar in der Stadt - die
  // spaeteren Kapitel sollen nicht von Anfang an als Wald von Saeulen
  // herumstehen.

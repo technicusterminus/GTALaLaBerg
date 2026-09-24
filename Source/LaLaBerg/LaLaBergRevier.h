@@ -34,8 +34,14 @@ public:
  struct FRevier {
   FString Name;          // "Vorstadt-Nord"
   FString Mannschaft;    // "Die Gelben"
+  FString Kopf;          // "Der Dispatcher"
   FLinearColor Farbe;
   TArray<FMarke> Marken;
+  // Wie zaeh der Kopf ist und wie schnell er faehrt.
+  float Leben = 100.0f;
+  float Tempo = 55.0f;
+  // Der Foerster ruft die Polizei, sobald er auftaucht.
+  bool bRuftPolizei = false;
  };
 
  const TArray<FRevier>& HoleReviere() const { return Reviere; }
@@ -48,12 +54,25 @@ public:
  void Markiere(class UStaticMeshComponent* Saeule, const FLinearColor& Farbe);
  // Fuer -LaLaBergRevierTest: alle Wahrzeichen des offenen Reviers treffen.
  void TestMarkiereAlle();
+ // Laeuft gerade die Jagd auf einen Kopf, und auf welchen?
+ bool KopfLaeuft() const { return Kopf.IsValid(); }
+ FString HoleKopfName() const;
+ FVector HoleKopfOrt() const;
+ // Fuer -LaLaBergKopfTest: den Kopf sofort ausser Gefecht setzen.
+ void TestStelleKopf();
 
 private:
  void LadeMarken();
  void Melde(const FString& Text) const;
  // Alle vier markiert und die Bewaehrung geschafft: Revier uebernehmen.
  void PruefeUebernahme(int32 Revier);
+ // Der Kopf der Mannschaft: ein Wagen in ihrer Farbe, der flieht. Wer ihn
+ // stellt, nimmt das Revier und findet, was er hinterlaesst.
+ void RufeKopf(int32 Revier);
+ void KopfGestellt(int32 Revier);
+ TWeakObjectPtr<class ALaLaBergVerkehrsauto> Kopf;
+ int32 KopfRevier = INDEX_NONE;
+ double KopfFrist = 0.0;
 
  TArray<FRevier> Reviere;
  UPROPERTY() TArray<TObjectPtr<class UStaticMeshComponent>> Teile;

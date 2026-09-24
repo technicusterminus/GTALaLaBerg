@@ -357,6 +357,10 @@ void ALaLaBergWagen::FaerbeModell() {
 
 void ALaLaBergWagen::Verletze(float Schaden, const FVector& AusRichtung, ELaLaBergSchaden Art) {
  if (IstAusgeschaltet()) return;
+ // Wer den Werkstattschluessel hat, faehrt einen verstaerkten Wagen: der
+ // Schaden kommt nur zu zwei Dritteln an.
+ if (const auto* Konto = ULaLaBergKonto::Hole(this))
+  if (Konto->HatFund(ULaLaBergKonto::EFund::Werkstatt)) Schaden *= 0.66f;
  Leben -= Schaden;
  if (auto* PC = Cast<APlayerController>(GetController()))
   if (auto* HUD = Cast<ALaLaBergHUD>(PC->GetHUD()))

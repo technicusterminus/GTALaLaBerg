@@ -711,6 +711,18 @@ void ALaLaBergCharacter::Einsteigen() {
    if (Abstand < BesteS) { BesteS = Abstand; Sonder = *It; }
   }
   if (Sonder) {
+   // Verschlossen, bis der passende Kopf gestellt ist (siehe
+   // Docs/Geschichte.md): der Hubschrauber braucht den Rotorschluessel,
+   // der Panzer den Zuendschluessel.
+   const auto* Konto = ULaLaBergKonto::Hole(this);
+   const bool bPanzer = Sonder->HoleArt() == ELaLaBergSonderart::Panzer;
+   const auto Noetig = bPanzer ? ULaLaBergKonto::EFund::Zuendung : ULaLaBergKonto::EFund::Rotor;
+   if (Konto && !Konto->HatFund(Noetig)) {
+    if (auto* HUD = Cast<ALaLaBergHUD>(PC->GetHUD()))
+     HUD->ZeigeRueckmeldung(bPanzer ? TEXT("Verschlossen – es fehlt der Zündschlüssel")
+                                    : TEXT("Verschlossen – es fehlt der Rotorschlüssel"));
+    return;
+   }
    Sonder->SetzeFahrer(this);
    SetActorHiddenInGame(true);
    SetActorEnableCollision(false);

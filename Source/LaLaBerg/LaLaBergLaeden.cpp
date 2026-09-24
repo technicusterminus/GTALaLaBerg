@@ -112,8 +112,11 @@ bool ALaLaBergLaeden::Kaufe(int32 Index) {
  ULaLaBergKonto* Konto = ULaLaBergKonto::Hole(this);
  if (!Konto || !Laeden.IsValidIndex(Offen) || !Laeden[Offen].Waren.IsValidIndex(Index)) return false;
  const FWare& Ware = Laeden[Offen].Waren[Index];
+ // Werkstattschluessel: die Lackiererei arbeitet umsonst (siehe
+ // Docs/Geschichte.md, Fund des ersten Kopfes).
+ const bool bUmsonst = Ware.Art == EArt::Lack && Konto->HatFund(ULaLaBergKonto::EFund::Werkstatt);
  if (Ware.Art == EArt::Waffe && HatSchon(Ware)) { Melde(FString::Printf(TEXT("%s hast du schon"), *Ware.Name)); return false; }
- if (!Konto->Bezahle(Ware.Preis)) {
+ if (!bUmsonst && !Konto->Bezahle(Ware.Preis)) {
   Melde(FString::Printf(TEXT("Zu wenig Geld – %s kostet %d €, du hast %d €"), *Ware.Name, Ware.Preis, Konto->HoleGeld()));
   return false;
  }
