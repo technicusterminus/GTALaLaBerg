@@ -1102,6 +1102,7 @@ void ALaLaBergGameMode::BeginPlay() {
  // Spielstand sich den Sender, und ist es nach dem Aussteigen still?
  if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergRadioTest"))) {
   static int32 SenderEin=-1, SenderNach=-1, SenderPlatte=-1; static bool bLief=false, bStillDanach=true;
+  static FString TitelEin, TitelNach;
   FTimerHandle ZumWagen;
   GetWorldTimerManager().SetTimer(ZumWagen,[this]() {
    auto* PC=GetWorld()->GetFirstPlayerController();
@@ -1119,19 +1120,31 @@ void ALaLaBergGameMode::BeginPlay() {
    if(auto* Wagen=PC?Cast<ALaLaBergWagen>(PC->GetPawn()):nullptr) {
     SenderEin=Wagen->HoleSender();
     bLief=Wagen->HoleSender()>0;
+    // Der Sender spielt einen Titel aus der Liste, keine gebaute Schleife -
+    // sonst waere "eine Stunde Radio" nur eine Behauptung ueber die Dateien.
+    TitelEin=Wagen->HoleTitelname();
     Wagen->SchalteRadio();
     SenderNach=Wagen->HoleSender();
+    TitelNach=Wagen->HoleTitelname();
    }
    if(auto* Konto=ULaLaBergKonto::Hole(this))
     if(auto* Platte=Konto->LadeVonPlatte()) SenderPlatte=Platte->Sender;
   },4.6f,false);
+  // Ein Bild vom Armaturenbrett: im Display steht der Sender und der Titel,
+  // der gerade laeuft - das ist der sichtbare Teil des Radios.
+  FTimerHandle Bild;
+  GetWorldTimerManager().SetTimer(Bild,[this]() {
+   if(auto* PC=GetWorld()->GetFirstPlayerController()) PC->ConsoleCommand(TEXT("HighResShot 1600x900"));
+  },5.4f,false);
   FTimerHandle Ende;
   GetWorldTimerManager().SetTimer(Ende,[this]() {
-   const bool bPass=bLief&&SenderEin==1&&SenderNach==2&&SenderPlatte==2;
-   Beleg(FString::Printf(TEXT("LALABERG_RADIOTEST %s lief=%d sender=%d->%d platte=%d"),
-                         bPass?TEXT("PASS"):TEXT("FAIL"),bLief?1:0,SenderEin,SenderNach,SenderPlatte));
+   const bool bPass=bLief&&SenderEin==1&&SenderNach==2&&SenderPlatte==2
+                    &&!TitelEin.IsEmpty()&&!TitelNach.IsEmpty()&&TitelEin!=TitelNach;
+   Beleg(FString::Printf(TEXT("LALABERG_RADIOTEST %s lief=%d sender=%d->%d platte=%d titel=\"%s\"->\"%s\""),
+                         bPass?TEXT("PASS"):TEXT("FAIL"),bLief?1:0,SenderEin,SenderNach,SenderPlatte,
+                         *TitelEin,*TitelNach));
    FPlatformMisc::RequestExitWithStatus(false,bPass?0:1);
-  },6.0f,false);
+  },7.0f,false);
  }
  // Die Schiessbude: startet sie, zaehlt sie Treffer, zahlt sie aus und
  // merkt sie sich die Bestleistung?

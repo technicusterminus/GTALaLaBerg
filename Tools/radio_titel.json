@@ -1,0 +1,59 @@
+{
+  "schema": "lalaberg.radio.1",
+  "hinweis": "Die Titel der drei Radiosender, geholt von Pixabay (Inhaltslizenz: freie Nutzung, keine Namensnennung noetig - genannt werden die Urheber trotzdem, siehe Content/SourceData/Audio/LIZENZ.md). Die MP3-Quellen liegen nicht im Repo; Tools/hole_radio.py laedt sie und wandelt sie um.",
+  "sender": {
+    "Lech": [
+      { "t": "Uranus", "k": "fanchisanchez", "u": "https://cdn.pixabay.com/download/audio/2026/07/12/audio_3b348ba924.mp3?filename=fanchisanchez-uranus-566233.mp3" },
+      { "t": "80s Retro Synthwave", "k": "Playsound", "u": "https://cdn.pixabay.com/download/audio/2024/01/17/audio_61dc80829a.mp3?filename=playsound-80s-retro-synthwave-186631.mp3" },
+      { "t": "Driving Techno", "k": "RibhavAgrawal", "u": "https://cdn.pixabay.com/download/audio/2025/01/22/audio_43ceb6d7b9.mp3?filename=ribhavagrawal-driving-techno-edm-music-005-290961.mp3" },
+      { "t": "Synthwave", "k": "AlexGrohl", "u": "https://cdn.pixabay.com/download/audio/2025/08/29/audio_ac6ae00edf.mp3?filename=alexgrohl-synthwave-393606.mp3" },
+      { "t": "Nostalgic Motivating Retro Synth Wave Pop", "k": "nickogloire", "u": "https://cdn.pixabay.com/download/audio/2024/10/13/audio_29c7a1f5e4.mp3?filename=nickogloire-nostalgic-motivating-retro-synth-wave-pop-250555.mp3" },
+      { "t": "Synthwave Music Neon Drive Horizon", "k": "alex-morgan", "u": "https://cdn.pixabay.com/download/audio/2026/08/01/audio_5eddc6b65b.mp3?filename=alex-morgan-synthwave-music-neon-drive-horizon-578508.mp3" },
+      { "t": "Synthwave Retro 80s", "k": "MondaMusic", "u": "https://cdn.pixabay.com/download/audio/2026/08/20/audio_d17e78aef8.mp3?filename=mondamusic-synthwave-retro-80s-589151.mp3" },
+      { "t": "Synthwave Retro 80s II", "k": "MondaMusic", "u": "https://cdn.pixabay.com/download/audio/2026/05/19/audio_c00a52a58f.mp3?filename=mondamusic-synthwave-retro-80s-529570.mp3" },
+      { "t": "Synthwave", "k": "The_Mountain", "u": "https://cdn.pixabay.com/download/audio/2026/08/27/audio_0ee06fcdf7.mp3?filename=the_mountain-synthwave-593074.mp3" },
+      { "t": "Broken Beat", "k": "alex-morgan", "u": "https://cdn.pixabay.com/download/audio/2026/09/11/audio_2610c9e616.mp3?filename=alex-morgan-broken-beat-601103.mp3" },
+      { "t": "Retro Wave", "k": "BerryDeep", "u": "https://cdn.pixabay.com/download/audio/2026/09/09/audio_efc3e2ac38.mp3?filename=berrydeep-retro-wave-600346.mp3" },
+      { "t": "Garage Music", "k": "alex-morgan", "u": "https://cdn.pixabay.com/download/audio/2026/09/11/audio_bbe5af8493.mp3?filename=alex-morgan-garage-music-601099.mp3" },
+      { "t": "Lounge Retro Wave", "k": "Abydos_Music", "u": "https://cdn.pixabay.com/download/audio/2024/01/16/audio_761828d3ef.mp3?filename=abydos_music-lounge-retro-wave-186444.mp3" },
+      { "t": "Breakbeat Music", "k": "alex-morgan", "u": "https://cdn.pixabay.com/download/audio/2026/09/11/audio_7403eba798.mp3?filename=alex-morgan-breakbeat-music-601100.mp3" },
+      { "t": "Focus Music", "k": "alex-morgan", "u": "https://cdn.pixabay.com/download/audio/2026/09/11/audio_2f339c52c8.mp3?filename=alex-morgan-focus-music-601104.mp3" },
+      { "t": "Chillstep", "k": "alex-morgan", "u": "https://cdn.pixabay.com/download/audio/2026/09/11/audio_9522ad86e6.mp3?filename=alex-morgan-chillstep-601097.mp3" },
+      { "t": "Trip Hop", "k": "alex-morgan", "u": "https://cdn.pixabay.com/download/audio/2026/09/11/audio_1bdbf317b0.mp3?filename=alex-morgan-trip-hop-601094.mp3" },
+      { "t": "Dark Wave Synth Instrumental", "k": "NickPanek", "u": "https://cdn.pixabay.com/download/audio/2024/09/06/audio_93965d86ee.mp3?filename=nickpanek-dark-wave-synth-instrumental-80s-retro-vibes-238647.mp3" },
+      { "t": "80s New Wave Instrumental", "k": "NickPanek", "u": "https://cdn.pixabay.com/download/audio/2025/02/15/audio_2bde757d61.mp3?filename=nickpanek-80s-new-wave-instrumental-retro-synth-vibes-301450.mp3" }
+    ],
+    "Blasmusik": [
+      { "t": "Marching Music - President Garfields Inauguration (Sousa)", "k": "Nesrality", "u": "https://cdn.pixabay.com/download/audio/2022/03/18/audio_fb61b463c3.mp3?filename=nesrality-marching-music-president-garfields-inauguration-by-john-philip-sousa-95353.mp3" },
+      { "t": "Saint Leo - Polka Rock", "k": "NickPanek", "u": "https://cdn.pixabay.com/download/audio/2025/08/18/audio_3c301fec3a.mp3?filename=nickpanek-saint-leo-aggressive-polka-rock-instrumental-391310.mp3" },
+      { "t": "March of the Royal Trumpets (Sousa)", "k": "Nesrality", "u": "https://cdn.pixabay.com/download/audio/2022/03/18/audio_fe25737a0c.mp3?filename=nesrality-marching-music-march-of-the-royal-trumpets-by-john-philip-sousa-95368.mp3" },
+      { "t": "Sylvensteinsee Walzer", "k": "u_dfhby5lcqk", "u": "https://cdn.pixabay.com/download/audio/2026/04/01/audio_5e2346ccea.mp3?filename=u_dfhby5lcqk-sylvensteinsee-walzer-512373.mp3" },
+      { "t": "Majestic Marching Band Anthem", "k": "NickPanek", "u": "https://cdn.pixabay.com/download/audio/2025/02/26/audio_3b5ad21d5e.mp3?filename=nickpanek-special-forces-tribute-majestic-marching-band-anthem-306552.mp3" },
+      { "t": "The Stars and Stripes Forever (Sousa)", "k": "Nesrality", "u": "https://cdn.pixabay.com/download/audio/2022/03/18/audio_88da7d036d.mp3?filename=nesrality-marching-music-the-stars-and-stripes-forever-by-john-philip-sousa-95379.mp3" },
+      { "t": "The Liberty Bell (Sousa)", "k": "Nesrality", "u": "https://cdn.pixabay.com/download/audio/2022/03/18/audio_6e5682ede8.mp3?filename=nesrality-marching-music-the-liberty-bell-by-john-philip-sousa-95377.mp3" },
+      { "t": "Brass Band Anthem", "k": "NickPanek", "u": "https://cdn.pixabay.com/download/audio/2025/01/10/audio_4ade48b058.mp3?filename=nickpanek-acid-rock-brass-band-anthem-286603.mp3" },
+      { "t": "Echoes of Old Streets", "k": "PsyAI", "u": "https://cdn.pixabay.com/download/audio/2026/03/22/audio_cf36123e0e.mp3?filename=psyai-echoes-of-old-streets-emotional-accordion-cinematic-underscores-506666.mp3" },
+      { "t": "The Pit has gone", "k": "MediaHobbyist", "u": "https://cdn.pixabay.com/download/audio/2026/05/02/audio_7b3cdbb82f.mp3?filename=mediahobbyist-the-pit-has-gone-527927.mp3" },
+      { "t": "Moldavian Polka", "k": "DPStudioMusic", "u": "https://cdn.pixabay.com/download/audio/2024/10/11/audio_4e671aafe4.mp3?filename=dpstudiomusic-moldavian-polka-249602.mp3" },
+      { "t": "German Oktoberfest", "k": "Art_Roseman", "u": "https://cdn.pixabay.com/download/audio/2026/08/25/audio_04f58e8d5d.mp3?filename=art_roseman-german-oktoberfest-591588.mp3" },
+      { "t": "German Oktoberfest Polka", "k": "Art_Roseman", "u": "https://cdn.pixabay.com/download/audio/2026/09/07/audio_6a29b26eba.mp3?filename=art_roseman-german-oktoberfest-polka-with-violin-and-accordion-599061.mp3" },
+      { "t": "On Parade (Sousa)", "k": "Nesrality", "u": "https://cdn.pixabay.com/download/audio/2022/03/18/audio_098575658a.mp3?filename=nesrality-marching-music-on-parade-by-john-philip-sousa-95369.mp3" },
+      { "t": "Oktoberfest", "k": "AliveTunes", "u": "https://cdn.pixabay.com/download/audio/2025/07/30/audio_258ac19148.mp3?filename=alivetunes-oktoberfest-382621.mp3" },
+      { "t": "The Wilfred Waltz Polka", "k": "NickPanek", "u": "https://cdn.pixabay.com/download/audio/2024/06/14/audio_a906d85369.mp3?filename=nickpanek-the-wilfred-waltz-polka-masterpiece-217145.mp3" },
+      { "t": "Ramona - Bavarian Folk Dance", "k": "PeterPiotr", "u": "https://cdn.pixabay.com/download/audio/2025/12/11/audio_67419ff60f.mp3?filename=peterpiotr-ramona-bavarian-folk-dance-music-free-450355.mp3" },
+      { "t": "The Whippets Waltz", "k": "MediaHobbyist", "u": "https://cdn.pixabay.com/download/audio/2026/05/02/audio_2a108fe922.mp3?filename=mediahobbyist-the-whippets-waltz-527929.mp3" }
+    ],
+    "Klassik": [
+      { "t": "Debussy - Streichquartett g-moll op. 10", "k": "GregorQuendel", "u": "https://cdn.pixabay.com/download/audio/2025/02/05/audio_085384cfe2.mp3?filename=gregorquendel-debussy-string-quartet-in-g-minor-op10-complete-297417.mp3" },
+      { "t": "Mondscheinsonate", "k": "Clavier-Music", "u": "https://cdn.pixabay.com/download/audio/2024/09/17/audio_0a42924a0c.mp3?filename=clavier-music-moonlight-sonata-classical-piano-241539.mp3" },
+      { "t": "Piano Classical Music", "k": "Tunetank", "u": "https://cdn.pixabay.com/download/audio/2025/06/13/audio_079f25fd6e.mp3?filename=tunetank-piano-classical-music-347514.mp3" },
+      { "t": "Classical Baroque", "k": "Dreamy_Rabbit", "u": "https://cdn.pixabay.com/download/audio/2024/10/11/audio_8029462233.mp3?filename=dreamy_rabbit-classical-baroque-249857.mp3" },
+      { "t": "Song of the Crimson Standard", "k": "u_opg8azc0w3", "u": "https://cdn.pixabay.com/download/audio/2026/02/06/audio_147a56ee26.mp3?filename=u_opg8azc0w3-song-of-the-crimson-standard-480677.mp3" },
+      { "t": "Piano Classical Music II", "k": "Tunetank", "u": "https://cdn.pixabay.com/download/audio/2025/06/13/audio_e4366b4642.mp3?filename=tunetank-piano-classical-music-349861.mp3" },
+      { "t": "Orchestra 2", "k": "MagentaSix", "u": "https://cdn.pixabay.com/download/audio/2024/01/06/audio_1bcbe02281.mp3?filename=magentasix-orchestra-2-184632.mp3" },
+      { "t": "Honor and Sword", "k": "Good_B_Music", "u": "https://cdn.pixabay.com/download/audio/2021/11/24/audio_82498b22da.mp3?filename=good_b_music-honor-and-sword-main-11222.mp3" },
+      { "t": "Baroque Pop", "k": "alanajordan", "u": "https://cdn.pixabay.com/download/audio/2025/04/11/audio_079106b711.mp3?filename=alanajordan-baroque-pop-326186.mp3" },
+      { "t": "Baroque Music", "k": "Dreamy_Rabbit", "u": "https://cdn.pixabay.com/download/audio/2025/08/29/audio_7f74402570.mp3?filename=dreamy_rabbit-baroque-music-393623.mp3" }
+    ]
+  }
+}

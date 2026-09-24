@@ -170,6 +170,7 @@ ALaLaBergWagen::ALaLaBergWagen() {
  Radio->bAutoActivate = false;
  Radio->bAllowSpatialization = false;
  Radio->SetVolumeMultiplier(0.55f);
+ Radio->OnAudioFinished.AddDynamic(this, &ALaLaBergWagen::TitelZuEnde);
 
  // Chaos-Vehicle statt vier Federstrahlen: echtes Motor-/Getriebe-Kennfeld,
  // Vorderradlenkung, Hinterradantrieb, eigene Reifenreibung je Rad statt
@@ -464,37 +465,110 @@ void ALaLaBergWagen::Nicken(float Wert) {
  Ausleger->SetRelativeRotation(R);
 }
 namespace {
- // Die Sender des Autoradios. Der erste Eintrag ist "aus".
- struct FSender { const TCHAR* Name; const TCHAR* Pfad; };
- const FSender SENDER[] = {
-  { TEXT("Radio aus"), nullptr },
-  { TEXT("Lech FM"), TEXT("/Game/Audio/SFX_Radio_Lech.SFX_Radio_Lech") },
-  { TEXT("Blasmusik Landsberg"), TEXT("/Game/Audio/SFX_Radio_Blasmusik.SFX_Radio_Blasmusik") },
-  { TEXT("Klinik Klassik"), TEXT("/Game/Audio/SFX_Radio_Klassik.SFX_Radio_Klassik") },
+ // Ein Titel im Programm eines Senders.
+ struct FTitel { FString Name; FString Kuenstler; FString Pfad; };
+ // Die Sender des Autoradios. Der erste Eintrag ist "aus". "Schluessel" ist
+ // der Name des Senders in radio.json, "Ersatz" die alte gebaute Schleife -
+ // sie springt ein, falls die Titel fehlen (frisch geklonte Arbeitskopie,
+ // in der Tools/importiere_radio.py noch nicht gelaufen ist).
+ struct FSender {
+  const TCHAR* Name; const TCHAR* Schluessel; const TCHAR* Ersatz; TArray<FTitel> Titel;
  };
+ FSender SENDER[] = {
+  { TEXT("Radio aus"), nullptr, nullptr },
+  { TEXT("Lech FM"), TEXT("Lech"), TEXT("/Game/Audio/SFX_Radio_Lech.SFX_Radio_Lech") },
+  { TEXT("Blasmusik Landsberg"), TEXT("Blasmusik"), TEXT("/Game/Audio/SFX_Radio_Blasmusik.SFX_Radio_Blasmusik") },
+  { TEXT("Klinik Klassik"), TEXT("Klassik"), TEXT("/Game/Audio/SFX_Radio_Klassik.SFX_Radio_Klassik") },
+ };
+
+ // Das Programm steht in einer Liste, nicht im Quelltext: wer einen Titel
+ // austauscht, laesst Tools/hole_radio.py und importiere_radio.py laufen und
+ // muss nichts neu uebersetzen. Einmal je Programmlauf gelesen.
+ void LiesProgramm() {
+  static bool bGelesen = false;
+  if (bGelesen) return;
+  bGelesen = true;
+  FString Text;
+  TSharedPtr<FJsonObject> Wurzel;
+  const FString Datei = FPaths::ProjectContentDir() / TEXT("SourceData/Audio/radio.json");
+  if (!FFileHelper::LoadFileToString(Text, *Datei) ||
+      !FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Wurzel) || !Wurzel.IsValid()) {
+   UE_LOG(LogTemp, Warning, TEXT("LALABERG_RADIO keine Titelliste (%s) - Ersatzschleife"), *Datei);
+   return;
+  }
+  const TSharedPtr<FJsonObject>* Liste = nullptr;
+  if (!Wurzel->TryGetObjectField(TEXT("sender"), Liste)) return;
+  for (FSender& S : SENDER) {
+   const TArray<TSharedPtr<FJsonValue>>* Titel = nullptr;
+   if (!S.Schluessel || !(*Liste)->TryGetArrayField(S.Schluessel, Titel)) continue;
+   for (const TSharedPtr<FJsonValue>& Wert : *Titel) {
+    const TSharedPtr<FJsonObject> Eintrag = Wert->AsObject();
+    if (!Eintrag.IsValid()) continue;
+    S.Titel.Add({ Eintrag->GetStringField(TEXT("titel")),
+                  Eintrag->GetStringField(TEXT("kuenstler")),
+                  Eintrag->GetStringField(TEXT("pfad")) });
+   }
+   UE_LOG(LogTemp, Display, TEXT("LALABERG_RADIO %s titel=%d"), S.Name, S.Titel.Num());
+  }
+ }
 }
 
 FString ALaLaBergWagen::HoleSendername() const {
  return SENDER[FMath::Clamp(Sender, 0, UE_ARRAY_COUNT(SENDER) - 1)].Name;
 }
 
+FString ALaLaBergWagen::HoleTitelname() const {
+ const FSender& S = SENDER[FMath::Clamp(Sender, 0, UE_ARRAY_COUNT(SENDER) - 1)];
+ return S.Titel.IsValidIndex(Titel) ? S.Titel[Titel].Name : FString();
+}
+
+// Einen Titel des laufenden Senders anwerfen. Nummer < 0 waehlt zufaellig;
+// bMittendrin steigt irgendwo im Stueck ein - ein Sender laeuft ja weiter,
+// auch wenn gerade niemand zuhoert.
+void ALaLaBergWagen::SpieleTitel(int32 Nummer, bool bMittendrin) {
+ LiesProgramm();
+ if (!Radio || Sender <= 0 || Sender >= UE_ARRAY_COUNT(SENDER)) return;
+ const FSender& S = SENDER[Sender];
+ if (S.Titel.Num() == 0) {                       // Ersatz: die alte Schleife
+  Titel = -1;
+  if (auto* Ton = S.Ersatz ? LoadObject<USoundBase>(nullptr, S.Ersatz) : nullptr) {
+   Radio->SetSound(Ton);
+   Radio->Play(FMath::FRandRange(0.0f, 20.0f));
+  }
+  return;
+ }
+ Titel = Nummer >= 0 ? Nummer % S.Titel.Num() : FMath::RandRange(0, S.Titel.Num() - 1);
+ auto* Ton = LoadObject<USoundBase>(nullptr, *S.Titel[Titel].Pfad);
+ if (!Ton) { UE_LOG(LogTemp, Warning, TEXT("LALABERG_RADIO fehlt: %s"), *S.Titel[Titel].Pfad); return; }
+ Radio->SetSound(Ton);
+ Radio->Play(bMittendrin ? FMath::FRandRange(0.0f, 0.6f * Ton->GetDuration()) : 0.0f);
+ UE_LOG(LogTemp, Display, TEXT("LALABERG_RADIO %s spielt \"%s\" (%s)"),
+        S.Name, *S.Titel[Titel].Name, *S.Titel[Titel].Kuenstler);
+}
+
+// Ein Stueck ist aus - das naechste laeuft an, der Reihe nach durchs Programm.
+void ALaLaBergWagen::TitelZuEnde() {
+ if (bSchaltet || Sender <= 0 || !Fahrer) return;   // Stoppen meldet auch "zu Ende"
+ SpieleTitel(Titel + 1, false);
+}
+
 // Einmal weiterschalten - durch alle Sender und wieder auf "aus".
 void ALaLaBergWagen::SchalteRadio() {
  Sender = (Sender + 1) % UE_ARRAY_COUNT(SENDER);
  if (auto* Konto = ULaLaBergKonto::Hole(this)) Konto->SetzeSender(Sender);
- if (!Radio) return;
- Radio->Stop();
- if (const TCHAR* Pfad = SENDER[Sender].Pfad) {
-  if (auto* Ton = LoadObject<USoundBase>(nullptr, Pfad)) {
-   Radio->SetSound(Ton);
-   // Mitten im Stueck einsteigen: ein Sender laeuft weiter, auch wenn
-   // niemand zuhoert.
-   Radio->Play(FMath::FRandRange(0.0f, 20.0f));
-  }
+ if (Radio) {
+  TGuardValue<bool> Sperre(bSchaltet, true);
+  Radio->Stop();
  }
+ Titel = -1;
+ SpieleTitel(-1, true);
  if (auto* PC = Cast<APlayerController>(GetController()))
-  if (auto* HUD = Cast<ALaLaBergHUD>(PC->GetHUD()))
-   HUD->ZeigeRueckmeldung(FString::Printf(TEXT("Radio: %s"), *HoleSendername()));
+  if (auto* HUD = Cast<ALaLaBergHUD>(PC->GetHUD())) {
+   const FString Name = HoleTitelname();
+   HUD->ZeigeRueckmeldung(Name.IsEmpty()
+    ? FString::Printf(TEXT("Radio: %s"), *HoleSendername())
+    : FString::Printf(TEXT("Radio: %s - %s"), *HoleSendername(), *Name));
+  }
  UE_LOG(LogTemp, Display, TEXT("LALABERG_RADIO sender=%d %s"), Sender, *HoleSendername());
 }
 
@@ -570,7 +644,10 @@ void ALaLaBergWagen::Aussteigen() {
  if (auto* FahrerBewegung = Fahrer->GetCharacterMovement()) FahrerBewegung->SetMovementMode(MOVE_Walking);
  PC->Possess(Fahrer);
  PC->SetControlRotation(FRotator(0, GetActorRotation().Yaw, 0));
- if (Radio && Radio->IsPlaying()) Radio->Stop();      // die Tuer geht zu
+ if (Radio && Radio->IsPlaying()) {                   // die Tuer geht zu
+  TGuardValue<bool> Sperre(bSchaltet, true);
+  Radio->Stop();
+ }
  Meldung(TEXT("Ausgestiegen - WASD zum Gehen."));
  Fahrer = nullptr;
  GasWert = LenkWert = Lenkung = 0.0f;

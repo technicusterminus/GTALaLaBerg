@@ -49,6 +49,10 @@ public:
  void SchalteRadio();
  int32 HoleSender() const { return Sender; }
  FString HoleSendername() const;
+ // Der Titel, der gerade laeuft - leer, solange keiner laeuft.
+ FString HoleTitelname() const;
+ // Wird vom Audiobauteil gerufen, wenn ein Titel zu Ende ist.
+ UFUNCTION() void TitelZuEnde();
  // Fuer den Fahrtest: Gas und Lenkung ohne Tastatur setzen.
  // Fuer den Fahrtest: Gas und Lenkung ohne Tastatur setzen. Solange das
  // gilt, ueberschreibt die Eingabeachse die Werte nicht - sonst stellte die
@@ -105,6 +109,12 @@ private:
  int32 FahrzeugTyp = -2;
  float Leben = 100.0f;
  int32 Sender = 0;
+ // Welcher Titel des Senders laeuft (-1 = keiner bzw. Notschleife).
+ int32 Titel = -1;
+ // Waehrend des Umschaltens: das Stoppen meldet ebenfalls "Titel zu Ende",
+ // und ohne diese Sperre wuerde sofort der naechste angeworfen.
+ bool bSchaltet = false;
+ void SpieleTitel(int32 Nummer, bool bMittendrin);
  UPROPERTY() TObjectPtr<class UAudioComponent> Radio = nullptr;
  UPROPERTY() TObjectPtr<class USpringArmComponent> Ausleger = nullptr;
  UPROPERTY() TObjectPtr<class UCameraComponent> Kamera = nullptr;

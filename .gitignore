@@ -15,3 +15,10 @@ Build/Windows/FileOpenOrder/
 # als die CC-lizenzierten Assets sonst in diesem Repo. Lokal ueber den
 # Fab-Reiter im Editor holen (siehe README "Datenquellen und Lizenzen").
 Content/CitySampleVehicles/
+
+# Die heruntergeladene und gewandelte Radiomusik - siehe Content/SourceData/Audio/LIZENZ.md
+Tools/Musik/
+
+# Die importierten Radiotitel (rund 0,5 GB) - stellt Tools/importiere_radio.py
+# jederzeit wieder her, siehe Content/SourceData/Audio/LIZENZ.md
+Content/Audio/Radio/

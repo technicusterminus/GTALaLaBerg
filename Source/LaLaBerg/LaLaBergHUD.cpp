@@ -164,9 +164,20 @@ void ALaLaBergHUD::Tacho(ALaLaBergWagen* Wagen) {
 
  // Der laufende Sender ueber dem Tacho - wie ein Display im Armaturenbrett.
  if (Wagen->HoleSender() > 0) {
-  const FString Sender = FString::Printf(TEXT("♪  %s"), *Wagen->HoleSendername());
+  // Das Display ist so breit wie der Tacho: vom Titel steht da, was neben
+  // dem Sendernamen noch hineinpasst, der Rest wird abgeschnitten.
+  const float Platz = B - 40 * S;
+  FString Zeile = FString::Printf(TEXT("♪  %s"), *Wagen->HoleSendername());
+  FString Titel = Wagen->HoleTitelname();
+  for (FString Versuch = Titel; !Versuch.IsEmpty(); ) {
+   const FString Voll = FString::Printf(TEXT("%s  ·  %s%s"), *Zeile, *Versuch,
+                                        Versuch.Len() == Titel.Len() ? TEXT("") : TEXT("…"));
+   if (Breite(Voll, 13, true) <= Platz) { Zeile = Voll; break; }
+   if (Versuch.Len() <= 4) break;                  // passt nur der Sender
+   Versuch = Versuch.Left(Versuch.Len() - 2).TrimEnd();
+  }
   Tafel(X, Y - 26 * S, B, 22 * S, Tinte);
-  Schrift(Sender, X + 22 * S, Y - 23 * S, 13, FLinearColor(0.95f, 0.72f, 0.12f), true);
+  Schrift(Zeile, X + 22 * S, Y - 23 * S, 13, FLinearColor(0.95f, 0.72f, 0.12f), true);
  }
  const FString Zahl = FString::Printf(TEXT("%d"), FMath::RoundToInt(FMath::Abs(Kmh)));
  const float ZB = Schrift(Zahl, X + 22 * S, Y + 8 * S, 46, Weiss, true);
