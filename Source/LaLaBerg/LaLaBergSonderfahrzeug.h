@@ -30,6 +30,9 @@ public:
  bool HatFahrer() const { return Fahrer != nullptr; }
  // Fuer -LaLaBergSonderTest: Steuerung ohne Tastatur.
  void TestSteuerung(float Schub, float Drehen, float Steigen);
+ // Fuer -LaLaBergKanonenTest: einmal feuern, ohne Maustaste.
+ bool TestFeuern() { return Feuern(); }
+ int32 HoleSchuesse() const { return Schuesse; }
  void TestAussteigen() { Aussteigen(); }
  float TempoKmh() const;
 
@@ -42,6 +45,12 @@ private:
  void Umsehen(float Wert);
  void Nicken(float Wert);
  void Steigen();
+ // Die Kanone des Panzers: ein Schuss alle drei Sekunden, danach faehrt das
+ // Rohr zurueck und die Wanne setzt sich. Liefert false, wenn noch geladen
+ // wird oder es kein Panzer ist.
+ bool Feuern();
+ // Die Eingabe erwartet eine Funktion ohne Rueckgabe.
+ void FeuerTaste() { Feuern(); }
  void Sinken();
  void Aussteigen();
  // Boden unter dem Fahrzeug; false, wenn dort nichts ist.
@@ -62,6 +71,12 @@ private:
  float Tempo = 0.0f;          // cm/s laengs
  float Sinkflug = 0.0f;       // cm/s senkrecht (nur Hubschrauber)
  float Drehphase = 0.0f;      // Rotorstellung in Grad
+ // Kanone: Zeitpunkt des letzten Schusses, Rueckstoss (1 unmittelbar nach
+ // dem Schuss, klingt ab) und die Zahl der Schuesse fuer den Test.
+ double LetzterSchuss = -10.0;
+ float Rueckstoss = 0.0f;
+ int32 Schuesse = 0;
+ UPROPERTY() TObjectPtr<class UPointLightComponent> Muendungsfeuer = nullptr;
  bool bTest = false;
  double EinstiegZeit = -10.0;
 };

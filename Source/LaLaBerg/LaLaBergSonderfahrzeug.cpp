@@ -11,6 +11,9 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "Components/PointLightComponent.h"
+#include "LaLaBergFarbkugel.h"
+#include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "Sound/SoundBase.h"
@@ -25,6 +28,11 @@ namespace {
  constexpr float HELI_STEIGEN = 800.0f, HELI_HALBHOCH = 150.0f;
  // Nie tiefer als das: sonst versinkt die Zelle im Gelaende.
  constexpr float HELI_BODENABSTAND = 40.0f;
+ // Kanone: 120 mm, alle drei Sekunden geladen, Muendung 7,8 m vor der
+ // Turmmitte (siehe Tools/baue_panzer_heli.py). Geschossen wird Farbe - es
+ // ist ein Paintball-Spiel, und ein 40-m-Klecks ist die richtige Antwort
+ // auf ein Kaliber dieser Groesse.
+ constexpr float KANONE_LADEZEIT = 3.0f, KANONE_MUENDUNG = 780.0f, KANONE_TEMPO = 14000.0f;
 
  UStaticMesh* Lade(const TCHAR* Name) {
   return LoadObject<UStaticMesh>(nullptr, *FString::Printf(TEXT("/Game/Art/Vehicles/Sonder/%s.%s"), Name, Name));
@@ -61,6 +69,15 @@ ALaLaBergSonderfahrzeug::ALaLaBergSonderfahrzeug() {
  Kamera = CreateDefaultSubobject<UCameraComponent>(TEXT("Kamera"));
  Kamera->SetupAttachment(Ausleger);
 
+ // Muendungsfeuer: haengt am Turm, damit es mit dem Rohr schwenkt.
+ Muendungsfeuer = CreateDefaultSubobject<UPointLightComponent>(TEXT("Muendungsfeuer"));
+ Muendungsfeuer->SetupAttachment(Dreher);
+ Muendungsfeuer->SetRelativeLocation(FVector(KANONE_MUENDUNG, 0, 0));
+ Muendungsfeuer->SetLightColor(FLinearColor(1.0f, 0.68f, 0.25f));
+ Muendungsfeuer->SetAttenuationRadius(3500.0f);
+ Muendungsfeuer->SetCastShadows(false);
+ Muendungsfeuer->SetIntensity(0.0f);
+
  Klang = CreateDefaultSubobject<UAudioComponent>(TEXT("Klang"));
  Klang->SetupAttachment(Rumpf);
  Klang->bAutoActivate = false;
@@ -94,6 +111,11 @@ void ALaLaBergSonderfahrzeug::BeginPlay() {
  }
  if (bPanzer) {
   Rumpf->SetBoxExtent(FVector(360.0f, 175.0f, PANZER_HALBHOCH));
+  // Weiter weg und hoeher als beim Hubschrauber: aus der Vorgabe sah man
+  // nur das Turmdach und nichts von der Strasse voraus.
+  Ausleger->TargetArmLength = 1600.0f;
+  Ausleger->SetRelativeLocation(FVector(0, 0, 420.0f));
+  Ausleger->SetRelativeRotation(FRotator(-18.0f, 0, 0));
  } else {
   Rumpf->SetBoxExtent(FVector(330.0f, 130.0f, HELI_HALBHOCH));
  }
@@ -122,6 +144,7 @@ void ALaLaBergSonderfahrzeug::SetupPlayerInputComponent(UInputComponent* Eingabe
  // Leertaste steigt, Strg sinkt - beim Panzer haelt die Leertaste an.
  Eingabe->BindAction("Jump", IE_Pressed, this, &ALaLaBergSonderfahrzeug::Steigen);
  Eingabe->BindAction("Jump", IE_Released, this, &ALaLaBergSonderfahrzeug::Sinken);
+ Eingabe->BindAction("Feuern", IE_Pressed, this, &ALaLaBergSonderfahrzeug::FeuerTaste);
  Eingabe->BindAction("Einsteigen", IE_Pressed, this, &ALaLaBergSonderfahrzeug::Aussteigen);
  Eingabe->BindAction("Recover", IE_Pressed, this, &ALaLaBergSonderfahrzeug::Aussteigen);
 }
@@ -161,6 +184,32 @@ bool ALaLaBergSonderfahrzeug::Bodenhoehe(float& Z) const {
  return true;
 }
 
+bool ALaLaBergSonderfahrzeug::Feuern() {
+ if (Art != ELaLaBergSonderart::Panzer || !Dreher) return false;
+ const double Jetzt = GetWorld()->GetTimeSeconds();
+ if (Jetzt - LetzterSchuss < KANONE_LADEZEIT) return false;
+ LetzterSchuss = Jetzt;
+ Rueckstoss = 1.0f;
+ Schuesse++;
+
+ const FVector Richtung = Dreher->GetForwardVector();
+ const FVector Muendung = Dreher->GetComponentLocation() + Richtung * KANONE_MUENDUNG;
+ // Verzoegert erzeugt wie bei der Waffe: Farbe und Groesse muessen stehen,
+ // bevor BeginPlay die Kugel daraus aufbaut.
+ const FTransform Lage(Richtung.Rotation(), Muendung);
+ if (auto* Kugel = GetWorld()->SpawnActorDeferred<ALaLaBergFarbkugel>(ALaLaBergFarbkugel::StaticClass(), Lage,
+      this, nullptr, ESpawnActorCollisionHandlingMethod::AlwaysSpawn)) {
+  // Grosses Kaliber: 20 cm Kugel, Klecks zwischen 12 und 22 m, flache Bahn.
+  Kugel->Einrichten(FLinearColor(0.95f, 0.55f, 0.05f), 20.0f, 1200.0f, 2200.0f, 0.25f);
+  Kugel->FinishSpawning(Lage);
+  Kugel->Abschiessen(Richtung, KANONE_TEMPO);
+ }
+ if (auto* Ton = LoadObject<USoundBase>(nullptr, TEXT("/Game/Audio/SFX_Panzer_Schuss.SFX_Panzer_Schuss")))
+  UGameplayStatics::PlaySoundAtLocation(this, Ton, Muendung, 1.0f, FMath::FRandRange(0.97f, 1.03f));
+ UE_LOG(LogTemp, Display, TEXT("LALABERG_KANONE schuss=%d bei %s"), Schuesse, *Muendung.ToString());
+ return true;
+}
+
 void ALaLaBergSonderfahrzeug::Tick(float Zeit) {
  Super::Tick(Zeit);
  const bool bPanzer = Art == ELaLaBergSonderart::Panzer;
@@ -191,6 +240,17 @@ void ALaLaBergSonderfahrzeug::Tick(float Zeit) {
    const float Blick = Fahrer && GetController() ? GetController()->GetControlRotation().Yaw : GetActorRotation().Yaw;
    const FRotator Jetzt = Dreher->GetComponentRotation();
    Dreher->SetWorldRotation(FMath::RInterpTo(Jetzt, FRotator(0, Blick, 0), Zeit, 3.0f));
+   // Rueckstoss: das Rohr faehrt in die Blende zurueck und kommt langsamer
+   // wieder vor, die Wanne nickt kurz, und der Muendungsblitz klingt ab.
+   Rueckstoss = FMath::FInterpTo(Rueckstoss, 0.0f, Zeit, 4.5f);
+   Dreher->SetRelativeLocation(FVector(-70.0f * Rueckstoss, 0, 80.0f));
+   if (Muendungsfeuer) Muendungsfeuer->SetIntensity(Rueckstoss > 0.55f ? 260000.0f * Rueckstoss : 0.0f);
+   if (Rueckstoss > 0.01f) {
+    const FRotator Lage = GetActorRotation();
+    SetActorRotation(FRotator(FMath::FInterpTo(Lage.Pitch, 3.2f * Rueckstoss, Zeit, 8.0f), Lage.Yaw, Lage.Roll));
+    // Der Schuss schiebt den Panzer auch ein Stueck zurueck.
+    Tempo -= 260.0f * Rueckstoss * Zeit;
+   }
   }
  } else {
   const float Ziel = FMath::Clamp(SchubWert, -0.5f, 1.0f) * HELI_TEMPO;

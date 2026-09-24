@@ -1062,6 +1062,7 @@ void ALaLaBergGameMode::BeginPlay() {
  // dem Klinikumsdach wartet.
  if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergSonderTest"))) {
   static float PanzerWeg=-1.0f, HeliHoehe=-1.0f;
+  static int32 PanzerSchuesse=0;
   static FVector PanzerStart=FVector::ZeroVector, HeliStart=FVector::ZeroVector;
   auto Hin=[this](ELaLaBergSonderart Art,float Hinter,float Hoch) {
    auto* PC=GetWorld()->GetFirstPlayerController();
@@ -1094,13 +1095,27 @@ void ALaLaBergGameMode::BeginPlay() {
     Sonder->TestSteuerung(1.0f,0.0f,0.0f);
    }
   },5.0f,false);
+  // Kanone: zweimal feuern, das zweite Mal muss die Ladezeit abwarten.
+  FTimerHandle Schuss;
+  GetWorldTimerManager().SetTimer(Schuss,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   if(auto* Sonder=PC?Cast<ALaLaBergSonderfahrzeug>(PC->GetPawn()):nullptr) {
+    Sonder->TestFeuern();
+    Sonder->TestFeuern();                     // zu frueh: darf nicht zaehlen
+    PanzerSchuesse=Sonder->HoleSchuesse();
+   }
+  },7.6f,false);
+  // Erst gut anderthalb Sekunden spaeter fotografieren: das Geschoss
+  // braucht die Zeit bis zum Einschlag, vorher sieht man keinen Klecks.
+  Bild(9.2f);
   FTimerHandle PanzerAus;
   GetWorldTimerManager().SetTimer(PanzerAus,[this]() {
    auto* PC=GetWorld()->GetFirstPlayerController();
    if(auto* Sonder=PC?Cast<ALaLaBergSonderfahrzeug>(PC->GetPawn()):nullptr) {
     PanzerWeg=FVector::Dist2D(PanzerStart,Sonder->GetActorLocation())/100.0f;
     Sonder->TestSteuerung(0.0f,0.0f,0.0f);
-    Beleg(FString::Printf(TEXT("LALABERG_SONDER panzer weg=%.0fm tempo=%.0fkmh"),PanzerWeg,Sonder->TempoKmh()));
+    Beleg(FString::Printf(TEXT("LALABERG_SONDER panzer weg=%.0fm tempo=%.0fkmh schuesse=%d"),
+                          PanzerWeg,Sonder->TempoKmh(),PanzerSchuesse));
    }
   },9.0f,false);
   Bild(9.2f);
@@ -1134,9 +1149,10 @@ void ALaLaBergGameMode::BeginPlay() {
    auto* Sonder=PC?Cast<ALaLaBergSonderfahrzeug>(PC->GetPawn()):nullptr;
    if(Sonder) HeliHoehe=(Sonder->GetActorLocation().Z-HeliStart.Z)/100.0f;
    if(PC) PC->ConsoleCommand(TEXT("HighResShot 1600x900"));
-   const bool bPass=PanzerWeg>8.0f&&HeliHoehe>8.0f;
-   Beleg(FString::Printf(TEXT("LALABERG_SONDERTEST %s panzer_weg=%.0fm heli_stieg=%.0fm"),
-                         bPass?TEXT("PASS"):TEXT("FAIL"),PanzerWeg,HeliHoehe));
+   // Genau ein Schuss: der zweite kam vor Ablauf der Ladezeit.
+   const bool bPass=PanzerWeg>8.0f&&HeliHoehe>8.0f&&PanzerSchuesse==1;
+   Beleg(FString::Printf(TEXT("LALABERG_SONDERTEST %s panzer_weg=%.0fm heli_stieg=%.0fm schuesse=%d"),
+                         bPass?TEXT("PASS"):TEXT("FAIL"),PanzerWeg,HeliHoehe,PanzerSchuesse));
    FTimerHandle Schluss;
    GetWorldTimerManager().SetTimer(Schluss,[bPass]() { FPlatformMisc::RequestExitWithStatus(false,bPass?0:1); },1.2f,false);
   },15.0f,false);
