@@ -424,10 +424,11 @@ def panzer(dauer=1.2, drehzahl=800.0, zylinder=12):
 if __name__ == "__main__":
     # Pistole: kurzer, heller Stoss. MP: schneller Bolzen, zweiter Klick
     # beim Zurueckfahren. Schrotflinte: weiteres Rohr, tiefer und voller.
-    schreibe("SFX_Schuss_Pistole", markierer(0.20, 900.0, 1.00, 0.45))
-    schreibe("SFX_Schuss_Maschine", markierer(0.15, 1150.0, 1.15, 0.60, nachbolzen=0.028))
-    schreibe("SFX_Schuss_Schrot", markierer(0.30, 520.0, 0.80, 0.35, hall=0.16))
-    schreibe("SFX_Schuss_Rakete", werfer())
+    # Die Schuesse kommen seit 2026-09-24 aus echten Aufnahmen (Pixabay,
+    # siehe Content/SourceData/Audio/LIZENZ.md und Tools/wandle_sounds.py) -
+    # gerechnete Markierergeraeusche klangen daneben nach Spielzeug. Die
+    # Funktionen markierer() und werfer() bleiben stehen: wer die Klaenge
+    # wieder ohne fremde Dateien bauen will, ruft sie hier auf.
     schreibe("SFX_Klecks", klecks())
     schreibe("SFX_Schritt", schritt(hart=True))
     schreibe("SFX_Schritt_Gras", schritt(hart=False))

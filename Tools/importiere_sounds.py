@@ -20,8 +20,10 @@ NAMEN = ["SFX_Schuss_Pistole", "SFX_Schuss_Maschine", "SFX_Schuss_Schrot", "SFX_
          "SFX_Klecks", "SFX_Schritt", "SFX_Schritt_Gras", "SFX_Motor",
          # Dauerklaenge: Martinshorn, Rotor und Panzerdiesel laufen in der
          # Schleife, solange die Quelle da ist.
-         "SFX_Sirene", "SFX_Rotor", "SFX_Panzer"]
-SCHLEIFE = ("Motor", "Sirene", "Rotor", "Panzer")
+         "SFX_Sirene", "SFX_Rotor", "SFX_Panzer", "SFX_Panzer_Schuss"]
+# Nur die Dauerklaenge laufen in der Schleife - der Panzerschuss nicht,
+# obwohl er "Panzer" heisst.
+SCHLEIFE = ("Motor", "Sirene", "Rotor")
 
 importiert = []
 for name in NAMEN:
@@ -43,7 +45,7 @@ for name in NAMEN:
     if unreal.EditorAssetLibrary.does_asset_exist(pfad):
         importiert.append(name)
         sound = unreal.load_asset(pfad)
-        if any(k in name for k in SCHLEIFE):
+        if any(k in name for k in SCHLEIFE) or name == "SFX_Panzer":
             sound.set_editor_property("looping", True)
 
 unreal.log("LALABERG_SOUNDS " + " ".join(importiert))
