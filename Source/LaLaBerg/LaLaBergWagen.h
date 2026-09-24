@@ -46,6 +46,12 @@ public:
  void SetzeFahrer(class ACharacter* Figur);
  // Autoradio: 0 = aus, sonst der Sender (siehe SENDER in der .cpp).
  // Umschalten mit der Radiotaste; der Stand haelt im Spielstand.
+ // Fuer -LaLaBergSchadenTest: den Wagen ohne Fahrer anschieben (cm/s) und
+ // die Stosspruefung einmal sofort ausfuehren. Der Aufruf nimmt dem Test die
+ // Zufaelle zweier Fahrzeuge in Bewegung ab - geprueft wird dieselbe
+ // Rechnung aus Abstand und Annaeherung, die im Spiel jedes Bild laeuft.
+ void TestSchubAuf(const FVector& TempoCmS);
+ void TestZusammenstoss() { LetzterStoss = -10.0f; PruefeZusammenstoss(); }
  void SchalteRadio();
  int32 HoleSender() const { return Sender; }
  FString HoleSendername() const;
@@ -108,6 +114,10 @@ private:
  // gewaehlte Modell nur um, wuerfelt nicht neu.
  int32 FahrzeugTyp = -2;
  float Leben = 100.0f;
+ // Zusammenstoesse (siehe PruefeZusammenstoss): Zeitpunkt des letzten, damit
+ // aus einem Aufprall nicht dreissig Treffer in dreissig Bildern werden.
+ void PruefeZusammenstoss();
+ float LetzterStoss = -10.0f;
  int32 Sender = 0;
  // Welcher Titel des Senders laeuft (-1 = keiner bzw. Notschleife).
  int32 Titel = -1;

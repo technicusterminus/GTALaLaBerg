@@ -1,6 +1,7 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "GameFramework/Pawn.h"
+#include "LaLaBergVerletzbar.h"
 #include "LaLaBergSonderfahrzeug.generated.h"
 
 // Die beiden versteckten Fahrzeuge: ein Panzer und ein Hubschrauber. Beide
@@ -15,9 +16,21 @@ UENUM()
 enum class ELaLaBergSonderart : uint8 { Panzer, Hubschrauber };
 
 UCLASS()
-class LALABERG_API ALaLaBergSonderfahrzeug : public APawn {
+class LALABERG_API ALaLaBergSonderfahrzeug : public APawn, public ILaLaBergVerletzbar {
  GENERATED_BODY()
 public:
+ // ILaLaBergVerletzbar: auch die beiden Fundstuecke halten nicht alles aus.
+ // Der Panzer steckt Farbkugeln weg, wie es sich fuer eine Wanne gehoert -
+ // eine Sprenggranate aber nicht; die duenne Zelle des Hubschraubers nimmt
+ // jeden Treffer krumm. Bei null faellt die Maschine aus: der Panzer bleibt
+ // stehen, der Hubschrauber sinkt zu Boden, und wer drin sitzt, steigt aus.
+ virtual void Verletze(float Schaden, const FVector& AusRichtung, ELaLaBergSchaden Schadensart) override;
+ virtual bool IstAusgeschaltet() const override { return bKaputt; }
+ virtual float Lebensanteil() const override { return FMath::Clamp(Leben / FMath::Max(1.0f, VollesLeben), 0.0f, 1.0f); }
+ float HoleLeben() const { return Leben; }
+ // Fuer -LaLaBergSonderSchadenTest: Treffer ohne Schuetzen.
+ void TestVerletze(float Schaden, ELaLaBergSchaden Schadensart) { Verletze(Schaden, -GetActorForwardVector(), Schadensart); }
+
  ALaLaBergSonderfahrzeug();
  virtual void Tick(float Zeit) override;
  virtual void SetupPlayerInputComponent(class UInputComponent* Eingabe) override;
@@ -75,6 +88,11 @@ private:
  // dem Schuss, klingt ab) und die Zahl der Schuesse fuer den Test.
  double LetzterSchuss = -10.0;
  float Rueckstoss = 0.0f;
+ // Lebenspunkte: der Panzer haelt ein Vielfaches des Hubschraubers aus.
+ float Leben = 0.0f, VollesLeben = 0.0f;
+ bool bKaputt = false;
+ // Faerbt Wanne, Turm und Rotoren um - einmal beim Bauen, einmal beim Ausfall.
+ void Faerbe(const FLinearColor& Farbe);
  int32 Schuesse = 0;
  UPROPERTY() TObjectPtr<class UPointLightComponent> Muendungsfeuer = nullptr;
  bool bTest = false;

@@ -1465,6 +1465,10 @@ void ALaLaBergGameMode::BeginPlay() {
   static float PassantAnteil=-1.0f, SpielerLeben=-1.0f, SpielerNachKlinik=-1.0f;
   static int32 Besuche=-1; static float KlinikAbstand=-1.0f;
   static bool bPassantUmgefallen=false, bAutoAus=false;
+  static float SturzLeben=-1.0f, WagenNachStoss=-1.0f, AngefahrenNachStoss=-1.0f;
+  static float PanzerNachKugel=-1.0f; static bool bPanzerAus=false, bHeliAus=false;
+  static ALaLaBergVerkehrsauto* GeparktZiel=nullptr;
+  static ALaLaBergWagen* StossWagen=nullptr;
   FTimerHandle Rechnung;
   GetWorldTimerManager().SetTimer(Rechnung,[this]() {
    // Passant: 50 Punkte Schaden lassen die Haelfte uebrig.
@@ -1494,16 +1498,89 @@ void ALaLaBergGameMode::BeginPlay() {
     KlinikAbstand=FVector::Dist2D(Figur->GetActorLocation(),FVector(-159000.0f,15600.0f,0.0f))/100.0f;
    }
   },4.0f,false);
+  // Auffahren: den fahrbaren Wagen sechs Meter hinter einen geparkten
+  // setzen und mit 43 km/h losschicken. Ein geparkter Wagen weicht nicht
+  // aus - ein fahrendes KI-Auto braeche vorher ab und der Test waere ein
+  // Wuerfelspiel.
+  FTimerHandle Stoss;
+  GetWorldTimerManager().SetTimer(Stoss,[this]() {
+   ALaLaBergVerkehrsauto* Geparkt=nullptr;
+   // Ein heiles Ziel - bevorzugt ein geparktes, das nicht ausweichen kann,
+   // sonst irgendein fahrendes. Der erste Wagen der Liste scheidet aus: er
+   // ist zu diesem Zeitpunkt schon das Wrack aus dem Beschussteil oben.
+   for(ALaLaBergVerkehrsauto* A:ALaLaBergVerkehrsauto::Alle)
+    if(A&&A->IstGeparkt()&&!A->IstAusgeschaltet()) { Geparkt=A; break; }
+   if(!Geparkt)
+    for(ALaLaBergVerkehrsauto* A:ALaLaBergVerkehrsauto::Alle)
+     if(A&&!A->IstAusgeschaltet()) { Geparkt=A; break; }
+   GeparktZiel=Geparkt;
+   if(!Geparkt) return;
+   for(TActorIterator<ALaLaBergWagen> It(GetWorld());It;++It) {
+    const FVector Richtung=Geparkt->GetActorForwardVector();
+    It->SetActorLocation(Geparkt->GetActorLocation()-Richtung*380.0f,false,nullptr,ETeleportType::TeleportPhysics);
+    It->SetActorRotation(Richtung.Rotation());
+    It->TestSchubAuf(Richtung*1800.0f + Geparkt->GetVelocity());   // 65 km/h schneller als das Ziel
+    StossWagen=*It;
+    break;
+   }
+  },7.0f,false);
+  // Im Bild darauf: die Pruefung einmal von Hand ausloesen, damit der Test
+  // nicht davon abhaengt, ob die beiden Fahrzeuge sich im richtigen Moment
+  // treffen (das Ziel faehrt, bremst und biegt ab).
+  FTimerHandle StossAusloesen;
+  GetWorldTimerManager().SetTimer(StossAusloesen,[this]() { if(StossWagen) StossWagen->TestZusammenstoss(); },7.1f,false);
+  FTimerHandle StossMessen;
+  GetWorldTimerManager().SetTimer(StossMessen,[this]() {
+   if(StossWagen) WagenNachStoss=100.0f*StossWagen->Lebensanteil();
+   if(GeparktZiel) AngefahrenNachStoss=100.0f*GeparktZiel->Lebensanteil();
+  },9.0f,false);
+  // Sturz: die Figur fuenfzehn Meter ueber dem Boden loslassen. Das sind rund
+  // 17 m/s beim Aufsetzen - schmerzhaft, aber zu ueberleben.
+  FTimerHandle Sturz;
+  GetWorldTimerManager().SetTimer(Sturz,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   if(auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr)
+    Figur->SetActorLocation(Figur->GetActorLocation()+FVector(0,0,1500.0f),false,nullptr,ETeleportType::TeleportPhysics);
+  },10.0f,false);
+  FTimerHandle SturzMessen;
+  GetWorldTimerManager().SetTimer(SturzMessen,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   if(auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr) SturzLeben=Figur->HoleLeben();
+  },13.0f,false);
+  // Panzer und Hubschrauber: Farbkugeln prallen an der Wanne ab, die
+  // Sprenggranate nicht - und die duenne Zelle des Hubschraubers gibt schon
+  // beim Beschuss auf.
+  FTimerHandle Sonder;
+  GetWorldTimerManager().SetTimer(Sonder,[this]() {
+   for(TActorIterator<ALaLaBergSonderfahrzeug> It(GetWorld());It;++It) {
+    if(It->HoleArt()==ELaLaBergSonderart::Panzer) {
+     It->TestVerletze(300.0f,ELaLaBergSchaden::Beschuss);   // 12 % davon: 36
+     PanzerNachKugel=It->HoleLeben();
+     It->TestVerletze(700.0f,ELaLaBergSchaden::Sprengung);
+     bPanzerAus=It->IstAusgeschaltet();
+    } else {
+     It->TestVerletze(250.0f,ELaLaBergSchaden::Beschuss);
+     bHeliAus=It->IstAusgeschaltet();
+    }
+   }
+  },13.5f,false);
   FTimerHandle Ende;
   GetWorldTimerManager().SetTimer(Ende,[this]() {
    const bool bPass=FMath::IsNearlyEqual(PassantAnteil,0.5f,0.02f)&&bPassantUmgefallen&&bAutoAus
                    &&FMath::IsNearlyEqual(SpielerLeben,60.0f,0.5f)&&Besuche==1
-                   &&FMath::IsNearlyEqual(SpielerNachKlinik,100.0f,0.5f)&&KlinikAbstand<120.0f;
-   Beleg(FString::Printf(TEXT("LALABERG_SCHADENTEST %s passant=%.2f umgefallen=%d auto_aus=%d spieler=%.0f klinik=%d leben_danach=%.0f abstand=%.0fm"),
+                   &&FMath::IsNearlyEqual(SpielerNachKlinik,100.0f,0.5f)&&KlinikAbstand<120.0f
+                   // Sturz aus 15 m: kostet spuerbar, ist aber zu ueberleben.
+                   &&SturzLeben>0.0f&&SturzLeben<80.0f
+                   // Auffahren: beide Wagen haben etwas abbekommen.
+                   &&WagenNachStoss<100.0f&&WagenNachStoss>0.0f&&AngefahrenNachStoss<100.0f
+                   // Panzerung: von 300 Punkten Beschuss kommen 36 an.
+                   &&FMath::IsNearlyEqual(PanzerNachKugel,564.0f,1.0f)&&bPanzerAus&&bHeliAus;
+   Beleg(FString::Printf(TEXT("LALABERG_SCHADENTEST %s passant=%.2f umgefallen=%d auto_aus=%d spieler=%.0f klinik=%d leben_danach=%.0f abstand=%.0fm sturz=%.0f stoss=%.0f/%.0f panzer=%.0f aus=%d/%d"),
                          bPass?TEXT("PASS"):TEXT("FAIL"),PassantAnteil,bPassantUmgefallen?1:0,bAutoAus?1:0,
-                         SpielerLeben,Besuche,SpielerNachKlinik,KlinikAbstand));
+                         SpielerLeben,Besuche,SpielerNachKlinik,KlinikAbstand,SturzLeben,
+                         WagenNachStoss,AngefahrenNachStoss,PanzerNachKugel,bPanzerAus?1:0,bHeliAus?1:0));
    FPlatformMisc::RequestExitWithStatus(false,bPass?0:1);
-  },6.0f,false);
+  },15.0f,false);
  }
  // Panzer und Hubschrauber: hinstellen, einsteigen, ein Stueck fahren bzw.
  // steigen - und je ein Bild, damit man sieht, was da im Wald steht und auf

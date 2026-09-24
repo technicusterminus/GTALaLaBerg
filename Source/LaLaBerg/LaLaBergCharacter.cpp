@@ -535,6 +535,21 @@ void ALaLaBergCharacter::PruefeAnprall(float Zeit) {
  for (TActorIterator<ALaLaBergWagen> It(GetWorld()); It; ++It) if (Pruefe(*It)) return;
 }
 
+// Aus der Hoehe gefallen. Gemessen wird die Geschwindigkeit beim Aufsetzen,
+// nicht die Fallhoehe: bis 8 m/s (gut drei Meter) faengt man sich ab, ab
+// 22 m/s (rund 25 Meter) ist es vorbei. Dazwischen steigt der Schaden
+// gleichmaessig - wer aus dem ersten Stock springt, humpelt weiter, wer vom
+// Klinikumsdach springt, wacht drinnen wieder auf.
+void ALaLaBergCharacter::Landed(const FHitResult& Boden) {
+ // Vor Super: dort setzt das Bewegungssystem die Fallgeschwindigkeit auf null.
+ const float Aufprall = -GetCharacterMovement()->Velocity.Z * 0.01f;
+ Super::Landed(Boden);
+ if (GetWorld()->GetTimeSeconds() < LandeSchonzeit || Aufprall <= 8.0f) return;
+ const float Schaden = FMath::GetMappedRangeValueClamped(FVector2D(8.0f, 22.0f), FVector2D(6.0f, 100.0f), Aufprall);
+ UE_LOG(LogTemp, Display, TEXT("LALABERG_STURZ tempo=%.1f schaden=%.0f"), Aufprall, Schaden);
+ Verletze(Schaden, FVector::UpVector, ELaLaBergSchaden::Sturz);
+}
+
 void ALaLaBergCharacter::Verletze(float Schaden, const FVector& AusRichtung, ELaLaBergSchaden Art) {
  if (Leben <= 0.0f) return;
  Leben -= Schaden;
@@ -544,8 +559,12 @@ void ALaLaBergCharacter::Verletze(float Schaden, const FVector& AusRichtung, ELa
   LaunchCharacter(AusRichtung.GetSafeNormal2D() * 420.0f + FVector(0, 0, 260.0f), true, true);
  if (auto* PC = Cast<APlayerController>(GetController()))
   if (auto* HUD = Cast<ALaLaBergHUD>(PC->GetHUD()))
-   HUD->ZeigeRueckmeldung(Leben > 0.0f ? FString::Printf(TEXT("Getroffen – %d Punkte übrig"), FMath::CeilToInt(Leben))
-                                       : FString(TEXT("Umgehauen – ab ins Klinikum")));
+   // Drei getrennte Aufrufe: FString::Printf nimmt nur ein zur Uebersetzung
+   // bekanntes Formatmuster, kein zur Laufzeit gewaehltes.
+   HUD->ZeigeRueckmeldung(
+    Leben <= 0.0f ? FString(TEXT("Umgehauen – ab ins Klinikum"))
+    : Art == ELaLaBergSchaden::Sturz ? FString::Printf(TEXT("Hart gelandet – %d Punkte übrig"), FMath::CeilToInt(Leben))
+    : FString::Printf(TEXT("Getroffen – %d Punkte übrig"), FMath::CeilToInt(Leben)));
  UE_LOG(LogTemp, Display, TEXT("LALABERG_SCHADEN spieler=%.0f art=%d"), Leben, static_cast<int32>(Art));
  if (Leben <= 0.0f) InsKrankenhaus();
 }
@@ -571,6 +590,7 @@ void ALaLaBergCharacter::InsKrankenhaus() {
  if (GetWorld()->LineTraceSingleByChannel(Boden, Ziel, Ziel - FVector(0, 0, 60000.0f), ECC_Visibility, Fragen))
   Ziel = Boden.ImpactPoint + FVector(0, 0, GetCapsuleComponent()->GetScaledCapsuleHalfHeight() + 10.0f);
  SetActorLocation(Ziel, false, nullptr, ETeleportType::TeleportPhysics);
+ LandeSchonzeit = GetWorld()->GetTimeSeconds() + 1.5f;
  if (auto* Bewegung = GetCharacterMovement()) Bewegung->StopMovementImmediately();
  if (PC) {
   PC->SetControlRotation(FRotator(0, -90.0f, 0));
@@ -591,6 +611,7 @@ void ALaLaBergCharacter::WarteAufBoden() {
  if(!GetWorld()->LineTraceSingleByChannel(Hit,FVector(P.X,P.Y,30000),FVector(P.X,P.Y,-30000),ECC_Visibility,Params)) return;
  GetWorldTimerManager().ClearTimer(BodenUhr);
  SetActorLocation(Hit.ImpactPoint+FVector(0,0,95),false,nullptr,ETeleportType::TeleportPhysics);
+ LandeSchonzeit = GetWorld()->GetTimeSeconds() + 1.5f;
  GetCharacterMovement()->SetMovementMode(MOVE_Walking);
  UE_LOG(LogTemp,Display,TEXT("LALABERG_BODEN z=%.0f"),Hit.ImpactPoint.Z);
 }

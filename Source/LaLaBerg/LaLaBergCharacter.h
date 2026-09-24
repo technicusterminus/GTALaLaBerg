@@ -110,6 +110,12 @@ private:
  // Figur erwischt - Fahrzeuge bewegen sich kinematisch, ein Stossimpuls
  // aus der Physik kommt dort nie an.
  void PruefeAnprall(float Zeit);
+ // Aufsetzen nach einem Sprung oder Sturz - hier kommt der Fallschaden her.
+ virtual void Landed(const FHitResult& Boden) override;
+ // Bis zu diesem Zeitpunkt ist eine Landung frei: nach jedem Versetzen
+ // (Klinikum, Bodensuche, Testaufbauten) faellt die Figur einmal auf den
+ // Boden, und dafuer soll sie nicht bluten.
+ float LandeSchonzeit = 0.0f;
  // Werte pflegen: Ausdauer waechst vom Laufen, das Lauftempo haengt daran.
  void PflegeWerte(float Zeit);
  // Aufwachen im Klinikum: Leben voll, Geld weg, Fahndung eingestellt.

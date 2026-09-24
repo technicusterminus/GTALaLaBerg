@@ -1,5 +1,7 @@
 #include "LaLaBergWagen.h"
 #include "LaLaBergKonto.h"
+#include "LaLaBergVerkehrsauto.h"
+#include "EngineUtils.h"
 #include "LaLaBergHUD.h"
 #include "Sound/SoundAttenuation.h"
 #include "ProceduralMeshComponent.h"
@@ -364,6 +366,46 @@ void ALaLaBergWagen::FaerbeModell() {
  UE_LOG(LogTemp, Display, TEXT("LALABERG_LACK typ=%d lackslots=%d"), FahrzeugTyp, Slots);
 }
 
+// Auffahren, Abdraengen, frontal ineinander: was zaehlt, ist die
+// Annaeherungsgeschwindigkeit, nicht das eigene Tempo. Wer steht und
+// angefahren wird, nimmt denselben Schaden wie der, der faehrt - und beide
+// nehmen ihn, nicht nur einer. Gemessen wird wie beim Anfahren eines
+// Fussgaengers (siehe ALaLaBergCharacter::PruefeAnprall) ueber Abstand und
+// Richtung statt ueber Kollisionsereignisse: die KI-Autos bewegen sich
+// kinematisch, ihr Kasten meldet gar keinen physikalischen Stoss.
+void ALaLaBergWagen::TestSchubAuf(const FVector& TempoCmS) {
+ if (Rumpf && Rumpf->IsSimulatingPhysics()) Rumpf->SetPhysicsLinearVelocity(TempoCmS);
+}
+
+void ALaLaBergWagen::PruefeZusammenstoss() {
+ if (IstAusgeschaltet()) return;
+ const float Jetzt = GetWorld()->GetTimeSeconds();
+ if (Jetzt - LetzterStoss < 1.0f) return;
+ const FVector Wo = GetActorLocation();
+ const FVector Fahrt = GetVelocity();
+ auto Pruefe = [&](AActor* Anderer) {
+  if (!Anderer || Anderer == this) return false;
+  const FVector Weg = Anderer->GetActorLocation() - Wo;
+  // Zwei Wagen sind je rund 4,5 m lang: naeher als 4,2 m zwischen den
+  // Mittelpunkten stehen sie nur, wenn es gekracht hat.
+  if (Weg.SizeSquared2D() > FMath::Square(420.0f) || FMath::Abs(Weg.Z) > 300.0f) return false;
+  const FVector Richtung = Weg.GetSafeNormal2D();
+  // Annaeherung: wie schnell schliesst sich der Abstand zwischen beiden?
+  const float AnnaeherungKmh = FVector::DotProduct(Fahrt - Anderer->GetVelocity(), Richtung) * 0.036f;
+  if (AnnaeherungKmh < 15.0f) return false;
+  LetzterStoss = Jetzt;
+  // 15 km/h kosten ein paar Prozent, ab 90 km/h ist der Wagen hin.
+  const float Schaden = FMath::GetMappedRangeValueClamped(FVector2D(15.0f, 90.0f), FVector2D(5.0f, 100.0f), AnnaeherungKmh);
+  Verletze(Schaden, -Richtung, ELaLaBergSchaden::Anprall);
+  if (auto* Getroffen = Cast<ILaLaBergVerletzbar>(Anderer)) Getroffen->Verletze(Schaden, Richtung, ELaLaBergSchaden::Anprall);
+  UE_LOG(LogTemp, Display, TEXT("LALABERG_STOSS tempo=%.0f schaden=%.0f gegen=%s"),
+         AnnaeherungKmh, Schaden, *Anderer->GetName());
+  return true;
+ };
+ for (ALaLaBergVerkehrsauto* Auto : ALaLaBergVerkehrsauto::Alle) if (Pruefe(Auto)) return;
+ for (TActorIterator<ALaLaBergWagen> It(GetWorld()); It; ++It) if (Pruefe(*It)) return;
+}
+
 void ALaLaBergWagen::Verletze(float Schaden, const FVector& AusRichtung, ELaLaBergSchaden Art) {
  if (IstAusgeschaltet()) return;
  // Wer den Werkstattschluessel hat, faehrt einen verstaerkten Wagen: der
@@ -658,6 +700,8 @@ void ALaLaBergWagen::Tick(float Zeit) {
  Super::Tick(Zeit);
  if (SchubNewton > 0.0f && Rumpf) Rumpf->AddForce(GetActorForwardVector() * SchubNewton * 100.0f);   // N -> kg*cm/s^2
  if (!Bewegung || !Rumpf || !Rumpf->IsSimulatingPhysics()) return;
+
+ PruefeZusammenstoss();
 
  // Lenkung nachziehen, nicht schlagartig setzen
  Lenkung = FMath::FInterpTo(Lenkung, LenkWert, Zeit, 6.0f);

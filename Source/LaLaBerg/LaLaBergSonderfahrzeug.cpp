@@ -121,13 +121,10 @@ void ALaLaBergSonderfahrzeug::BeginPlay() {
  }
  // Olivgruen der Panzer, weiss-rot der Hubschrauber - eine Farbe je Maschine
  // reicht, beide bestehen aus einem Stueck.
- auto* Basis = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
- const FLinearColor Farbe = bPanzer ? FLinearColor(0.10f, 0.13f, 0.07f) : FLinearColor(0.80f, 0.82f, 0.84f);
- for (UStaticMeshComponent* Teil : { Koerper.Get(), Dreher.Get(), Heckrotor.Get() }) {
-  if (!Teil || !Teil->GetStaticMesh() || !Basis) continue;
-  for (int32 Slot = 0; Slot < Teil->GetNumMaterials(); Slot++)
-   if (auto* M = Teil->CreateDynamicMaterialInstance(Slot, Basis)) M->SetVectorParameterValue(TEXT("Color"), Farbe);
- }
+ Faerbe(bPanzer ? FLinearColor(0.10f, 0.13f, 0.07f) : FLinearColor(0.80f, 0.82f, 0.84f));
+ // Panzerstahl gegen Blechzelle: der Panzer haelt ein Vielfaches aus, und
+ // was ihn erledigt, sind Sprenggranaten, nicht Farbkugeln (siehe Verletze).
+ VollesLeben = Leben = bPanzer ? 600.0f : 220.0f;
  if (auto* Ton = LoadObject<USoundBase>(nullptr, bPanzer ? TEXT("/Game/Audio/SFX_Panzer.SFX_Panzer")
                                                         : TEXT("/Game/Audio/SFX_Rotor.SFX_Rotor")))
   Klang->SetSound(Ton);
@@ -184,7 +181,41 @@ bool ALaLaBergSonderfahrzeug::Bodenhoehe(float& Z) const {
  return true;
 }
 
+void ALaLaBergSonderfahrzeug::Faerbe(const FLinearColor& Farbe) {
+ auto* Basis = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+ for (UStaticMeshComponent* Teil : { Koerper.Get(), Dreher.Get(), Heckrotor.Get() }) {
+  if (!Teil || !Teil->GetStaticMesh() || !Basis) continue;
+  for (int32 Slot = 0; Slot < Teil->GetNumMaterials(); Slot++)
+   if (auto* M = Teil->CreateDynamicMaterialInstance(Slot, Basis)) M->SetVectorParameterValue(TEXT("Color"), Farbe);
+ }
+}
+
+// Der Parameter heisst Schadensart, nicht Art: "Art" ist hier schon die
+// Maschine (Panzer oder Hubschrauber).
+void ALaLaBergSonderfahrzeug::Verletze(float Schaden, const FVector& AusRichtung, ELaLaBergSchaden Schadensart) {
+ if (bKaputt) return;
+ // Farbkugeln und Rempler an der Wanne: Lack ab, mehr nicht. Eine
+ // Sprenggranate zaehlt dagegen voll - auch am Panzer.
+ const bool bPrallt = Art == ELaLaBergSonderart::Panzer && Schadensart != ELaLaBergSchaden::Sprengung;
+ if (bPrallt) Schaden *= 0.12f;
+ Leben = FMath::Max(0.0f, Leben - Schaden);
+ if (auto* PC = Cast<APlayerController>(GetController()))
+  if (auto* HUD = Cast<ALaLaBergHUD>(PC->GetHUD()))
+   HUD->ZeigeRueckmeldung(Leben > 0.0f
+    ? FString::Printf(TEXT("Treffer – %d %%"), FMath::CeilToInt(100.0f * Lebensanteil()))
+    : FString(Art == ELaLaBergSonderart::Panzer ? TEXT("Panzer steht – Kette zerrissen")
+                                                : TEXT("Turbine aus – die Maschine sinkt")));
+ if (Leben > 0.0f) return;
+ bKaputt = true;
+ Faerbe(FLinearColor(0.05f, 0.045f, 0.04f));         // ausgebrannt
+ if (Klang && Klang->IsPlaying()) Klang->Stop();
+ if (Muendungsfeuer) Muendungsfeuer->SetIntensity(0.0f);
+ UE_LOG(LogTemp, Display, TEXT("LALABERG_SONDER_KAPUTT art=%d schadensart=%d"),
+        static_cast<int32>(Art), static_cast<int32>(Schadensart));
+}
+
 bool ALaLaBergSonderfahrzeug::Feuern() {
+ if (bKaputt) return false;
  if (Art != ELaLaBergSonderart::Panzer || !Dreher) return false;
  const double Jetzt = GetWorld()->GetTimeSeconds();
  if (Jetzt - LetzterSchuss < KANONE_LADEZEIT) return false;
@@ -216,7 +247,10 @@ bool ALaLaBergSonderfahrzeug::Feuern() {
 void ALaLaBergSonderfahrzeug::Tick(float Zeit) {
  Super::Tick(Zeit);
  const bool bPanzer = Art == ELaLaBergSonderart::Panzer;
- const bool bFaehrt = Fahrer != nullptr;
+ // Kaputt heisst: wie ohne Fahrer. Der Panzer rollt aus und steht, der
+ // Hubschrauber sinkt mit 9 m/s zu Boden - beides macht der Tick unten
+ // ohnehin schon, sobald niemand mehr steuert.
+ const bool bFaehrt = Fahrer != nullptr && !bKaputt;
 
  if (bPanzer) {
   const float Ziel = FMath::Clamp(SchubWert, -0.6f, 1.0f) * PANZER_TEMPO;
@@ -287,6 +321,12 @@ void ALaLaBergSonderfahrzeug::Tick(float Zeit) {
   // Der Heckrotor liegt im Ringkanal und dreht sich um die Querachse; er
   // laeuft schneller als der Hauptrotor (beim Vorbild rund viermal).
   if (Heckrotor) Heckrotor->SetRelativeRotation(FRotator(0, 0, Drehphase * 3.8f));
+ }
+
+ // Am Boden angekommen ist Schluss - der Fahrer klettert heraus.
+ if (bKaputt && Fahrer && FMath::Abs(Tempo) < 60.0f) {
+  float Boden = 0.0f;
+  if (Bodenhoehe(Boden) && GetActorLocation().Z - Boden < 400.0f) Aussteigen();
  }
 
  if (Klang) {
