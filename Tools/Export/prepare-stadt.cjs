@@ -150,6 +150,35 @@ const PUTZ = [
 // Biberschwanz in Ton gebrannt: rotbraun mit Streuung, kein Lachsrosa.
 const DACH = [0x8A4A33, 0x7B4130, 0x9A5A3E, 0x6E3A2C, 0x84462F];
 
+// Die Farben kamen im Spiel blasser heraus, als sie in der Liste stehen:
+// die Fototextur liegt als Modulator darueber und zieht jeden Ton zur Mitte.
+// Deshalb die Saettigung hier schon anheben, statt im Material nachzudrehen -
+// dort traefe es auch Dach, Pflaster und Wiese.
+function kraeftiger(farbe, faktor) {
+  const r = (farbe >> 16) & 255, g = (farbe >> 8) & 255, b = farbe & 255;
+  const mittel = (r + g + b) / 3;
+  const zieh = v => Math.max(0, Math.min(255, Math.round(mittel + (v - mittel) * faktor)));
+  return (zieh(r) << 16) | (zieh(g) << 8) | zieh(b);
+}
+const PUTZ_KRAEFTIG = PUTZ.map(c => kraeftiger(c, 1.45));
+
+// Ausserhalb der Altstadt kennt die Flaechennutzung keine Farben und liefert
+// fuer fast jedes Haus denselben blassen Grauton - ganze Strassenzuege
+// standen in Betongrau. Landsberger Vorstadt: warmer Ocker, Sandgelb,
+// Cremeweiss, ein blasses Gruen und ein Graublau, dazwischen einzelne
+// kraeftigere Toene.
+const VORSTADT = [
+  0xE8D6AE,   // Ocker
+  0xEFE6D2,   // Cremeweiss
+  0xDCD2BC,   // Sand
+  0xD6DCCE,   // blasses Gruen
+  0xD2DAE0,   // Graublau
+  0xE6D2C2,   // Altrosa hell
+  0xEDE4D0,   // Elfenbein
+  0xDDCFB2,   // Naturputz
+];
+const VORSTADT_KRAEFTIG = VORSTADT.map(c => kraeftiger(c, 1.35));
+
 function streuung(x, z) {          // gleiche Lage, gleiche Farbe
   const h = Math.abs(Math.round(x * 7.3) * 73856093 ^ Math.round(z * 7.3) * 19349663);
   return h % 1000 / 1000;
@@ -678,13 +707,23 @@ for (let bi = 0; bi < city.buildings.length; bi++) {
   else if (Terrain.isWater(bd.o[0], bd.o[1])) { wc = 0xB4B4AE; rc = 0x9C9C96; }
   else if (!bd.n && inAltstadt(bd.o)) {
     const t = streuung(bd.o[0], bd.o[1]);
-    wc = PUTZ[Math.floor(t * PUTZ.length) % PUTZ.length];
+    wc = PUTZ_KRAEFTIG[Math.floor(t * PUTZ_KRAEFTIG.length) % PUTZ_KRAEFTIG.length];
     rc = DACH[Math.floor(t * 997) % DACH.length];
     umgefaerbt++;
   } else if (inAltstadt(bd.o)) {
     // Benannte Haeuser behalten ihren Putz, aber die Dachfarbe der Daten ist
     // die Notfallangabe - die Sparkasse am Hauptplatz trug ein gelbes Dach.
     rc = DACH[Math.floor(streuung(bd.o[0], bd.o[1]) * 997) % DACH.length];
+  } else {
+    // Vorstadt: dieselbe Behandlung wie in der Altstadt, nur mit der
+    // eigenen Palette. Feste Wahl aus der Lage, damit dasselbe Haus immer
+    // gleich aussieht; das Dach kommt in jedem Fall aus der Ziegelreihe,
+    // die Dachfarben der Daten sind eine Notfallangabe (im Bild leuchteten
+    // ganze Zeilen orange).
+    const t = streuung(bd.o[0], bd.o[1]);
+    wc = VORSTADT_KRAEFTIG[Math.floor(t * VORSTADT_KRAEFTIG.length) % VORSTADT_KRAEFTIG.length];
+    rc = DACH[Math.floor(t * 997) % DACH.length];
+    umgefaerbt++;
   }
   const yTop = yBase + hoehe;
 
@@ -941,7 +980,9 @@ for (const r of city.roads) {
     // Ausserhalb der Altstadt lag die Fahrbahn bisher blank in der Wiese.
     // Jetzt beidseits ein Gehweg mit Bordstein - Platz fuer die Passanten
     // und eine erkennbare Strassenkante statt eines ausgefransten Rands.
-    const s = ziel('Sidewalk', farbe(0x8C8880));
+    // Eigene Klasse "Gehweg": in der Altstadt bleibt es Pflaster, hier
+    // kommen Betonplatten drauf (siehe LaLaBergImportCommandlet, M_Gehweg).
+    const s = ziel('Gehweg', farbe(0xA9A59C));
     const innen = breite / 2;
     gehwegTeile += seitenband(s, r.p, innen, innen + GEHWEG_BREIT, BORD);
     gehwegTeile += seitenband(s, r.p, -innen - GEHWEG_BREIT, -innen, BORD);

@@ -52,6 +52,9 @@ namespace
   else if (Name.StartsWith(TEXT("Roof"))) Path = TEXT("/Game/Art/Materials/M_Ziegel.M_Ziegel");
   // Claude: Pflaster matt statt Asphalt - gegen die Sonne spiegelte der
  else if (Name.StartsWith(TEXT("Sidewalk"))) Path = TEXT("/Game/Art/Materials/M_Pflaster.M_Pflaster");
+  // Claude: Gehwege ausserhalb der Altstadt sind Betonplatten, nicht
+  // Altstadtpflaster (siehe Tools/baue_gehweg.py, T_Gehweg aus ambientCG).
+  else if (Name.StartsWith(TEXT("Gehweg"))) Path = TEXT("/Game/Art/Materials/M_Gehweg.M_Gehweg");
   // Hauptplatz sonst fast weiss.
   else if (Name.StartsWith(TEXT("Plaza"))) Path = TEXT("/Game/Art/Materials/M_Pflaster.M_Pflaster");
   else if (Name.StartsWith(TEXT("Road")) || Name.StartsWith(TEXT("Rail"))) Path = TEXT("/Game/Art/Materials/M_Asphalt.M_Asphalt");
@@ -76,7 +79,7 @@ namespace
  {
   return Name.StartsWith(TEXT("Ground")) || Name.StartsWith(TEXT("Road")) ||
    Name.StartsWith(TEXT("Rail")) || Name.StartsWith(TEXT("Plaza")) || Name.StartsWith(TEXT("Sidewalk")) ||
-   Name.StartsWith(TEXT("Water"));
+   Name.StartsWith(TEXT("Gehweg")) || Name.StartsWith(TEXT("Water"));
  }
 
  bool UsesSmoothNormals(const FString& Name)
@@ -276,6 +279,8 @@ int32 ULaLaBergImportCommandlet::Main(const FString& Params)
  FString SectorId = TEXT("S_N1_N1");
  FParse::Value(*Params, TEXT("Sector="), SectorId);
  const bool bSurfaceOnly = FParse::Param(*Params, TEXT("SurfaceOnly"));
+ FString OnlySection;
+ FParse::Value(*Params, TEXT("Section="), OnlySection);
  if (SectorId.Contains(TEXT("..")) || SectorId.Contains(TEXT("/")) || SectorId.Contains(TEXT("\\")))
  {
   UE_LOG(LogTemp, Error, TEXT("Invalid sector id"));
@@ -319,6 +324,11 @@ int32 ULaLaBergImportCommandlet::Main(const FString& Params)
   {
    const TSharedPtr<FJsonObject> Section = Value->AsObject();
    const FString SectionName = Section->GetStringField(TEXT("name"));
+   if (!OnlySection.IsEmpty() && SectionName != OnlySection)
+   {
+    ++Uebersprungen;
+    continue;
+   }
    if (bSurfaceOnly && !IsSurfaceSection(SectionName))
    {
     ++Uebersprungen;

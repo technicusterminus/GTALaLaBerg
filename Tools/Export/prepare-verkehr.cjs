@@ -526,14 +526,38 @@ console.log(JSON.stringify({ autoRouten: autos.length, uebersprungen,
   kreuzungsWahlen, abbiegungenGesamt,
   abbiegeAnteil: +(abbiegungenGesamt / Math.max(1, kreuzungsWahlen)).toFixed(2) }));
 
-// Passanten: beidseitig entlang derselben Strassen, aber nur in der Alt-
-// stadt - dort ist die Dichte gewuenscht, nicht auf der Umgehungsstrasse.
-const PASSANT_ROUTEN = 90;
+// Passanten: beidseitig entlang derselben Strassen. Bis 2026-09-23 nur in
+// der Altstadt - seit dort auch in der Vorstadt Gehwege liegen (siehe
+// prepare-stadt.cjs, Gehwegbaender innerorts), laufen sie in der ganzen
+// bebauten Stadt. Nicht an der Umgehungsstrasse: "innerorts" heisst, dass
+// in einem 25-m-Raster ringsum ein Haus steht - dieselbe Regel, nach der
+// die Gehwege entstehen.
+const BEBAUT = new Set();
+const bauZelle = (x, z) => Math.floor(x / 25) + ':' + Math.floor(z / 25);
+for (const bd of city.buildings) if (bd && bd.o) BEBAUT.add(bauZelle(bd.o[0], bd.o[1]));
+function innerorts(x, z) {
+  for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++)
+    if (BEBAUT.has(bauZelle(x + dx * 25, z + dz * 25))) return true;
+  return false;
+}
+// 90 Routen in der Altstadt wie bisher, dazu 110 in der uebrigen Stadt.
+const PASSANT_ROUTEN_ALTSTADT = 90;
+const PASSANT_ROUTEN = 200;
 const passanten = [];
+let altstadtRouten = 0;
+// Zwei Durchgaenge: erst die Altstadt, dann der Rest. In einem Durchgang
+// waeren die 200 Plaetze von den langen Ausfallstrassen belegt gewesen
+// (KANDIDATEN ist nach Laenge sortiert) - die Altstadt kam auf 18 Routen
+// statt 90, ausgerechnet dort, wo die meisten Leute unterwegs sind.
+for (const durchgang of [0, 1])
 for (const r of KANDIDATEN) {
   if (passanten.length >= PASSANT_ROUTEN) break;
   const mitte = r.p;
-  if (!inAltstadt(mitte[0], mitte[1])) continue;
+  const bAltstadt = inAltstadt(mitte[0], mitte[1]);
+  if (durchgang === 0 && !bAltstadt) continue;
+  if (durchgang === 1 && bAltstadt) continue;
+  if (bAltstadt && altstadtRouten >= PASSANT_ROUTEN_ALTSTADT) continue;
+  if (!bAltstadt && !innerorts(mitte[0], mitte[1])) continue;
   const punkte = resample(r.p, 6);
   if (punkte.length < 3) continue;
   for (const seite of [1, -1]) {
@@ -549,8 +573,10 @@ for (const r of KANDIDATEN) {
       weg.push(ux(ox), uz(oz), Math.round(boden(ox, oz) * M));
     }
     passanten.push({ p: weg });
+    if (bAltstadt) altstadtRouten++;
   }
 }
+console.log(JSON.stringify({ passantenRouten: passanten.length, altstadtRouten }));
 
 // Ampeln: die amtlichen Standorte echter Lichtsignalanlagen (OSM
 // highway=traffic_signals). Richtung aus der Strassenachse am naechsten

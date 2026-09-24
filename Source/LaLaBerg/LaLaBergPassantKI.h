@@ -89,6 +89,10 @@ private:
  float NaechsteBodenpruefung = -1.0f;   // Weltzeit der naechsten Messung
  bool bBodenGemessen = false;           // erste Messung sofort, ohne Nachfuehren
  bool bSohleGesetzt = false;            // siehe Tick: Sohlenhoehe einmal nachgemessen
+ // Sichtweiten-Abstufung (siehe Tick): weit weg wird die Figur unsichtbar,
+ // tickt seltener und rechnet kein Ausweichen mehr. Bei 200 Figuren war
+ // gerade das Ausweichen der Preistreiber - jede prueft jede.
+ bool bNah = true;
  float Groesse = 1.72f;
  float BeinL = 0.0f;                // Beinlaenge in cm, aus Groesse abgeleitet
  float OberschenkelL = 0.0f, UnterschenkelL = 0.0f, OberarmL = 0.0f;

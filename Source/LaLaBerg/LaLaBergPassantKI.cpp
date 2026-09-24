@@ -56,6 +56,10 @@ namespace {
  // Seitlicher Versatz zum Ausweichen, kleiner als bei Autos (siehe
  // LaLaBergVerkehrsauto.cpp) - ein Gehweg bietet weniger Platz.
  constexpr float MAX_SEITVERSATZ = 55.0f;
+ // Ab hier zeigt das Spiel die Figur nicht mehr und rechnet nur noch ihren
+ // Weg: 120 m. Mit 200 Passanten (statt 94) fiel die Bildrate sonst von 25
+ // auf 16 - die Ausweichpruefung vergleicht jede Figur mit jeder.
+ constexpr float NAHBEREICH = 12000.0f;
 }
 
 TArray<ALaLaBergPassantKI*> ALaLaBergPassantKI::Alle;
@@ -127,6 +131,8 @@ ALaLaBergPassantKI::ALaLaBergPassantKI() {
  SkelettKoerper->SetRelativeRotation(FRotator(0, -90.0f, 0));
  SkelettKoerper->SetCollisionEnabled(ECollisionEnabled::NoCollision);
  SkelettKoerper->SetVisibility(false);
+ // Die Pose nur rechnen, wenn die Figur wirklich gezeichnet wird.
+ SkelettKoerper->VisibilityBasedAnimTickOption = EVisibilityBasedAnimTickOption::OnlyTickPoseWhenRendered;
  // Dieselbe Bodenversatz -86 wie SkelettKoerper: SetLeaderPoseComponent
  // uebernimmt nur die Knochen-Transforms, nicht die eigene Komponenten-
  // Transform - ohne diesen Versatz schwebte der Kopf um 86 Einheiten zu
@@ -375,6 +381,17 @@ void ALaLaBergPassantKI::Tick(float Zeit) {
   StolpertBis = GetWorld()->GetTimeSeconds() + 2.5f;
   ALaLaBergPolizei::Melde(ELaLaBergTat::PassantAngefahren);
  }
+ // Nah oder fern? Der Wechsel schaltet Sichtbarkeit und Taktrate um.
+ {
+  const APawn* Spieler = UGameplayStatics::GetPlayerPawn(GetWorld(), 0);
+  const bool bJetztNah = !Spieler || FVector::Dist2D(Spieler->GetActorLocation(), GetActorLocation()) < NAHBEREICH;
+  if (bJetztNah != bNah) {
+   bNah = bJetztNah;
+   SetActorHiddenInGame(!bNah);
+   // Ferne Figuren gehen weiter, nur in groesseren Schritten.
+   PrimaryActorTick.TickInterval = bNah ? 0.0f : 0.25f;
+  }
+ }
  const bool bStolpert = GetWorld()->GetTimeSeconds() < StolpertBis;
  FVector Ort = GetActorLocation() - LetzterAusweichOffset;
  // Auf die reine Routenhoehe zurueck: der Wegfolger zieht Ort zu den
@@ -382,7 +399,11 @@ void ALaLaBergPassantKI::Tick(float Zeit) {
  // um Bild aufsummieren (derselbe Fehler wie einst beim Seitversatz).
  Ort.Z -= Bodenversatz;
  const FVector Vorwaerts = GetActorForwardVector();
- const float Bremse = FMath::Min(BremseVorPassant(this, Ort, Vorwaerts), BremseVorSpieler(GetWorld(), Ort, Vorwaerts));
+ // Ausweichen und Bremsen nur in Sichtweite - wer es nicht sieht, den
+ // stoert auch nicht, wenn zwei ferne Figuren sich durchdringen.
+ const float Bremse = bNah
+  ? FMath::Min(BremseVorPassant(this, Ort, Vorwaerts), BremseVorSpieler(GetWorld(), Ort, Vorwaerts))
+  : 1.0f;
  const float Faktor = (bStolpert ? 0.15f : 1.0f) * Bremse;
  const FVector Richtung = Weg.Bewege(Ort, Tempo * Zeit * Faktor);
  if (GetWorld()->GetTimeSeconds() >= NaechsteBodenpruefung) {

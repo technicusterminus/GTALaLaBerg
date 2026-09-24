@@ -470,7 +470,7 @@ void ALaLaBergCharacter::PruefeSchritt(float Zeit) {
  SchrittWeg = 0.0f;
  // Auf Asphalt und Pflaster klackt der Absatz, auf der Wiese knistert es.
  // Welcher Belag es ist, sagt der Name des Netzes unter den Fuessen (die
- // Stadtteile heissen Road, Sidewalk, Plaza, Ground - siehe
+ // Stadtteile heissen Road, Sidewalk, Gehweg, Plaza, Ground - siehe
  // LaLaBergImportCommandlet).
  bool bHart = true;
  {
@@ -480,7 +480,8 @@ void ALaLaBergCharacter::PruefeSchritt(float Zeit) {
   if (GetWorld()->LineTraceSingleByChannel(Boden, Fuss, Fuss - FVector(0, 0, 250.0f), ECC_Visibility, Fragen)) {
    const auto* Belag = Cast<UStaticMeshComponent>(Boden.GetComponent());
    const FString Name = Belag && Belag->GetStaticMesh() ? Belag->GetStaticMesh()->GetName() : FString();
-   bHart = Name.Contains(TEXT("Road")) || Name.Contains(TEXT("Sidewalk")) || Name.Contains(TEXT("Plaza"))
+   bHart = Name.Contains(TEXT("Road")) || Name.Contains(TEXT("Sidewalk")) || Name.Contains(TEXT("Gehweg"))
+        || Name.Contains(TEXT("Plaza"))
         || Name.Contains(TEXT("Rail")) || Name.Contains(TEXT("Roof")) || Name.Contains(TEXT("Wall"));
   }
  }
