@@ -1647,11 +1647,15 @@ void ALaLaBergGameMode::BeginPlay() {
   // treffen (das Ziel faehrt, bremst und biegt ab).
   FTimerHandle StossAusloesen;
   GetWorldTimerManager().SetTimer(StossAusloesen,[this]() { if(StossWagen) StossWagen->TestZusammenstoss(); },7.1f,false);
+  // Gleich nach dem Stoss messen, nicht Sekunden spaeter: die beiden Wagen
+  // stehen ineinander, und jede weitere Sekunde bringt den naechsten Stoss
+  // (ein Meter Abstand, 65 km/h Annaeherung) - nach zweien waeren beide
+  // ausgeschaltet, und der Test saehe einen Schaden, den er nicht gestellt hat.
   FTimerHandle StossMessen;
   GetWorldTimerManager().SetTimer(StossMessen,[this]() {
    if(StossWagen) WagenNachStoss=100.0f*StossWagen->Lebensanteil();
    if(GeparktZiel) AngefahrenNachStoss=100.0f*GeparktZiel->Lebensanteil();
-  },9.0f,false);
+  },7.2f,false);
   // Sturz: die Figur fuenfzehn Meter ueber dem Boden loslassen. Das sind rund
   // 17 m/s beim Aufsetzen - schmerzhaft, aber zu ueberleben.
   FTimerHandle Sturz;
