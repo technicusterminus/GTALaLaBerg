@@ -9,6 +9,7 @@
 #include "LaLaBergVerletzbar.h"
 #include "LaLaBergLaeden.h"
 #include "LaLaBergKonto.h"
+#include "LaLaBergRevier.h"
 #include "ImageUtils.h"
 #include "Engine/Texture2D.h"
 #include "InputCoreTypes.h"
@@ -106,6 +107,7 @@ void ALaLaBergHUD::DrawHUD() {
   Auftrag();
   Fahndung();
   Leben();
+  Kapitel();
   Laden();
  }
  if (auto* Wagen = Cast<ALaLaBergWagen>(Figur)) {
@@ -339,6 +341,19 @@ void ALaLaBergHUD::Minikarte() {
    Tafel(P.X - 6 * S, P.Y - 6 * S, 12 * S, 12 * S, FLinearColor(0.02f, 0.02f, 0.03f, 1.0f));
    Tafel(P.X - 4 * S, P.Y - 4 * S, 8 * S, 8 * S, FLinearColor(0.1f, 0.85f, 0.35f));
   }
+ // Wahrzeichen des offenen Reviers: Raute in der Farbe der Mannschaft,
+ // markierte in Orange.
+ if (const ALaLaBergRevier* R = ALaLaBergRevier::Instanz.Get()) {
+  const int32 Offen = R->HoleOffenes();
+  if (R->HoleReviere().IsValidIndex(Offen))
+   for (const auto& M : R->HoleReviere()[Offen].Marken) {
+    const FVector2D P = Bildort(M.Ort);
+    if (P.X < X || P.Y < Y || P.X > X + G || P.Y > Y + G) continue;
+    Tafel(P.X - 6 * S, P.Y - 6 * S, 12 * S, 12 * S, FLinearColor(0.02f, 0.02f, 0.03f, 1.0f));
+    Tafel(P.X - 4 * S, P.Y - 4 * S, 8 * S, 8 * S,
+          M.bMarkiert ? FLinearColor(0.95f, 0.45f, 0.05f) : R->HoleReviere()[Offen].Farbe);
+   }
+ }
  if (const ALaLaBergPolizei* Pol = ALaLaBergPolizei::Instanz.Get()) {
   TArray<FVector> Orte; Pol->HoleStreifen(Orte);
   const bool bRot = FMath::Frac(GetWorld()->GetRealTimeSeconds() * 2.5f) < 0.5f;
@@ -379,6 +394,17 @@ void ALaLaBergHUD::Vollkarte() {
   Tafel(P.X - 6 * S, P.Y - 6 * S, 12 * S, 12 * S, F);
   const FString Name = A->IstUnterwegs() ? A->HoleZielName() : FString(TEXT("Auftrag"));
   Schrift(Name, P.X + 12 * S, P.Y - 10 * S, 14, Weiss, true);
+ }
+ if (const ALaLaBergRevier* R = ALaLaBergRevier::Instanz.Get()) {
+  const int32 Offen = R->HoleOffenes();
+  if (R->HoleReviere().IsValidIndex(Offen))
+   for (const auto& M : R->HoleReviere()[Offen].Marken) {
+    const FVector2D P = Bildort(M.Ort);
+    Tafel(P.X - 8 * S, P.Y - 8 * S, 16 * S, 16 * S, FLinearColor(0.02f, 0.02f, 0.03f, 1.0f));
+    Tafel(P.X - 6 * S, P.Y - 6 * S, 12 * S, 12 * S,
+          M.bMarkiert ? FLinearColor(0.95f, 0.45f, 0.05f) : R->HoleReviere()[Offen].Farbe);
+    Schrift(M.Name, P.X + 12 * S, P.Y - 9 * S, 12, M.bMarkiert ? Leise : Weiss, true);
+   }
  }
  if (const ALaLaBergLaeden* L = ALaLaBergLaeden::Instanz.Get())
   for (const auto& Laden : L->HoleLaeden()) {
@@ -445,6 +471,42 @@ void ALaLaBergHUD::Figurblatt() {
   const float KX = X + 168 * S + i * 24 * S;
   Tafel(KX, ZY + 32 * S, 18 * S, 12 * S, FLinearColor(1, 1, 1, 0.12f));
   if (Konto->HatRevier(i)) Tafel(KX, ZY + 32 * S, 18 * S, 12 * S, FLinearColor(0.2f, 0.78f, 0.34f));
+ }
+}
+
+// Oben rechts unter der Auftragstafel: an welchem Kapitel man steht und wie
+// weit das offene Revier markiert ist. Ohne das stehen die Saeulen ohne
+// Erklaerung in der Stadt herum.
+void ALaLaBergHUD::Kapitel() {
+ const ALaLaBergRevier* R = ALaLaBergRevier::Instanz.Get();
+ const auto* Konto = ULaLaBergKonto::Hole(this);
+ if (!R || !Konto) return;
+ const int32 Offen = R->HoleOffenes();
+ const float S = Massstab;
+ const float B = 340 * S, H = 64 * S;
+ const float X = Canvas->ClipX - B - 40 * S;
+ // Unter der Auftragstafel (40 + 104) beziehungsweise unter den Sternen.
+ const float Y = 40 * S + 116 * S;
+ if (!R->HoleReviere().IsValidIndex(Offen)) {
+  // Alles genommen - die Stadt gehoert dem Spieler.
+  Tafel(X, Y, B, H, FLinearColor(0.02f, 0.025f, 0.035f, 0.78f));
+  Tafel(X, Y, 5 * S, H, FLinearColor(0.95f, 0.72f, 0.12f));
+  Schrift(TEXT("DER FARBKRIEG"), X + 24 * S, Y + 12 * S, 11, Leise, true);
+  Schrift(TEXT("Die Stadt gehört dir"), X + 24 * S, Y + 30 * S, 17, Weiss, true);
+  return;
+ }
+ const auto& Revier = R->HoleReviere()[Offen];
+ const int32 Stand = R->HoleMarkiert(Offen), Ganz = Revier.Marken.Num();
+ Tafel(X, Y, B, H, FLinearColor(0.02f, 0.025f, 0.035f, 0.78f));
+ Tafel(X, Y, 5 * S, H, Revier.Farbe);
+ Schrift(FString::Printf(TEXT("KAPITEL %d · %s"), Konto->HoleKapitel() + 1, *Revier.Mannschaft),
+         X + 24 * S, Y + 10 * S, 11, Leise, true);
+ Schrift(Revier.Name, X + 24 * S, Y + 26 * S, 16, Weiss, true);
+ // Vier Kaestchen fuer die vier Wahrzeichen.
+ for (int32 i = 0; i < Ganz; i++) {
+  const float KX = X + B - 24 * S - (Ganz - i) * 26 * S;
+  Tafel(KX, Y + 30 * S, 20 * S, 12 * S, FLinearColor(1, 1, 1, 0.14f));
+  if (i < Stand) Tafel(KX, Y + 30 * S, 20 * S, 12 * S, FLinearColor(0.95f, 0.45f, 0.05f));
  }
 }
 

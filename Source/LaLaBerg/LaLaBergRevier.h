@@ -29,6 +29,7 @@ public:
   FVector Ort = FVector::ZeroVector;
   bool bMarkiert = false;
   class UStaticMeshComponent* Saeule = nullptr;
+  class UStaticMeshComponent* Ring = nullptr;
  };
  struct FRevier {
   FString Name;          // "Vorstadt-Nord"

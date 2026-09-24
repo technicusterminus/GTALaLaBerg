@@ -104,6 +104,23 @@ void ALaLaBergRevier::LadeMarken() {
       MID->SetVectorParameterValue(TEXT("Color"), R.Farbe);
      M.Saeule = Saeule;
      Teile.Add(Saeule);
+     // Ring am Fuss, wie bei Auftrag und Laden: von nahem sieht man die
+     // Saeule sonst erst, wenn man den Kopf hebt.
+     auto* Ring = NewObject<UStaticMeshComponent>(this);
+     Ring->SetMobility(EComponentMobility::Movable);
+     Ring->SetupAttachment(RootComponent);
+     Ring->SetUsingAbsoluteLocation(true);
+     Ring->SetUsingAbsoluteScale(true);
+     Ring->SetStaticMesh(Wuerfel);
+     Ring->SetWorldLocation(M.Ort + FVector(0, 0, 12.0f));
+     Ring->SetWorldScale3D(FVector(14.0f, 14.0f, 0.08f));
+     Ring->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+     Ring->SetCastShadow(false);
+     Ring->RegisterComponent();
+     if (auto* Grund = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial")))
+      if (auto* MID = Ring->CreateDynamicMaterialInstance(0, Grund)) MID->SetVectorParameterValue(TEXT("Color"), R.Farbe);
+     M.Ring = Ring;
+     Teile.Add(Ring);
     }
     R.Marken.Add(M);
     break;
@@ -119,8 +136,9 @@ void ALaLaBergRevier::LadeMarken() {
    if (Konto->HatRevier(i))
     for (FMarke& M : Reviere[i].Marken) {
      M.bMarkiert = true;
-     if (M.Saeule) if (auto* MID = Cast<UMaterialInstanceDynamic>(M.Saeule->GetMaterial(0)))
-      MID->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.95f, 0.45f, 0.05f));
+     for (UStaticMeshComponent* Teil : { M.Saeule, M.Ring })
+      if (Teil) if (auto* MID = Cast<UMaterialInstanceDynamic>(Teil->GetMaterial(0)))
+       MID->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.95f, 0.45f, 0.05f));
     }
 }
 
@@ -150,8 +168,9 @@ void ALaLaBergRevier::Markiere(UStaticMeshComponent* Saeule, const FLinearColor&
  for (FMarke& M : Reviere[Offen].Marken) {
   if (M.Saeule != Saeule || M.bMarkiert) continue;
   M.bMarkiert = true;
-  if (auto* MID = Cast<UMaterialInstanceDynamic>(Saeule->GetMaterial(0)))
-   MID->SetVectorParameterValue(TEXT("Color"), Farbe);
+  for (UStaticMeshComponent* Teil : { M.Saeule, M.Ring })
+   if (Teil) if (auto* MID = Cast<UMaterialInstanceDynamic>(Teil->GetMaterial(0)))
+    MID->SetVectorParameterValue(TEXT("Color"), Farbe);
   const int32 Zahl = HoleMarkiert(Offen);
   Melde(FString::Printf(TEXT("%s markiert – %d von %d im Revier %s"), *M.Name, Zahl,
                         Reviere[Offen].Marken.Num(), *Reviere[Offen].Name));
@@ -199,5 +218,6 @@ void ALaLaBergRevier::Tick(float Zeit) {
  const int32 Offen = HoleOffenes();
  for (int32 i = 0; i < Reviere.Num(); i++)
   for (const FMarke& M : Reviere[i].Marken)
-   if (M.Saeule) M.Saeule->SetVisibility(i == Offen || M.bMarkiert);
+   for (UStaticMeshComponent* Teil : { M.Saeule, M.Ring })
+    if (Teil) Teil->SetVisibility(i == Offen || M.bMarkiert);
 }
