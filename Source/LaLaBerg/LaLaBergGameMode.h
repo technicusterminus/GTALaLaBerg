@@ -55,6 +55,13 @@ private:
  // Wegpunkte fuer KI-Verkehr und Passanten laden und die Figuren dazu
  // erzeugen (Tools/Export/prepare-verkehr.cjs -> Content/SourceData/Verkehr).
  void LadeVerkehr();
+ // Spiegelebene ueber dem Lech - siehe .cpp.
+ void BaueSpiegelebene();
+ // Haelt sie unter der Kamera und auf Wasserhoehe - siehe .cpp.
+ void PflegeSpiegelebene();
+ UPROPERTY() TObjectPtr<class APlanarReflection> Spiegel = nullptr;
+ // Mittelpunkt und Oberkante jeder Wasserflaeche der Stadt.
+ TArray<FVector> Wasserstellen;
  int32 AutoZahl=0, PassantZahl=0, AmpelZahl=0, GeparktZahl=0;
  // Fuer -LaLaBergAmpelTest: die laengste tatsaechlich vorkommende
  // Phasenzahl bestimmt, wie lang ein voller Kreuzungszyklus maximal dauert

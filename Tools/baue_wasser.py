@@ -27,20 +27,28 @@ exec(quelle.split("\ngebaut = [")[0])
 ORDNER = "/Game/Art/Materials"
 PFAD = "%s/M_Wasser" % ORDNER
 
-material = unreal.EditorAssetLibrary.load_asset(PFAD)
-if material:
-    # An Ort und Stelle neu bauen, damit die Stadt-Meshes ihren Verweis behalten.
-    unreal.MaterialEditingLibrary.delete_all_material_expressions(material)
-else:
-    material = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
-        "M_Wasser", ORDNER, unreal.Material, unreal.MaterialFactoryNew())
+# Das Material wird jedes Mal neu angelegt statt ausgeraeumt:
+# delete_all_material_expressions laesst eigene Ausgabeknoten
+# (SingleLayerWaterMaterialOutput) stehen, und ab dem zweiten Lauf lagen zwei
+# davon im Material - Unreal uebersetzt es dann gar nicht mehr ("can contain
+# only one Single Layer Water Material node") und zeigt das Schachbrett des
+# Ersatzmaterials. An die Knotenliste kommt man ueber Python nicht heran
+# (weder "expressions" noch "expression_collection" sind freigegeben),
+# deshalb der grobe Weg. Der Pfad bleibt derselbe - die Stadt findet ihr
+# Wassermaterial beim naechsten Laden wieder.
+if unreal.EditorAssetLibrary.does_asset_exist(PFAD):
+    unreal.EditorAssetLibrary.delete_asset(PFAD)
+material = unreal.AssetToolsHelpers.get_asset_tools().create_asset(
+    "M_Wasser", ORDNER, unreal.Material, unreal.MaterialFactoryNew())
 
-material.set_editor_property("blend_mode", unreal.BlendMode.BLEND_TRANSLUCENT)
-material.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_DEFAULT_LIT)
+# Single Layer Water statt durchscheinender Flaeche. Auf einer
+# durchscheinenden Flaeche spiegelt in Unreal weder Screen Space noch eine
+# Spiegelebene - nur Lumens Frontschicht, und die gab dem Lech den Himmel,
+# aber nie das Ufer. Dieses Beleuchtungsmodell ist undurchsichtig, dafuer
+# greifen beide Spiegelungen darauf.
+material.set_editor_property("blend_mode", unreal.BlendMode.BLEND_OPAQUE)
+material.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_SINGLE_LAYER_WATER)
 material.set_editor_property("two_sided", False)
-# Durchscheinende Flaechen werden sonst nicht beleuchtet wie eine Oberflaeche.
-material.set_editor_property("translucency_lighting_mode",
-                             unreal.TranslucencyLightingMode.TLM_SURFACE_PER_PIXEL_LIGHTING)
 material.set_editor_property("screen_space_reflections", True)
 material.set_editor_property("used_with_static_lighting", True)
 
@@ -98,34 +106,14 @@ fresnel.set_editor_property("exponent", 4.0)
 fresnel.set_editor_property("base_reflect_fraction", 0.04)
 verbinde(normale, "", fresnel, "Normal")
 
+# Die Farbe der Oberflaeche: dunkles Gletschergruen. Die Tiefenfaerbung kam
+# frueher aus DepthFade - das darf ein undurchsichtiges Material nicht mehr
+# lesen ("Only transparent or postprocess materials can read from scene
+# depth"). Mit ihr ist auch der Uferschaum entfallen: er haengt an derselben
+# Szenentiefe und braucht eine eigene Loesung.
 tief = knoten(material, unreal.MaterialExpressionConstant3Vector, -1250, 380)
 tief.set_editor_property("constant", unreal.LinearColor(0.010, 0.052, 0.060, 1.0))
-
-# Tiefenfaerbung nur noch fuer die Deckkraft am Ufer: die Wasserflaechen
-# liegen flach ueber dem Gelaende, der Tiefenunterschied ist fast ueberall
-# gering - als Farbgeber blieb davon ein gleichmaessiges Hellgruen, das
-# nach Schwimmbad aussah statt nach Fluss.
-tiefe = knoten(material, unreal.MaterialExpressionDepthFade, -1250, 620)
-tiefe.set_editor_property("fade_distance_default", 260.0)
-
-# Farbe: nur das dunkle Gletschergruen. Der zweite Versuch hellte sie zum
-# streifenden Blick hin auf - genau dort, wo Wasser in Wirklichkeit dunkel
-# wird und stattdessen spiegelt. Das Ergebnis sah aus wie ein Schwimmbad.
-# Hell wird die Flaeche jetzt nur ueber Spiegelung und Glanz.
-# Schaum am Ufer: wo das Wasser auf Geometrie trifft, steht eine weisse
-# Kante - das Merkmal, an dem man eine Wasserflaeche von einer gefaerbten
-# Glasscheibe unterscheidet.
-schaumtiefe = knoten(material, unreal.MaterialExpressionDepthFade, -1250, 760)
-schaumtiefe.set_editor_property("fade_distance_default", 130.0)
-schaum = knoten(material, unreal.MaterialExpressionOneMinus, -1050, 760)
-verbinde(schaumtiefe, "", schaum, "")
-weiss = knoten(material, unreal.MaterialExpressionConstant3Vector, -1250, 880)
-weiss.set_editor_property("constant", unreal.LinearColor(0.72, 0.78, 0.78, 1.0))
-grundfarbe = knoten(material, unreal.MaterialExpressionLinearInterpolate, -880, 440)
-verbinde(tief, "", grundfarbe, "A")
-verbinde(weiss, "", grundfarbe, "B")
-verbinde(schaum, "", grundfarbe, "Alpha")
-an_kanal(grundfarbe, "", unreal.MaterialProperty.MP_BASE_COLOR)
+an_kanal(tief, "", unreal.MaterialProperty.MP_BASE_COLOR)
 
 # Glanz: immer vorhanden, flach betrachtet voll. Werte ueber 1 bringen
 # nichts, deshalb 0,55 plus Fresnel.
@@ -137,24 +125,42 @@ verbinde(spiegel, "", spiegel_plus, "A")
 spiegel_plus.set_editor_property("const_b", 0.55)
 an_kanal(spiegel_plus, "", unreal.MaterialProperty.MP_SPECULAR)
 
-# Rauheit: spiegelglatt, nur der Schaum am Ufer ist stumpf.
-rau = knoten(material, unreal.MaterialExpressionLinearInterpolate, -880, 300)
-rau.set_editor_property("const_a", 0.035)    # glatt genug fuer Spiegelbilder
-rau.set_editor_property("const_b", 0.55)
-verbinde(schaum, "", rau, "Alpha")
+# Rauheit: spiegelglatt - alles darueber verschmiert das Spiegelbild.
+rau = knoten(material, unreal.MaterialExpressionConstant, -880, 300)
+rau.set_editor_property("r", 0.035)
 an_kanal(rau, "", unreal.MaterialProperty.MP_ROUGHNESS)
 
-# Deckkraft: am Ufer durchsichtig, weiter draussen dichter, und flach
-# betrachtet fast undurchsichtig (dort spiegelt es).
-deck_tiefe = knoten(material, unreal.MaterialExpressionLinearInterpolate, -950, 700)
-deck_tiefe.set_editor_property("const_a", 0.22)
-deck_tiefe.set_editor_property("const_b", 0.72)
-verbinde(tiefe, "", deck_tiefe, "Alpha")
-deckkraft = knoten(material, unreal.MaterialExpressionLinearInterpolate, -700, 700)
-verbinde(deck_tiefe, "", deckkraft, "A")
-deckkraft.set_editor_property("const_b", 1.0)
-verbinde(fresnel, "", deckkraft, "Alpha")
-an_kanal(deckkraft, "", unreal.MaterialProperty.MP_OPACITY)
+# Was unter der Oberflaeche geschieht, regelt das Wassermodell: Streuung gibt
+# dem Wasser Tiefe, Absorption schluckt zuerst das Rot.
+wasserwerte = knoten(material, unreal.MaterialExpressionSingleLayerWaterMaterialOutput, -400, 700)
+streuung = knoten(material, unreal.MaterialExpressionConstant3Vector, -700, 700)
+streuung.set_editor_property("constant", unreal.LinearColor(0.00080, 0.00190, 0.00230, 1.0))
+absorption = knoten(material, unreal.MaterialExpressionConstant3Vector, -700, 820)
+absorption.set_editor_property("constant", unreal.LinearColor(0.3000, 0.1000, 0.0700, 1.0))
+phase = knoten(material, unreal.MaterialExpressionConstant, -700, 940)
+phase.set_editor_property("r", 0.0)
+# Nichts scheint von hinten durch: unter den Wasserflaechen der Stadt liegt
+# kein Flussbett, sondern nichts - ohne diese Null schien dort der Himmel
+# durch und tauchte den Lech in ein leuchtendes Schwimmbadtuerkis.
+hinter = knoten(material, unreal.MaterialExpressionConstant, -700, 1010)
+hinter.set_editor_property("r", 0.0)
+
+
+def ans_wasser(quelle, *namen):
+    """Eingang des Wasserknotens verbinden. Trifft der Name nicht, bleibt der
+    Eingang still leer und Unreals Vorgabewerte gelten - deshalb alle
+    Schreibweisen durchprobieren und sonst warnen."""
+    for name in namen:
+        if verbinde(quelle, "", wasserwerte, name):
+            return name
+    unreal.log_warning("LALABERG_WASSER Eingang nicht gefunden: %s" % (namen,))
+    return None
+
+
+ans_wasser(streuung, "ScatteringCoefficients", "Scattering Coefficients")
+ans_wasser(absorption, "AbsorptionCoefficients", "Absorption Coefficients")
+ans_wasser(phase, "PhaseG", "Phase G")
+ans_wasser(hinter, "ColorScaleBehindWater", "Color Scale Behind Water")
 
 # Brechung: Wasser hat 1,33; die Wellen bewegen sie mit.
 brechung = knoten(material, unreal.MaterialExpressionLinearInterpolate, -700, 860)

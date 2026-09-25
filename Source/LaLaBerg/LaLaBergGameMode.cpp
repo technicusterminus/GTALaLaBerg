@@ -46,6 +46,8 @@
 #include "LaLaBergWaffe.h"
 #include "LaLaBergVerkehrsauto.h"
 #include "LaLaBergAutoPool.h"
+#include "Engine/PlanarReflection.h"
+#include "Components/PlanarReflectionComponent.h"
 #include "Camera/CameraActor.h"
 #include "LaLaBergKastenPool.h"
 #include "LaLaBergPassantKI.h"
@@ -65,6 +67,7 @@ ALaLaBergGameMode::ALaLaBergGameMode() {
  PrimaryActorTick.bCanEverTick=true;
 }
 void ALaLaBergGameMode::Tick(float DeltaSeconds) {
+ PflegeSpiegelebene();
  Super::Tick(DeltaSeconds);
  AktualisiereTageszeit(DeltaSeconds);
 }
@@ -461,6 +464,10 @@ void ALaLaBergGameMode::InitGame(const FString& MapName,const FString& Options,F
  {
   FTimerHandle H;
   GetWorldTimerManager().SetTimer(H,[this]() { LadeVerkehr(); },2.3f,false);
+  // Nach dem Verkehr, damit die Autos in den Spiegelbildern mit auftauchen.
+  FTimerHandle S;
+  if(!FParse::Param(FCommandLine::Get(),TEXT("LaLaBergOhneSpiegel")))
+   GetWorldTimerManager().SetTimer(S,[this]() { BaueSpiegelebene(); },3.2f,false);
  }
  UE_LOG(LogTemp,Display,TEXT("LALABERG_LICHT sonne=%d lux=%.1f richtung=%s atmo=%d himmel=%d"),
   (int32)Sun->GetLightComponent()->Mobility.GetValue(),Sun->GetLightComponent()->Intensity,
@@ -536,6 +543,96 @@ AActor* ALaLaBergGameMode::ChoosePlayerStart_Implementation(AController* Player)
  return Startpunkt?static_cast<AActor*>(Startpunkt):Super::ChoosePlayerStart_Implementation(Player);
 }
 
+// Spiegelbilder auf dem Lech: eine planare Spiegelung ueber der
+// Wasseroberflaeche. Die Kamera rendert die Szene ein zweites Mal an der
+// Wasserflaeche gespiegelt, und das Ergebnis liegt als Spiegelbild auf dem
+// Wasser - so findet sich das Ufer im Fluss wieder, samt allem, was gerade
+// nicht im Bild ist (Haeuser hinter der Kamera, Bruecken, Baeume).
+//
+// Zwei billigere Wege waren vorher dran und sind gemessen durchgefallen:
+// Spiegelsonden (Wuerfelkarten wie in Far Cry 1) ignoriert Lumen ganz, und
+// Lumens eigene Frontschicht-Spiegelung auf der durchscheinenden Flaeche gab
+// nur den Himmel her. Deshalb jetzt Screen Space als Verfahren (siehe
+// DefaultEngine.ini), undurchsichtiges Wassermodell (Tools/baue_wasser.py)
+// und diese Ebene.
+//
+// Die Spiegelung ist teuer, deshalb zwei Bremsen: sie rendert mit 35 % der
+// Bildbreite - ein Spiegelbild auf bewegtem Wasser braucht keine Schaerfe -
+// und blendet sich ab, sobald die Kamera weiter als 40 m von der
+// Wasserflaeche weg ist. In der Stadt kostet sie dann gar nichts.
+void ALaLaBergGameMode::BaueSpiegelebene() {
+ const UMaterialInterface* MWasser=LoadObject<UMaterialInterface>(nullptr,TEXT("/Game/Art/Materials/M_Wasser.M_Wasser"));
+ if(!MWasser) return;
+ FBox Wasser(ForceInit);
+ int32 Flaechen=0;
+ for(TActorIterator<AActor> It(GetWorld());It;++It) {
+  TArray<UPrimitiveComponent*> Teile;
+  It->GetComponents<UPrimitiveComponent>(Teile);
+  for(UPrimitiveComponent* Teil:Teile) {
+   bool bWasser=false;
+   for(int32 i=0;i<Teil->GetNumMaterials()&&!bWasser;i++) bWasser=Teil->GetMaterial(i)==MWasser;
+   if(!bWasser) continue;
+   Wasser+=Teil->Bounds.GetBox();
+   // Mittelpunkt und Oberkante jeder Flaeche - daraus sucht
+   // PflegeSpiegelebene die naechstgelegene Wasserhoehe.
+   const FBox Kasten=Teil->Bounds.GetBox();
+   Wasserstellen.Add(FVector(Kasten.GetCenter().X,Kasten.GetCenter().Y,Kasten.Max.Z));
+   Flaechen++;
+  }
+ }
+ if(Flaechen==0||!Wasser.IsValid) {
+  UE_LOG(LogTemp,Warning,TEXT("LALABERG_SPIEGEL keine Wasserflaeche gefunden"));
+  return;
+ }
+ // Eine Ebene fuer den ganzen Fluss geht nicht: der Lech faellt auf seinen
+ // dreieinhalb Kilometern durch die Stadt um 38 Meter, und eine Spiegelebene
+ // ist flach. Zwei Dutzend Ebenen waeren zwei Dutzend zusaetzliche
+ // Szenendurchlaeufe - also eine einzige, die in PflegeSpiegelebene der
+ // Kamera nachgefuehrt wird: immer auf der Hoehe der naechstgelegenen
+ // Wasserflaeche.
+ const FVector Mitte(Wasser.GetCenter().X,Wasser.GetCenter().Y,Wasser.Max.Z);
+ Spiegel=GetWorld()->SpawnActor<APlanarReflection>(Mitte,FRotator::ZeroRotator);
+ if(!Spiegel) return;
+ if(auto* K=Spiegel->GetPlanarReflectionComponent()) {
+  K->SetMobility(EComponentMobility::Movable);
+  // Gross genug, dass die Ebene unter der Kamera den sichtbaren Fluss
+  // abdeckt - sie wandert mit, sie muss nicht den ganzen Lauf umfassen.
+  K->SetWorldScale3D(FVector(40.0f,40.0f,4.0f));
+  // Halbe Bildbreite reicht - ein Spiegelbild auf bewegtem Wasser darf
+  // unscharf sein. Die Wellen brechen es zusaetzlich, aber massvoll: bei 180
+  // war vom Ufer nur noch ein dunkler Schleier uebrig, bei 60 erkennt man
+  // die Hausreihe wieder.
+  K->ScreenPercentage=50;
+  K->NormalDistortionStrength=60.0f;
+  K->PrefilterRoughness=0.008f;
+  K->DistanceFromPlaneFadeoutStart=2500.0f;
+  K->DistanceFromPlaneFadeoutEnd=4000.0f;
+  K->bShowPreviewPlane=false;
+  K->MarkRenderStateDirty();
+ }
+ UE_LOG(LogTemp,Display,TEXT("LALABERG_SPIEGEL flaechen=%d stellen=%d mitte=%s groesse=%s"),
+        Flaechen,Wasserstellen.Num(),*Mitte.ToString(),*Wasser.GetSize().ToString());
+}
+
+// Haelt die Spiegelebene unter der Kamera und auf der Hoehe des Wassers, das
+// dort liegt. Ohne das Nachfuehren spiegelte sie an einer Stelle richtig und
+// auf dem ganzen uebrigen Fluss falsch - im ersten Versuch lag sie 33 Meter
+// ueber dem Wasser am Klinikum, und das Bild zeigte nur den Himmel.
+void ALaLaBergGameMode::PflegeSpiegelebene() {
+ if(!Spiegel||Wasserstellen.IsEmpty()) return;
+ const APlayerController* PC=GetWorld()->GetFirstPlayerController();
+ const APawn* Wer=PC?PC->GetPawn():nullptr;
+ if(!Wer) return;
+ const FVector Blick=Wer->GetActorLocation();
+ int32 Naechste=0; float Beste=TNumericLimits<float>::Max();
+ for(int32 i=0;i<Wasserstellen.Num();i++) {
+  const float Abstand=FVector::DistSquared2D(Blick,Wasserstellen[i]);
+  if(Abstand<Beste) { Beste=Abstand; Naechste=i; }
+ }
+ // Unter der Kamera, aber auf der Hoehe der naechsten Wasserflaeche.
+ Spiegel->SetActorLocation(FVector(Blick.X,Blick.Y,Wasserstellen[Naechste].Z));
+}
+
 void ALaLaBergGameMode::BeginPlay() {
  Super::BeginPlay();
  // -LaLaBergNacht springt sofort auf Mitternacht - zum Pruefen der
@@ -575,6 +672,7 @@ void ALaLaBergGameMode::BeginPlay() {
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergBudeTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergRadioTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergInsassenTest")) ||
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergSpiegelFoto")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergRennTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergJagdTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergZielFoto"));
@@ -1147,6 +1245,33 @@ void ALaLaBergGameMode::BeginPlay() {
                          *TitelEin,*TitelNach));
    FPlatformMisc::RequestExitWithStatus(false,bPass?0:1);
   },7.0f,false);
+ }
+ // Ein Bild fuer die Spiegelung: Kamera knapp ueber dem Wasser, waagerechter
+ // Blick auf das gegenueberliegende Ufer. Nur so flach zeigt sich, ob sich
+ // die Haeuser im Fluss wiederfinden - von oben sieht man in jedem Fall nur
+ // die Wellen. Mit -LaLaBergOhneSpiegel bleibt die Spiegelebene weg - fuer
+ // den Vergleich desselben Blicks ohne sie.
+ if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergSpiegelFoto"))) {
+  FTimerHandle Bild;
+  GetWorldTimerManager().SetTimer(Bild,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   if(!PC) return;
+   // Fuenf Meter ueber dem Wasser, Blick schraeg hinunter auf den Fluss vor
+   // dem gegenueberliegenden Ufer. Waagerecht ging nicht: dann fuellt der
+   // Hoehennebel das halbe Bild, und das blassblaue Feld, das man fuer
+   // Wasser haelt, ist Dunst.
+   const FVector Ort(-14500.0f,22000.0f,900.0f);
+   auto* Kamera=GetWorld()->SpawnActor<ACameraActor>(Ort,FRotator(-11.0f,35.0f,0.0f));
+   if(Kamera) PC->SetViewTarget(Kamera);
+   UE_LOG(LogTemp,Display,TEXT("LALABERG_SPIEGELFOTO ort=%s spiegel=%d"),*Ort.ToString(),
+          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergOhneSpiegel"))?0:1);
+  },8.0f,false);
+  FTimerHandle Ausloesen;
+  GetWorldTimerManager().SetTimer(Ausloesen,[this]() {
+   if(auto* PC=GetWorld()->GetFirstPlayerController()) PC->ConsoleCommand(TEXT("HighResShot 1600x900"));
+  },8.6f,false);
+  FTimerHandle Ende;
+  GetWorldTimerManager().SetTimer(Ende,[]() { FPlatformMisc::RequestExitWithStatus(false,0); },10.5f,false);
  }
  // Die Insassen: sitzt in den fahrenden Autos jemand, sitzt er im Wagen
  // (und nicht daneben oder auf dem Dach), und sieht man ihn auch?
