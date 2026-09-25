@@ -17,7 +17,12 @@ UENUM()
 // Rennen: vier Kontrollpunkte der Reihe nach gegen die Uhr, mit Einsatz und
 // Preisgeld. Verfolgung: ein Wagen faehrt davon und muss gestellt werden -
 // mit Farbe beschiessen oder rammen, bis er steht.
-enum class ELaLaBergAuftragsart : uint8 { Lieferung, Taxi, Rennen, Verfolgung };
+// Krankenwagen: ein Verletzter muss ins Klinikum, und zwar schnell - kurze
+// Frist, guter Lohn, aber jeder Rempler unterwegs zieht ab; der Patient ist
+// nicht aus Holz. Streife: drei Wagen hintereinander aus dem Verkehr ziehen,
+// bezahlt wird die ganze Runde - und weil man im Dienst ist, ist die
+// Fahndung nach jedem gestellten Wagen erledigt.
+enum class ELaLaBergAuftragsart : uint8 { Lieferung, Taxi, Rennen, Verfolgung, Krankenwagen, Streife };
 
 // Verwaltet Angebot, laufenden Auftrag, Frist und Lohn - siehe oben.
 UCLASS()
@@ -49,7 +54,15 @@ public:
  float HoleRestzeit() const;
  // Fuer das HUD: welche Art gerade laeuft oder angeboten wird.
  ELaLaBergAuftragsart HoleArt() const { return Art; }
+ // Verfolgung und Streife laufen gleich ab: das Ziel ist ein fahrender
+ // Wagen, kein Ort. Wegpunkt, Zielname und die Abfrage im Tick fragen
+ // deshalb nicht nach der Art, sondern hiernach.
+ bool JagdAufWagen() const { return Art == ELaLaBergAuftragsart::Verfolgung || Art == ELaLaBergAuftragsart::Streife; }
  int32 HoleTaxifahrten() const { return Taxifahrten; }
+ int32 HoleKrankenfahrten() const { return Krankenfahrten; }
+ int32 HoleStreifen() const { return Streifen; }
+ // Streife: der wievielte von drei Wagen (fuer das HUD und den Test).
+ int32 HoleStreifeRest() const { return StreifeRest; }
  // Das Geld liegt im Konto (ULaLaBergKonto) und ueberdauert das Spielende.
  int32 HoleGeld() const;
  int32 HoleLohn() const { return Lohn; }
@@ -104,6 +117,12 @@ private:
  // Rennen: die Kontrollpunkte (Indizes in Ziele) und der naechste davon.
  TArray<int32> Strecke;
  int32 Punkt = 0, Einsatz = 0, Rennen = 0, Verfolgungen = 0;
+ int32 Krankenfahrten = 0, Streifen = 0;
+ // Krankenwagen: Zustand des Wagens beim Einsteigen - was unterwegs
+ // kaputtgeht, zieht vom Lohn ab (siehe Erledige).
+ float WagenAnfang = 100.0f;
+ // Streife: wie viele Wagen der Runde noch fehlen.
+ int32 StreifeRest = 0;
  // Verfolgung: der fluechtende Wagen. TWeakObjectPtr, weil er unterwegs
  // eingesammelt werden kann (siehe ALaLaBergAutoPool).
  TWeakObjectPtr<class ALaLaBergVerkehrsauto> Beute;

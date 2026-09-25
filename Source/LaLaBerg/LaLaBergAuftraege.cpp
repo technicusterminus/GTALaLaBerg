@@ -2,6 +2,7 @@
 #include "LaLaBergHUD.h"
 #include "LaLaBergKonto.h"
 #include "LaLaBergWagen.h"
+#include "LaLaBergPolizei.h"
 #include "LaLaBergVerkehrsauto.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
@@ -237,13 +238,13 @@ bool ALaLaBergAuftraege::SucheBeute() {
 
 FVector ALaLaBergAuftraege::HoleWegpunkt() const {
  if (!bUnterwegs) return StartOrt;
- if (Art == ELaLaBergAuftragsart::Verfolgung) return Beute.IsValid() ? Beute->GetActorLocation() : StartOrt;
+ if (JagdAufWagen()) return Beute.IsValid() ? Beute->GetActorLocation() : StartOrt;
  return Ziele.IsValidIndex(AktZiel) ? Ziele[AktZiel].Ort : StartOrt;
 }
 
 FString ALaLaBergAuftraege::HoleZielName() const {
  if (!bUnterwegs) return FString();
- if (Art == ELaLaBergAuftragsart::Verfolgung) return TEXT("Der flüchtende Wagen");
+ if (JagdAufWagen()) return Art == ELaLaBergAuftragsart::Streife ? TEXT("Der nächste Wagen") : TEXT("Der flüchtende Wagen");
  return Ziele.IsValidIndex(AktZiel) ? Ziele[AktZiel].N : FString();
 }
 
@@ -253,7 +254,8 @@ void ALaLaBergAuftraege::NimmAn() {
  // Vier Arten, gleich haeufig - bis auf die Lieferung, die als einzige
  // auch zu Fuss geht und deshalb immer einspringt.
  static const ELaLaBergAuftragsart ARTEN[] = { ELaLaBergAuftragsart::Lieferung, ELaLaBergAuftragsart::Taxi,
-                                               ELaLaBergAuftragsart::Rennen, ELaLaBergAuftragsart::Verfolgung };
+                                               ELaLaBergAuftragsart::Rennen, ELaLaBergAuftragsart::Verfolgung,
+                                               ELaLaBergAuftragsart::Krankenwagen, ELaLaBergAuftragsart::Streife };
  Art = bTaxiErzwungen ? ELaLaBergAuftragsart::Taxi
      : bArtErzwungen  ? ErzwungeneArt
                       : ARTEN[FMath::RandRange(0, UE_ARRAY_COUNT(ARTEN) - 1)];
@@ -269,6 +271,8 @@ void ALaLaBergAuftraege::NimmAn() {
    LetzterHinweis = Jetzt;
    Melde(Gewollt == ELaLaBergAuftragsart::Taxi ? TEXT("Hier wartet auch ein Fahrgast – mit dem Wagen vorfahren")
         : Gewollt == ELaLaBergAuftragsart::Rennen ? TEXT("Hier startet auch ein Rennen – mit dem Wagen vorfahren")
+        : Gewollt == ELaLaBergAuftragsart::Krankenwagen ? TEXT("Hier wartet ein Verletzter – mit dem Wagen vorfahren")
+        : Gewollt == ELaLaBergAuftragsart::Streife ? TEXT("Hier beginnt auch eine Streife – mit dem Wagen vorfahren")
                                                   : TEXT("Hier gäbe es auch eine Verfolgung – mit dem Wagen vorfahren"));
   }
  }
@@ -276,6 +280,8 @@ void ALaLaBergAuftraege::NimmAn() {
  Punkt = 0;
  Einsatz = 0;
  Beute.Reset();
+ StreifeRest = 0;
+ WagenAnfang = 100.0f;
  TArray<int32> Moeglich;
  for (int32 i = 0; i < Ziele.Num(); i++) {
   const float D = Waagerecht(Ziele[i].Ort, StartOrt);
@@ -283,6 +289,29 @@ void ALaLaBergAuftraege::NimmAn() {
  }
  if (Moeglich.IsEmpty()) { UE_LOG(LogTemp, Warning, TEXT("LALABERG_AUFTRAG kein Ziel in Reichweite")); return; }
  AktZiel = Moeglich[FMath::RandRange(0, Moeglich.Num() - 1)];
+ // Der Krankenwagen faehrt nicht irgendwohin, sondern ins Klinikum - und
+ // wenn das gerade zu nah ist, faehrt er eben eine andere Art.
+ if (Art == ELaLaBergAuftragsart::Krankenwagen) {
+  // Landsberg hat zwei Haeuser: das Klinikum und die kbo-Lech-Mangfall-
+  // Klinik. Genommen wird das naechstgelegene, das nicht die Saeule selbst
+  // ist - das Spiel beginnt am Klinikum, und von dort faehrt kein
+  // Krankenwagen zum Klinikum. Die Strecke darf kuerzer sein als sonst:
+  // ein Krankenwagen faehrt auch mal nur ueber zwei Strassen.
+  int32 Klinik = INDEX_NONE;
+  float Naechste = TNumericLimits<float>::Max();
+  for (int32 i = 0; i < Ziele.Num(); i++) {
+   if (i == StartZiel || !(Ziele[i].N.StartsWith(TEXT("Klinikum")) || Ziele[i].N.StartsWith(TEXT("kbo-")))) continue;
+   const float D = Waagerecht(Ziele[i].Ort, StartOrt);
+   // Sechzig Meter genuegen. Erst standen hier 150 - und damit fiel am
+   // Klinikum jeder Einsatz aus: die blaue Saeule steht dort 104 m vom
+   // Klinikum und 142 m von der kbo-Klinik entfernt.
+   if (D < 6000.0f || D >= Naechste) continue;
+   Naechste = D;
+   Klinik = i;
+  }
+  if (Klinik != INDEX_NONE) AktZiel = Klinik;
+  else Art = ELaLaBergAuftragsart::Lieferung;
+ }
  const float Meter = Waagerecht(Ziele[AktZiel].Ort, StartOrt) / 100.0f;
  // Die Strassen sind laenger als die Luftlinie; 10 m/s ist gemaechliches
  // Stadttempo, dazu eine halbe Minute fuers Einsteigen.
@@ -294,14 +323,26 @@ void ALaLaBergAuftraege::NimmAn() {
  // Erledige).
  Lohn = Art == ELaLaBergAuftragsart::Taxi
   ? 160 + FMath::RoundToInt(Meter / 100.0f) * 24
+  : Art == ELaLaBergAuftragsart::Krankenwagen
+  ? 260 + FMath::RoundToInt(Meter / 100.0f) * 34
+  : Art == ELaLaBergAuftragsart::Streife
+  ? 240
   : 100 + FMath::RoundToInt(Meter / 5.0f / 10.0f) * 10;
+ // Der Krankenwagen hat es eilig: zwei Drittel der sonst ueblichen Frist.
+ if (Art == ELaLaBergAuftragsart::Krankenwagen) Zeit = FMath::RoundToFloat(Meter * 1.5f / 15.0f + 20.0f);
  Frist = GetWorld()->GetTimeSeconds() + Zeit;
  GesamtZeit = Zeit;
  if (Art == ELaLaBergAuftragsart::Rennen) BereiteRennen(Zeit);
- else if (Art == ELaLaBergAuftragsart::Verfolgung && !SucheBeute()) {
+ else if ((Art == ELaLaBergAuftragsart::Verfolgung || Art == ELaLaBergAuftragsart::Streife) && !SucheBeute()) {
   // Kein Wagen in Reichweite: dann eben eine Lieferung.
   Art = ELaLaBergAuftragsart::Lieferung;
  }
+ // Streife: drei Wagen in einer Runde, jeder mit eigener Frist.
+ if (Art == ELaLaBergAuftragsart::Streife) { StreifeRest = 3; Frist = GetWorld()->GetTimeSeconds() + 90.0; }
+ // Krankenwagen: merken, wie heil der Wagen losfaehrt.
+ if (Art == ELaLaBergAuftragsart::Krankenwagen)
+  if (auto* PCW = GetWorld()->GetFirstPlayerController())
+   if (auto* Wagen = Cast<ALaLaBergWagen>(PCW->GetPawn())) WagenAnfang = 100.0f * Wagen->Lebensanteil();
  bUnterwegs = true;
  bAngebot = false;
  Zeige(true, false, StartOrt);
@@ -313,6 +354,10 @@ void ALaLaBergAuftraege::NimmAn() {
   Melde(FString::Printf(TEXT("Rennen gewonnen! +%d € (Einsatz %d €)"), Lohn, Einsatz));
  else if (Art == ELaLaBergAuftragsart::Verfolgung)
   Melde(FString::Printf(TEXT("Gestellt! +%d €"), Lohn));
+ else if (Art == ELaLaBergAuftragsart::Streife)
+  Melde(FString::Printf(TEXT("Streife: drei Wagen, %d € die Runde"), Lohn));
+ else if (Art == ELaLaBergAuftragsart::Krankenwagen)
+  Melde(FString::Printf(TEXT("Verletzter ins Klinikum – %d:%02d Minuten, %d €"), Min, Sek, Lohn));
  else Melde(Art == ELaLaBergAuftragsart::Taxi
        ? FString::Printf(TEXT("Fahrgast nach %s – %d:%02d Minuten, %d € plus Trinkgeld"), *Ziele[AktZiel].N, Min, Sek, Lohn)
        : FString::Printf(TEXT("Lieferung zu %s – %d:%02d Minuten, %d €"), *Ziele[AktZiel].N, Min, Sek, Lohn));
@@ -321,6 +366,8 @@ void ALaLaBergAuftraege::NimmAn() {
  const TCHAR* ArtName = Art == ELaLaBergAuftragsart::Taxi ? TEXT("taxi")
                       : Art == ELaLaBergAuftragsart::Rennen ? TEXT("rennen")
                       : Art == ELaLaBergAuftragsart::Verfolgung ? TEXT("verfolgung")
+                      : Art == ELaLaBergAuftragsart::Krankenwagen ? TEXT("krankenwagen")
+                      : Art == ELaLaBergAuftragsart::Streife ? TEXT("streife")
                                                                 : TEXT("lieferung");
  UE_LOG(LogTemp, Display, TEXT("LALABERG_AUFTRAG start art=%s ziel=%s luftlinie=%.0fm zeit=%.0fs lohn=%d"),
         ArtName, *Ziele[AktZiel].N, Meter, Zeit, Lohn);
@@ -339,9 +386,38 @@ void ALaLaBergAuftraege::Erledige() {
  }
  // Trinkgeld beim Taxi: wer die Haelfte der Frist noch uebrig hat, bekommt
  // 40 Prozent obendrauf, linear abnehmend bis auf null.
+ // Streife: nach jedem gestellten Wagen ist die Fahndung erledigt - man ist
+ // schliesslich im Dienst -, und solange noch Wagen fehlen, geht die Runde
+ // weiter statt auszuzahlen.
+ if (Art == ELaLaBergAuftragsart::Streife) {
+  if (ALaLaBergPolizei* Polizei = ALaLaBergPolizei::Instanz.Get()) Polizei->Verwische();
+  StreifeRest = FMath::Max(0, StreifeRest - 1);
+  if (StreifeRest > 0 && SucheBeute()) {
+   Lohn += 240;
+   Frist = GetWorld()->GetTimeSeconds() + 90.0;
+   Melde(FString::Printf(TEXT("Einer steht – noch %d auf der Runde"), StreifeRest));
+   return;
+  }
+ }
  int32 Trinkgeld = 0;
  if (Art == ELaLaBergAuftragsart::Rennen) Rennen++;
  if (Art == ELaLaBergAuftragsart::Verfolgung) Verfolgungen++;
+ if (Art == ELaLaBergAuftragsart::Streife) Streifen++;
+ // Krankenwagen: was der Wagen unterwegs abbekommen hat, zieht ab - bis zur
+ // Haelfte des Lohns. Wer den Patienten durch die Stadt prellt, wird nicht
+ // dafuer bezahlt.
+ if (Art == ELaLaBergAuftragsart::Krankenwagen) {
+  Krankenfahrten++;
+  float Jetzt = WagenAnfang;
+  if (auto* PCW = GetWorld()->GetFirstPlayerController())
+   if (auto* Wagen = Cast<ALaLaBergWagen>(PCW->GetPawn())) Jetzt = 100.0f * Wagen->Lebensanteil();
+  const float Schaden = FMath::Clamp(WagenAnfang - Jetzt, 0.0f, 100.0f);
+  const int32 Abzug = FMath::RoundToInt(Lohn * 0.5f * (Schaden / 100.0f));
+  if (Abzug > 0) {
+   Lohn = FMath::Max(0, Lohn - Abzug);
+   Melde(FString::Printf(TEXT("Harte Fahrt – %d € weniger"), Abzug));
+  }
+ }
  if (Art == ELaLaBergAuftragsart::Taxi) {
   const float Rest = FMath::Max(0.0f, HoleRestzeit());
   const float Anteil = FMath::Clamp(Rest / FMath::Max(1.0f, GesamtZeit) / 0.5f, 0.0f, 1.0f);
@@ -357,7 +433,9 @@ void ALaLaBergAuftraege::Erledige() {
   Konto->ZaehleArt(static_cast<int32>(Art));
   Konto->Uebe(ULaLaBergKonto::EWert::Ruf,
               Art == ELaLaBergAuftragsart::Lieferung ? 14.0f
-            : Art == ELaLaBergAuftragsart::Taxi ? 18.0f : 32.0f);
+            : Art == ELaLaBergAuftragsart::Taxi ? 18.0f
+            : Art == ELaLaBergAuftragsart::Krankenwagen ? 26.0f
+            : Art == ELaLaBergAuftragsart::Streife ? 40.0f : 32.0f);
  }
  Erledigt++;
  bUnterwegs = false;
@@ -416,7 +494,7 @@ void ALaLaBergAuftraege::Tick(float DeltaSeconds) {
  APawn* Figur = PC ? PC->GetPawn() : nullptr;
  if (!Figur) return;
  const FVector Wo = Figur->GetActorLocation();
- if (bUnterwegs && Art == ELaLaBergAuftragsart::Verfolgung) {
+ if (bUnterwegs && JagdAufWagen()) {
   // Gestellt ist, wer steht: ausgeschaltet durch Farbe oder Rammen.
   if (!Beute.IsValid()) Scheitere();
   else if (Beute->IstAusgeschaltet()) Erledige();

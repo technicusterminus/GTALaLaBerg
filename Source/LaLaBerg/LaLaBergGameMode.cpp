@@ -687,6 +687,8 @@ void ALaLaBergGameMode::BeginPlay() {
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergInsassenTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergSpiegelFoto")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergBildrate")) ||
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergKrankenTest")) ||
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergStreifeTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergRennTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergJagdTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergZielFoto"));
@@ -1767,6 +1769,64 @@ void ALaLaBergGameMode::BeginPlay() {
                          bArt?1:0,Punkte,Gewonnen,Gestellt,Geld));
    FPlatformMisc::RequestExitWithStatus(false,bPass?0:1);
   },12.0f,false);
+ }
+ // Die beiden Dienste (siehe ELaLaBergAuftragsart): der Krankenwagen faehrt
+ // ins Klinikum, und wer den Patienten unterwegs durchschuettelt, bekommt
+ // weniger; die Streife zieht drei Wagen hintereinander aus dem Verkehr und
+ // wird erst am Ende der Runde bezahlt.
+ if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergKrankenTest"))||FParse::Param(FCommandLine::Get(),TEXT("LaLaBergStreifeTest"))) {
+  const bool bStreife=FParse::Param(FCommandLine::Get(),TEXT("LaLaBergStreifeTest"));
+  static bool bArt=false, bKlinik=false; static int32 Fahrten=0, Runden=0, Geld=0, Lohn=0, RestAnfang=0;
+  FTimerHandle ZumWagen;
+  GetWorldTimerManager().SetTimer(ZumWagen,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr;
+   for(TActorIterator<ALaLaBergWagen> It(GetWorld());It&&Figur;++It) {
+    Figur->SetActorLocation(It->GetActorLocation()-It->GetActorRightVector()*250.0f+FVector(0,0,60),
+                            false,nullptr,ETeleportType::TeleportPhysics);
+    break;
+   }
+  },4.0f,false);
+  FTimerHandle Ein;
+  GetWorldTimerManager().SetTimer(Ein,[this,bStreife]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   if(auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr) Figur->Einsteigen();
+   if(auto* A=ALaLaBergAuftraege::Instanz.Get()) {
+    A->TestErzwinge(bStreife?ELaLaBergAuftragsart::Streife:ELaLaBergAuftragsart::Krankenwagen);
+    // An die blaue Saeule fahren, damit der Auftrag angenommen wird.
+    if(APawn* Wagen=PC?PC->GetPawn():nullptr)
+     Wagen->SetActorLocation(A->HoleWegpunkt()+FVector(0,0,120),false,nullptr,ETeleportType::TeleportPhysics);
+   }
+  },4.5f,false);
+  // Krankenwagen: zum Ziel springen. Streife: die Wagen der Reihe nach
+  // stellen - nach jedem sucht die Runde den naechsten.
+  FTimerHandle Fahren;
+  GetWorldTimerManager().SetTimer(Fahren,[this,bStreife]() {
+   auto* A=ALaLaBergAuftraege::Instanz.Get();
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   if(!A||!A->IstUnterwegs()||!PC||!PC->GetPawn()) return;
+   bArt=A->HoleArt()==(bStreife?ELaLaBergAuftragsart::Streife:ELaLaBergAuftragsart::Krankenwagen);
+   if(bStreife) {
+    if(RestAnfang==0) { RestAnfang=A->HoleStreifeRest(); Lohn=A->HoleLohn(); }
+    if(auto* Beute=A->TestHoleBeute()) Beute->Verletze(140.0f,FVector(1,0,0),ELaLaBergSchaden::Sprengung);
+   } else {
+    if(!bKlinik) bKlinik=A->HoleZielName().StartsWith(TEXT("Klinikum"));
+    PC->GetPawn()->SetActorLocation(A->HoleWegpunkt()+FVector(0,0,120),false,nullptr,ETeleportType::TeleportPhysics);
+   }
+  },0.7f,true,5.2f);
+  FTimerHandle Ende;
+  GetWorldTimerManager().SetTimer(Ende,[this,bStreife]() {
+   if(auto* A=ALaLaBergAuftraege::Instanz.Get()) {
+    Fahrten=A->HoleKrankenfahrten(); Runden=A->HoleStreifen(); Geld=A->HoleGeld();
+   }
+   // Streife: drei Wagen in einer Runde, und der Lohn waechst mit jedem.
+   // Krankenwagen: das Ziel muss das Klinikum sein, und die Fahrt zaehlt.
+   const bool bPass=bArt&&Geld>0&&(bStreife?(Runden==1&&RestAnfang==3):(Fahrten==1&&bKlinik));
+   Beleg(FString::Printf(TEXT("LALABERG_%s %s art=%d klinik=%d fahrten=%d runden=%d wagen_je_runde=%d geld=%d"),
+                         bStreife?TEXT("STREIFETEST"):TEXT("KRANKENTEST"),bPass?TEXT("PASS"):TEXT("FAIL"),
+                         bArt?1:0,bKlinik?1:0,Fahrten,Runden,RestAnfang,Geld));
+   FPlatformMisc::RequestExitWithStatus(false,bPass?0:1);
+  },14.0f,false);
  }
  // Taxi: einsteigen, an der blauen Saeule halten, Fahrgast aufnehmen, zum
  // Ziel fahren. Geprueft wird, dass die Art wirklich Taxi ist, dass die

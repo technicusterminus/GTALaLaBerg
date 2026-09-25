@@ -41,6 +41,8 @@ public:
  // Kapitel haengt daran (siehe Docs/Geschichte.md).
  UPROPERTY() int32 Lieferungen = 0;
  UPROPERTY() int32 Taxifahrten = 0;
+ UPROPERTY() int32 Krankenfahrten = 0;
+ UPROPERTY() int32 Streifen = 0;
  UPROPERTY() int32 Rennen = 0;
  UPROPERTY() int32 Verfolgungen = 0;
  // Je Mission des Drehbuchs ein Bit (siehe LaLaBergDrehbuch).
@@ -104,7 +106,8 @@ public:
  bool HatFund(EFund Fund) const { return Stand && (Stand->Funde & (1 << static_cast<int32>(Fund))); }
  void GibFund(EFund Fund);
  // Erledigte Auftraege nach Art. Die Reihenfolge ist die von
- // ELaLaBergAuftragsart (Lieferung, Taxi, Rennen, Verfolgung).
+ // ELaLaBergAuftragsart (Lieferung, Taxi, Rennen, Verfolgung,
+ // Krankenwagen, Streife).
  void ZaehleArt(int32 Art);
  int32 HoleArtZahl(int32 Art) const;
  // Geschaffte Missionen des Drehbuchs.

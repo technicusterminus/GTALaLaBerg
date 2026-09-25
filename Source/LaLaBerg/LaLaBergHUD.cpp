@@ -719,9 +719,16 @@ void ALaLaBergHUD::Auftrag() {
  Pfeil(FVector2D(PX, PY), (Ziel - Wo).Rotation().Yaw - Kamera, R, Farbe);
 
  const float TX = X + 100 * S;
- const bool bTaxi = A->HoleArt() == ELaLaBergAuftragsart::Taxi;
- Schrift(bUnterwegs ? (bTaxi ? TEXT("FAHRGAST NACH") : TEXT("LIEFERUNG NACH")) : TEXT("AUFTRAG VERFÜGBAR"),
-         TX, Y + 12 * S, 11, Leise, true);
+ // Die Zeile ueber dem Ziel sagt, was man gerade faehrt.
+ const ELaLaBergAuftragsart Art = A->HoleArt();
+ const TCHAR* Kopfzeile =
+   Art == ELaLaBergAuftragsart::Taxi ? TEXT("FAHRGAST NACH")
+ : Art == ELaLaBergAuftragsart::Krankenwagen ? TEXT("VERLETZTER NACH")
+ : Art == ELaLaBergAuftragsart::Streife ? TEXT("STREIFE")
+ : Art == ELaLaBergAuftragsart::Verfolgung ? TEXT("VERFOLGUNG")
+ : Art == ELaLaBergAuftragsart::Rennen ? TEXT("RENNEN")
+                                       : TEXT("LIEFERUNG NACH");
+ Schrift(bUnterwegs ? Kopfzeile : TEXT("AUFTRAG VERFÜGBAR"), TX, Y + 12 * S, 11, Leise, true);
  const FString Titel = bUnterwegs ? A->HoleZielName() : FString(TEXT("Zur blauen Säule"));
  const float Platz = B - (TX - X) - 16 * S;
  const float Punkt = 19.0f * FMath::Min(1.0f, Platz / FMath::Max(1.0f, Breite(Titel, 19, true)));

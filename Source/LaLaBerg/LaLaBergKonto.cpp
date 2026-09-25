@@ -109,6 +109,8 @@ void ULaLaBergKonto::ZaehleArt(int32 Art) {
   case 1: Stand->Taxifahrten++; break;
   case 2: Stand->Rennen++; break;
   case 3: Stand->Verfolgungen++; break;
+  case 4: Stand->Krankenfahrten++; break;
+  case 5: Stand->Streifen++; break;
   default: return;
  }
  Speichere();
