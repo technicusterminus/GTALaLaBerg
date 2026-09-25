@@ -41,6 +41,12 @@ public:
   FString Id, Name, StartName;
   FVector Start = FVector::ZeroVector;
   int32 Kapitel = 1, Lohn = 0, Ruf = 0;
+  // Reihenfolge innerhalb des Kapitels. Nicht die Stelle im Feld: die ist
+  // die Kennung im Spielstand (ULaLaBergKonto::HatMission) und darf sich
+  // nie verschieben, sonst gelten in einem alten Spielstand ploetzlich
+  // andere Missionen als geschafft. Neue Missionen werden deshalb hinten
+  // angehaengt und ueber "reihe" an ihren Platz gestellt.
+  int32 Reihe = 0;
   TArray<FStufe> Stufen;
  };
 
@@ -60,6 +66,12 @@ public:
  // Fuer -LaLaBergStoryTest.
  bool TestStarte();
  void TestStufeGeschafft();
+ // Fuer -LaLaBergStoryTest: wie viele Missionen geladen sind und wie viele
+ // Ortsnamen darin nicht in orte.json stehen (siehe .cpp).
+ int32 HoleMissionszahl() const { return Missionen.Num(); }
+ int32 HoleFehlendeOrte() const { return FehlendeOrte; }
+ int32 HoleReihe(int32 Nummer) const { return Missionen.IsValidIndex(Nummer) ? Missionen[Nummer].Reihe : -1; }
+ int32 HoleKapitelVon(int32 Nummer) const { return Missionen.IsValidIndex(Nummer) ? Missionen[Nummer].Kapitel : -1; }
  int32 HoleGeschafft() const { return Geschafft; }
 
 private:
@@ -75,6 +87,10 @@ private:
  bool SucheGegner();
 
  TArray<FMission> Missionen;
+
+ // Ortsnamen aus missionen.json, die orte.json nicht kennt.
+
+ int32 FehlendeOrte = 0;
  int32 AktMission = INDEX_NONE, AktStufe = 0, Angebot = INDEX_NONE, Geschafft = 0;
  double Frist = 0.0;
  double HalteBis = 0.0;

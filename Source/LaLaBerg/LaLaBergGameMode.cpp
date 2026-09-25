@@ -1544,12 +1544,27 @@ void ALaLaBergGameMode::BeginPlay() {
  // an, laeuft sie Stufe fuer Stufe durch, und zahlt sie am Ende aus?
  if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergStoryTest"))) {
   static bool bGestartet=false; static int32 Stufen=0, Geschafft=0, GeldVorher=0, GeldNachher=0;
+  static int32 Missionen=0, FehlendeOrte=-1; static bool bReihenfolge=false;
   FTimerHandle Start;
   GetWorldTimerManager().SetTimer(Start,[this]() {
    auto* D=ALaLaBergDrehbuch::Instanz.Get();
    auto* Konto=ULaLaBergKonto::Hole(this);
    if(!D||!Konto) return;
    GeldVorher=Konto->HoleGeld();
+   // Das ganze Drehbuch pruefen, nicht nur die eine Mission: sind alle
+   // Missionen geladen, kennt orte.json jeden Ortsnamen darin (ein
+   // Schreibfehler setzt die Mission sonst still an den Nullpunkt der
+   // Stadt), und steigt die Reihenfolge innerhalb jedes Kapitels?
+   Missionen=D->HoleMissionszahl();
+   FehlendeOrte=D->HoleFehlendeOrte();
+   bReihenfolge=true;
+   for(int32 k=1;k<=4;k++) {
+    TArray<int32> Reihen;
+    for(int32 i=0;i<Missionen;i++) if(D->HoleKapitelVon(i)==k) Reihen.Add(D->HoleReihe(i));
+    if(Reihen.Num()<2) { bReihenfolge=false; continue; }
+    TSet<int32> Einmalig(Reihen);
+    if(Einmalig.Num()!=Reihen.Num()) bReihenfolge=false;   // zwei Missionen auf demselben Platz
+   }
    bGestartet=D->TestStarte();
    Stufen=D->HoleStufen();
   },4.0f,false);
@@ -1564,9 +1579,11 @@ void ALaLaBergGameMode::BeginPlay() {
    auto* Konto=ULaLaBergKonto::Hole(this);
    if(D) Geschafft=D->HoleGeschafft();
    if(Konto) GeldNachher=Konto->HoleGeld();
-   const bool bPass=bGestartet&&Stufen>=2&&Geschafft>=1&&GeldNachher>GeldVorher;
-   Beleg(FString::Printf(TEXT("LALABERG_STORYTEST %s gestartet=%d stufen=%d geschafft=%d geld=%d->%d"),
-                         bPass?TEXT("PASS"):TEXT("FAIL"),bGestartet?1:0,Stufen,Geschafft,GeldVorher,GeldNachher));
+   const bool bPass=bGestartet&&Stufen>=2&&Geschafft>=1&&GeldNachher>GeldVorher
+                   &&Missionen>=20&&FehlendeOrte==0&&bReihenfolge;
+   Beleg(FString::Printf(TEXT("LALABERG_STORYTEST %s gestartet=%d stufen=%d geschafft=%d geld=%d->%d missionen=%d fehlende_orte=%d reihenfolge=%d"),
+                         bPass?TEXT("PASS"):TEXT("FAIL"),bGestartet?1:0,Stufen,Geschafft,GeldVorher,GeldNachher,
+                         Missionen,FehlendeOrte,bReihenfolge?1:0));
    FPlatformMisc::RequestExitWithStatus(false,bPass?0:1);
   },9.0f,false);
  }

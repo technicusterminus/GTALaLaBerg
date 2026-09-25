@@ -71,6 +71,24 @@ void ALaLaBergDrehbuch::LadeDrehbuch() {
     if (!Orte.Contains(Name))
      Orte.Add(Name, FVector(Obj->GetNumberField(TEXT("x")), Obj->GetNumberField(TEXT("y")), 0.0f));
    }
+  // Auch die Plaetze, nicht nur die Wahrzeichen: Hauptplatz, Holzmarkt und
+  // der Herkomer-Steg sind Orte, an denen eine Mission spielt, stehen in
+  // orte.json aber als Umriss statt als Punkt. Als Ort zaehlt die Mitte
+  // des Umrisses.
+  if (Wurzel.IsValid())
+   for (const auto& Wert : Wurzel->GetArrayField(TEXT("plaetze"))) {
+    const auto Obj = Wert->AsObject();
+    if (!Obj.IsValid()) continue;
+    const FString Name = Obj->GetStringField(TEXT("n"));
+    const TArray<TSharedPtr<FJsonValue>>* Umriss = nullptr;
+    if (Orte.Contains(Name) || !Obj->TryGetArrayField(TEXT("p"), Umriss) || Umriss->Num() < 6) continue;
+    FVector2D Mitte(0, 0);
+    const int32 Ecken = Umriss->Num() / 2;
+    for (int32 i = 0; i < Ecken; i++)
+     Mitte += FVector2D((*Umriss)[i * 2]->AsNumber(), (*Umriss)[i * 2 + 1]->AsNumber());
+    Mitte /= FMath::Max(1, Ecken);
+    Orte.Add(Name, FVector(Mitte.X, Mitte.Y, 0.0f));
+   }
  }
  // Hoehe je Ort: ein Strahl von oben auf die Stadt.
  auto AufDenBoden = [this](FVector Ort) {
@@ -99,7 +117,13 @@ void ALaLaBergDrehbuch::LadeDrehbuch() {
   M.Kapitel = Obj->GetIntegerField(TEXT("kapitel"));
   M.Lohn = Obj->GetIntegerField(TEXT("lohn"));
   M.Ruf = Obj->GetIntegerField(TEXT("ruf"));
+  M.Reihe = Missionen.Num() * 10;                 // Rueckfall: Reihenfolge im Feld
+  double Rang = 0.0;
+  if (Obj->TryGetNumberField(TEXT("reihe"), Rang)) M.Reihe = static_cast<int32>(Rang);
   if (const FVector* Gefunden = Orte.Find(M.StartName)) M.Start = AufDenBoden(*Gefunden);
+  // Ein verschriebener Ortsname faellt sonst nicht auf: die Mission landet
+  // still am Nullpunkt der Stadt, und dort steht sie dann im Feld.
+  else { FehlendeOrte++; UE_LOG(LogTemp, Warning, TEXT("LALABERG_DREHBUCH Ort fehlt: %s (Start von %s)"), *M.StartName, *M.Id); }
   for (const auto& SWert : Obj->GetArrayField(TEXT("stufen"))) {
    const auto SObj = SWert->AsObject();
    if (!SObj.IsValid()) continue;
@@ -112,13 +136,17 @@ void ALaLaBergDrehbuch::LadeDrehbuch() {
    if (SObj->TryGetNumberField(TEXT("sterne"), Zahl)) S.Sterne = static_cast<int32>(Zahl);
    SObj->TryGetBoolField(TEXT("imWagen"), S.bImWagen);
    const FVector* Gefunden = Orte.Find(S.OrtName);
+   if (!Gefunden && !S.OrtName.IsEmpty()) {
+    FehlendeOrte++;
+    UE_LOG(LogTemp, Warning, TEXT("LALABERG_DREHBUCH Ort fehlt: %s (Stufe in %s)"), *S.OrtName, *M.Id);
+   }
    S.Ort = Gefunden ? AufDenBoden(*Gefunden) : M.Start;
    M.Stufen.Add(S);
   }
   Missionen.Add(M);
  }
  bGeladen = true;
- UE_LOG(LogTemp, Display, TEXT("LALABERG_DREHBUCH missionen=%d"), Missionen.Num());
+ UE_LOG(LogTemp, Display, TEXT("LALABERG_DREHBUCH missionen=%d fehlende_orte=%d"), Missionen.Num(), FehlendeOrte);
 }
 
 // Die naechste Mission des laufenden Kapitels, die noch nicht geschafft ist.
@@ -128,10 +156,14 @@ void ALaLaBergDrehbuch::SucheAngebot() {
  const auto* Konto = ULaLaBergKonto::Hole(this);
  if (!Konto || !bGeladen) return;
  const int32 Kapitel = FMath::Max(1, Konto->HoleKapitel() + 1);
+ // Die offene Mission des Kapitels mit der kleinsten "reihe" - nicht die
+ // erste im Feld (siehe FMission::Reihe).
+ int32 Beste = MAX_int32;
  for (int32 i = 0; i < Missionen.Num(); i++) {
   if (Missionen[i].Kapitel != Kapitel || Konto->HatMission(i)) continue;
+  if (Missionen[i].Reihe >= Beste) continue;
+  Beste = Missionen[i].Reihe;
   Angebot = i;
-  break;
  }
  // Saeule und Ring bei Bedarf bauen, sonst nur umsetzen.
  if (Angebot == INDEX_NONE) {
