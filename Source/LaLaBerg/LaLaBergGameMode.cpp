@@ -598,15 +598,16 @@ void ALaLaBergGameMode::BaueSpiegelebene() {
   // Gross genug, dass die Ebene unter der Kamera den sichtbaren Fluss
   // abdeckt - sie wandert mit, sie muss nicht den ganzen Lauf umfassen.
   K->SetWorldScale3D(FVector(40.0f,40.0f,4.0f));
-  // Halbe Bildbreite reicht - ein Spiegelbild auf bewegtem Wasser darf
-  // unscharf sein. Die Wellen brechen es zusaetzlich, aber massvoll: bei 180
-  // war vom Ufer nur noch ein dunkler Schleier uebrig, bei 60 erkennt man
-  // die Hausreihe wieder.
-  K->ScreenPercentage=50;
+  // Ein Viertel der Bildbreite. Bei der Haelfte kostete das Spiegelbild
+  // gemessene 91 ms je Bild - die Haelfte der ganzen Bildzeit am Klinikum
+  // (ProfileGPU, -LaLaBergBildrate -LaLaBergGpu), denn gespiegelt wird die
+  // ganze Stadt ein zweites Mal. Auf bewegtem Wasser sieht man den
+  // Unterschied zwischen halber und viertel Aufloesung ohnehin kaum.
+  K->ScreenPercentage=25;
   K->NormalDistortionStrength=60.0f;
   K->PrefilterRoughness=0.008f;
-  K->DistanceFromPlaneFadeoutStart=2500.0f;
-  K->DistanceFromPlaneFadeoutEnd=4000.0f;
+  K->DistanceFromPlaneFadeoutStart=1200.0f;
+  K->DistanceFromPlaneFadeoutEnd=2500.0f;
   K->bShowPreviewPlane=false;
   K->MarkRenderStateDirty();
  }
@@ -629,6 +630,18 @@ void ALaLaBergGameMode::PflegeSpiegelebene() {
   const float Abstand=FVector::DistSquared2D(Blick,Wasserstellen[i]);
   if(Abstand<Beste) { Beste=Abstand; Naechste=i; }
  }
+ // Nur in Ufernaehe arbeiten. Die Ebene folgt der Kamera, also lag sie
+ // sonst auch am Hauptplatz unter dem Spieler und renderte die Szene ein
+ // zweites Mal, 1,5 km vom Fluss entfernt: gemessen 14 statt 26 Bildern je
+ // Sekunde im Fahrtest, also knapp die Haelfte fuer ein Spiegelbild, das
+ // dort niemand sieht. Jenseits von 150 m wird sie abgeschaltet.
+ auto* Bauteil=Spiegel->GetPlanarReflectionComponent();
+ if(!Bauteil) return;
+ // Achtzig Meter: naeher kommt man dem Wasser nur am Ufer selbst, und nur
+ // dort ist ein Spiegelbild ueberhaupt im Bild.
+ const bool bNah=Beste<FMath::Square(8000.0f);
+ if(bNah!=Bauteil->IsVisible()) Bauteil->SetVisibility(bNah);
+ if(!bNah) return;
  // Unter der Kamera, aber auf der Hoehe der naechsten Wasserflaeche.
  Spiegel->SetActorLocation(FVector(Blick.X,Blick.Y,Wasserstellen[Naechste].Z));
 }
@@ -673,6 +686,7 @@ void ALaLaBergGameMode::BeginPlay() {
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergRadioTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergInsassenTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergSpiegelFoto")) ||
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergBildrate")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergRennTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergJagdTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergZielFoto"));
@@ -1273,7 +1287,90 @@ void ALaLaBergGameMode::BeginPlay() {
   FTimerHandle Ende;
   GetWorldTimerManager().SetTimer(Ende,[]() { FPlatformMisc::RequestExitWithStatus(false,0); },10.5f,false);
  }
- // Die Insassen: sitzt in den fahrenden Autos jemand, sitzt er im Wagen
+// Die Bildrate zu Fuss - der Fahrtest misst sie nur am Steuer, und zu Fuss
+ // steht die Kamera tiefer, sieht mehr Fassade und mehr Passanten. Drei
+ // Stellen, je drei Sekunden: der Start am Klinikum, der Hauptplatz in der
+ // Altstadt (die dichteste Bebauung) und das Lechufer, wo seit dem
+ // Wasserumbau die Spiegelebene mitrendert. Mit -LaLaBergOhneSpiegel
+ // derselbe Lauf ohne sie - die Differenz am Lech ist der Preis der
+ // Spiegelung.
+ if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergBildrate"))) {
+  struct FStelle { const TCHAR* Name; FVector Ort; FRotator Blick; };
+  static const FStelle STELLEN[] = {
+   { TEXT("Klinikum"),   FVector(-159000.0f,15600.0f,0.0f),  FRotator(-4.0f,-90.0f,0.0f) },
+   { TEXT("Hauptplatz"), FVector(-1700.0f,-2600.0f,0.0f),    FRotator(-2.0f,42.0f,0.0f) },
+   { TEXT("Lechufer"),   FVector(-14500.0f,22000.0f,600.0f), FRotator(-11.0f,35.0f,0.0f) },
+  };
+  static int32 Stelle=-1; static uint64 Bilder=0; static double Uhr=0.0;
+  static float Mittel[3]={0,0,0}, Schlechteste[3]={1000,1000,1000};
+  static uint64 LetzteBilder=0; static double LetzteUhr=0.0;
+  // Alle 0,5 s die Bildrate seit der letzten Messung; die schlechteste
+  // Halbsekunde zaehlt getrennt, weil ein Ruckler im Mittel untergeht.
+  FTimerHandle Takt;
+  GetWorldTimerManager().SetTimer(Takt,[this]() {
+   if(Stelle<0||Stelle>=3) return;
+   const uint64 Jetzt=GFrameCounter; const double Zeit=FPlatformTime::Seconds();
+   if(LetzteUhr>0.0) {
+    const float Fps=(Jetzt-LetzteBilder)/FMath::Max(0.001,Zeit-LetzteUhr);
+    Schlechteste[Stelle]=FMath::Min(Schlechteste[Stelle],Fps);
+   }
+   LetzteBilder=Jetzt; LetzteUhr=Zeit;
+  },0.5f,true,12.0f);
+  for(int32 i=0;i<3;i++) {
+   // Hinstellen, eine Sekunde ankommen lassen, dann drei Sekunden messen.
+   FTimerHandle Hin;
+   GetWorldTimerManager().SetTimer(Hin,[this,i]() {
+    auto* PC=GetWorld()->GetFirstPlayerController();
+    auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr;
+    if(!PC||!Figur) return;
+    FVector Ziel=STELLEN[i].Ort;
+    // Auf den Boden setzen, wo die Hoehe nicht vorgegeben ist.
+    if(FMath::IsNearlyZero(Ziel.Z)) {
+     FHitResult Boden; FCollisionQueryParams Fragen; Fragen.AddIgnoredActor(Figur);
+     if(GetWorld()->LineTraceSingleByChannel(Boden,Ziel+FVector(0,0,30000),Ziel-FVector(0,0,30000),ECC_Visibility,Fragen))
+      Ziel=Boden.ImpactPoint+FVector(0,0,95.0f);
+    }
+    Figur->SetActorLocation(Ziel,false,nullptr,ETeleportType::TeleportPhysics);
+    PC->SetControlRotation(STELLEN[i].Blick);
+    if(auto* Anzeige=Cast<ALaLaBergHUD>(PC->GetHUD())) Anzeige->OrtSofort();
+   },10.0f+i*12.0f,false);
+   FTimerHandle An;
+   GetWorldTimerManager().SetTimer(An,[this,i]() {
+    Stelle=i; Bilder=GFrameCounter; Uhr=FPlatformTime::Seconds(); LetzteUhr=0.0;
+    // Mit -LaLaBergGpu zusaetzlich die Aufschluesselung eines Bildes ins
+    // Protokoll - daran sieht man, welcher Durchlauf die Zeit kostet.
+    if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergGpu")))
+     if(auto* PC=GetWorld()->GetFirstPlayerController()) PC->ConsoleCommand(TEXT("ProfileGPU"));
+   // Erst vier Sekunden ankommen lassen: unmittelbar nach dem Versetzen
+   // uebersetzt Unreal die Shader der neu sichtbaren Geometrie und streamt
+   // Texturen nach. Die ersten Messungen lagen deshalb bei 2 fps, obwohl
+   // dieselbe Stelle Sekunden spaeter mit dem Zwanzigfachen lief.
+   },14.0f+i*12.0f,false);
+   FTimerHandle Aus;
+   GetWorldTimerManager().SetTimer(Aus,[this,i]() {
+    Mittel[i]=(GFrameCounter-Bilder)/FMath::Max(0.001,FPlatformTime::Seconds()-Uhr);
+    Stelle=-1;
+    Beleg(FString::Printf(TEXT("LALABERG_BILDRATE %s mittel=%.0f schlechteste=%.0f"),
+                          STELLEN[i].Name,Mittel[i],Schlechteste[i]));
+   },20.0f+i*12.0f,false);
+  }
+  FTimerHandle Ende;
+  GetWorldTimerManager().SetTimer(Ende,[this]() {
+   const float Kleinste=FMath::Min3(Mittel[0],Mittel[1],Mittel[2]);
+   // Zwanzig Bilder je Sekunde ist die Grenze, unter der das Spiel sich
+   // zaeh anfuehlt - kein Schoenheitswert, ein Warnsignal.
+   const bool bPass=Kleinste>=20.0f;
+   Beleg(FString::Printf(TEXT("LALABERG_BILDRATETEST %s klinikum=%.0f/%.0f hauptplatz=%.0f/%.0f lechufer=%.0f/%.0f spiegel=%d aufloesung=%s"),
+                         bPass?TEXT("PASS"):TEXT("FAIL"),
+                         Mittel[0],Schlechteste[0],Mittel[1],Schlechteste[1],Mittel[2],Schlechteste[2],
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergOhneSpiegel"))?0:1,
+                         GEngine&&GEngine->GameViewport?*FString::Printf(TEXT("%dx%d"),
+                          GEngine->GameViewport->Viewport->GetSizeXY().X,
+                          GEngine->GameViewport->Viewport->GetSizeXY().Y):TEXT("?")));
+   FPlatformMisc::RequestExitWithStatus(false,bPass?0:1);
+  },46.0f,false);
+ }
+  // Die Insassen: sitzt in den fahrenden Autos jemand, sitzt er im Wagen
  // (und nicht daneben oder auf dem Dach), und sieht man ihn auch?
  if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergInsassenTest"))) {
   static int32 Plaetze=-1, MitFahrer=0, MitBeifahrer=0; static float SitzAbstand=-1.0f, SitzHoehe=-1.0f;
