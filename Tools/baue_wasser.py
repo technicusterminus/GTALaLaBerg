@@ -73,17 +73,27 @@ def welle(textur_name, groesse_cm, tempo_x, tempo_y, y):
     return probe
 
 
-# Lange Duenung, gross und langsam; kurzes Kraeuseln, klein und schnell und
-# quer dazu.
+# Drei Lagen statt zwei: lange Duenung (9 m), kurzes Kraeuseln (2,6 m) und
+# darueber ein feines Zittern (0,9 m). Zwei Lagen ergaben aus der Naehe ein
+# erkennbar wiederkehrendes Muster - dieselbe Kachel, nur zweimal. Die dritte
+# Lage laeuft schraeg zu beiden und in anderem Tempo; damit faellt der Takt
+# der Kachel nicht mehr auf.
 duenung = welle("T_Welle_N", 900.0, 0.010, 0.004, -600)
 kraeuseln = welle("T_Kraeusel_N", 260.0, -0.020, 0.013, -100)
+zittern = welle("T_Kraeusel_N", 90.0, 0.031, -0.026, 380)
 wellen = knoten(material, unreal.MaterialExpressionAdd, -1250, -350)
 verbinde(duenung, "RGB", wellen, "A")
 verbinde(kraeuseln, "RGB", wellen, "B")
-# Zwei addierte Normalen zeigen im Mittel zu steil - halbieren genuegt.
+feiner = knoten(material, unreal.MaterialExpressionMultiply, -1350, -250)
+verbinde(zittern, "RGB", feiner, "A")
+feiner.set_editor_property("const_b", 0.45)   # die feinste Lage nur angedeutet
+wellen_alle = knoten(material, unreal.MaterialExpressionAdd, -1150, -350)
+verbinde(wellen, "", wellen_alle, "A")
+verbinde(feiner, "", wellen_alle, "B")
+# Drei addierte Normalen zeigen im Mittel viel zu steil.
 flacher = knoten(material, unreal.MaterialExpressionMultiply, -1050, -350)
-verbinde(wellen, "", flacher, "A")
-flacher.set_editor_property("const_b", 0.5)
+verbinde(wellen_alle, "", flacher, "A")
+flacher.set_editor_property("const_b", 0.36)
 # In der Ferne die Wellen flachziehen: sonst liegt am Horizont ein
 # sichtbarer Teppich aus derselben Kachel. Ueber 40 m wird die Normale
 # zur glatten Flaeche hin ueberblendet.
@@ -111,9 +121,49 @@ verbinde(normale, "", fresnel, "Normal")
 # lesen ("Only transparent or postprocess materials can read from scene
 # depth"). Mit ihr ist auch der Uferschaum entfallen: er haengt an derselben
 # Szenentiefe und braucht eine eigene Loesung.
+# Den Blauanteil holt eine Maske heraus: ein Ausgang namens "B" existiert
+# an der Ueberblendung nicht, und ohne Maske blieb der Eingang leer
+# ("Node OneMinus: Missing 1-x input") - das Material uebersetzte dann gar
+# nicht mehr und die Stadt zeigte das Schachbrett des Ersatzmaterials.
+blau = knoten(material, unreal.MaterialExpressionComponentMask, -1200, 300)
+blau.set_editor_property("r", False)
+blau.set_editor_property("g", False)
+blau.set_editor_property("b", True)
+blau.set_editor_property("a", False)
+verbinde(normale, "", blau, "")
+flanke = knoten(material, unreal.MaterialExpressionOneMinus, -1050, 300)
+verbinde(blau, "", flanke, "")
+# Zwei Farben statt einer: steil von oben sieht man in den Fluss hinein
+# (dunkles Gletschergruen), flach ueber die Flaeche fast nur noch das, was
+# sich spiegelt - dort wird die Oberflaeche selbst dunkel und tritt zurueck.
+# Mit einer einzigen Farbe lag ueber dem ganzen Fluss dasselbe Tuerkis, egal
+# von wo man schaute, und das sah nach eingefaerbtem Glas aus.
 tief = knoten(material, unreal.MaterialExpressionConstant3Vector, -1250, 380)
-tief.set_editor_property("constant", unreal.LinearColor(0.010, 0.052, 0.060, 1.0))
-an_kanal(tief, "", unreal.MaterialProperty.MP_BASE_COLOR)
+tief.set_editor_property("constant", unreal.LinearColor(0.008, 0.034, 0.038, 1.0))
+streifend = knoten(material, unreal.MaterialExpressionConstant3Vector, -1250, 460)
+streifend.set_editor_property("constant", unreal.LinearColor(0.002, 0.006, 0.008, 1.0))
+grundfarbe = knoten(material, unreal.MaterialExpressionLinearInterpolate, -1000, 400)
+verbinde(tief, "", grundfarbe, "A")
+verbinde(streifend, "", grundfarbe, "B")
+verbinde(fresnel, "", grundfarbe, "Alpha")
+
+# Schaumkronen auf den steilsten Wellen. Uferschaum im Wortsinn - die weisse
+# Kante, wo das Wasser auf Land trifft - braucht die Szenentiefe und ist im
+# undurchsichtigen Material nicht mehr zu haben. Der Lech ist ohnehin ein
+# Gebirgsfluss: er schaeumt auf den Kaemmen, nicht nur am Ufer. Gemessen
+# wird die Steilheit an derselben Flanke wie die Rauheit (siehe unten): wo
+# die Welle am steilsten steht, steht der Schaum.
+kamm = knoten(material, unreal.MaterialExpressionSmoothStep, -1000, 540)
+kamm.set_editor_property("const_min", 0.42)
+kamm.set_editor_property("const_max", 0.78)
+verbinde(flanke, "", kamm, "Value")
+gischt = knoten(material, unreal.MaterialExpressionConstant3Vector, -1000, 620)
+gischt.set_editor_property("constant", unreal.LinearColor(0.62, 0.68, 0.70, 1.0))
+mit_schaum = knoten(material, unreal.MaterialExpressionLinearInterpolate, -820, 440)
+verbinde(grundfarbe, "", mit_schaum, "A")
+verbinde(gischt, "", mit_schaum, "B")
+verbinde(kamm, "", mit_schaum, "Alpha")
+an_kanal(mit_schaum, "", unreal.MaterialProperty.MP_BASE_COLOR)
 
 # Glanz: immer vorhanden, flach betrachtet voll. Werte ueber 1 bringen
 # nichts, deshalb 0,55 plus Fresnel.
@@ -125,9 +175,15 @@ verbinde(spiegel, "", spiegel_plus, "A")
 spiegel_plus.set_editor_property("const_b", 0.55)
 an_kanal(spiegel_plus, "", unreal.MaterialProperty.MP_SPECULAR)
 
-# Rauheit: spiegelglatt - alles darueber verschmiert das Spiegelbild.
-rau = knoten(material, unreal.MaterialExpressionConstant, -880, 300)
-rau.set_editor_property("r", 0.035)
+# Rauheit: spiegelglatt, wo die Flaeche ruhig liegt, eine Spur stumpfer auf
+# den Wellenflanken. Diese Spur ist das Glitzern: die Sonne bricht sich dort
+# in tausend kleinen Punkten statt in einem grossen Fleck. Ueber den
+# Blauanteil der Normalen - der ist 1, wo die Flaeche waagerecht liegt, und
+# kleiner, je steiler die Welle steht.
+rau = knoten(material, unreal.MaterialExpressionLinearInterpolate, -880, 300)
+rau.set_editor_property("const_a", 0.020)
+rau.set_editor_property("const_b", 0.120)
+verbinde(flanke, "", rau, "Alpha")
 an_kanal(rau, "", unreal.MaterialProperty.MP_ROUGHNESS)
 
 # Was unter der Oberflaeche geschieht, regelt das Wassermodell: Streuung gibt
