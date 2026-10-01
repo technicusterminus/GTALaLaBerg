@@ -1296,7 +1296,8 @@ void ALaLaBergGameMode::BeginPlay() {
  // mit langer Zeit heissen Pixelkosten - die kommen von dem, was den
  // Bildschirm fuellt, nicht von dem, was viele Aufrufe kostet.
  if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergOhneWasser"))||FParse::Param(FCommandLine::Get(),TEXT("LaLaBergOhneBaeume"))
-  ||FParse::Param(FCommandLine::Get(),TEXT("LaLaBergOhnePassanten"))||FParse::Param(FCommandLine::Get(),TEXT("LaLaBergOhneAutos"))) {
+  ||FParse::Param(FCommandLine::Get(),TEXT("LaLaBergOhnePassanten"))||FParse::Param(FCommandLine::Get(),TEXT("LaLaBergOhneAutos"))
+  ||FParse::Param(FCommandLine::Get(),TEXT("LaLaBergOhneFigur"))) {
   FTimerHandle Aus;
   GetWorldTimerManager().SetTimer(Aus,[this]() {
    const bool bOhneWasser=FParse::Param(FCommandLine::Get(),TEXT("LaLaBergOhneWasser"));
@@ -1335,6 +1336,11 @@ void ALaLaBergGameMode::BeginPlay() {
     TArray<ALaLaBergVerkehrsauto*> Weg(ALaLaBergVerkehrsauto::Alle);
     for(ALaLaBergVerkehrsauto* A:Weg) { if(!A) continue; A->TestVerstecke(); A->Destroy(); Autos++; }
    }
+   // Die Spielfigur selbst: im Auto laeuft dieselbe Stadt an fast derselben
+   // Stelle mit 28 fps, zu Fuss mit 4 - der Unterschied ist die Figur.
+   if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergOhneFigur")))
+    if(auto* PC=GetWorld()->GetFirstPlayerController())
+     if(APawn* Spieler=PC->GetPawn()) Spieler->SetActorHiddenInGame(true);
    UE_LOG(LogTemp,Display,TEXT("LALABERG_AUSGEBLENDET wasser=%d baeume=%d teile=%d passanten=%d autos=%d"),
           bOhneWasser?1:0,bOhneBaeume?1:0,Versteckt,Figuren,Autos);
   },3.5f,false);
@@ -1385,17 +1391,21 @@ void ALaLaBergGameMode::BeginPlay() {
    // dort sieht man die ganze Stadt bis zum Horizont, und gemessen wurde
    // dann der schlechteste Blick des Spiels statt eines gewoehnlichen.
    { TEXT("Klinikum"),   FVector(-167210.0f,14530.0f,2965.0f), FRotator(-4.0f,-90.0f,0.0f) },
+   // Dort, wo der Fahrtest mit 28 fps misst: derselbe Ort wie der Wagen,
+   // aber zu Fuss. Unterscheiden sich beide Zahlen, liegt es am Zustand
+   // "zu Fuss", nicht am Ort.
+   { TEXT("WagenOrt"),   FVector(-158827.0f,20577.0f,2987.0f), FRotator(-4.0f,0.0f,0.0f) },
    { TEXT("Hauptplatz"), FVector(-1700.0f,-2600.0f,0.0f),    FRotator(-2.0f,42.0f,0.0f) },
    { TEXT("Lechufer"),   FVector(-14500.0f,22000.0f,600.0f), FRotator(-11.0f,35.0f,0.0f) },
   };
   static int32 Stelle=-1; static uint64 Bilder=0; static double Uhr=0.0;
-  static float Mittel[3]={0,0,0}, Schlechteste[3]={1000,1000,1000};
+  static float Mittel[4]={0,0,0,0}, Schlechteste[4]={1000,1000,1000,1000};
   static uint64 LetzteBilder=0; static double LetzteUhr=0.0;
   // Alle 0,5 s die Bildrate seit der letzten Messung; die schlechteste
   // Halbsekunde zaehlt getrennt, weil ein Ruckler im Mittel untergeht.
   FTimerHandle Takt;
   GetWorldTimerManager().SetTimer(Takt,[this]() {
-   if(Stelle<0||Stelle>=3) return;
+   if(Stelle<0||Stelle>=4) return;
    const uint64 Jetzt=GFrameCounter; const double Zeit=FPlatformTime::Seconds();
    if(LetzteUhr>0.0) {
     const float Fps=(Jetzt-LetzteBilder)/FMath::Max(0.001,Zeit-LetzteUhr);
@@ -1403,7 +1413,7 @@ void ALaLaBergGameMode::BeginPlay() {
    }
    LetzteBilder=Jetzt; LetzteUhr=Zeit;
   },0.5f,true,12.0f);
-  for(int32 i=0;i<3;i++) {
+  for(int32 i=0;i<4;i++) {
    // Hinstellen, eine Sekunde ankommen lassen, dann drei Sekunden messen.
    FTimerHandle Hin;
    GetWorldTimerManager().SetTimer(Hin,[this,i]() {
@@ -1451,19 +1461,19 @@ void ALaLaBergGameMode::BeginPlay() {
   }
   FTimerHandle Ende;
   GetWorldTimerManager().SetTimer(Ende,[this]() {
-   const float Kleinste=FMath::Min3(Mittel[0],Mittel[1],Mittel[2]);
+   const float Kleinste=FMath::Min(FMath::Min3(Mittel[0],Mittel[1],Mittel[2]),Mittel[3]);
    // Zwanzig Bilder je Sekunde ist die Grenze, unter der das Spiel sich
    // zaeh anfuehlt - kein Schoenheitswert, ein Warnsignal.
    const bool bPass=Kleinste>=20.0f;
-   Beleg(FString::Printf(TEXT("LALABERG_BILDRATETEST %s klinikum=%.0f/%.0f hauptplatz=%.0f/%.0f lechufer=%.0f/%.0f spiegel=%d aufloesung=%s"),
+   Beleg(FString::Printf(TEXT("LALABERG_BILDRATETEST %s klinikum=%.0f/%.0f wagenort=%.0f/%.0f hauptplatz=%.0f/%.0f lechufer=%.0f/%.0f spiegel=%d aufloesung=%s"),
                          bPass?TEXT("PASS"):TEXT("FAIL"),
-                         Mittel[0],Schlechteste[0],Mittel[1],Schlechteste[1],Mittel[2],Schlechteste[2],
+                         Mittel[0],Schlechteste[0],Mittel[1],Schlechteste[1],Mittel[2],Schlechteste[2],Mittel[3],Schlechteste[3],
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergOhneSpiegel"))?0:1,
                          GEngine&&GEngine->GameViewport?*FString::Printf(TEXT("%dx%d"),
                           GEngine->GameViewport->Viewport->GetSizeXY().X,
                           GEngine->GameViewport->Viewport->GetSizeXY().Y):TEXT("?")));
    FPlatformMisc::RequestExitWithStatus(false,bPass?0:1);
-  },46.0f,false);
+  },62.0f,false);
  }
   // Die Insassen: sitzt in den fahrenden Autos jemand, sitzt er im Wagen
  // (und nicht daneben oder auf dem Dach), und sieht man ihn auch?
