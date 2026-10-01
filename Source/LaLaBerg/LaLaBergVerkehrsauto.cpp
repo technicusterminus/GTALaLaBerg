@@ -500,32 +500,19 @@ void ALaLaBergVerkehrsauto::Tick(float Zeit) {
   APawn* Ziel = UGameplayStatics::GetPlayerPawn(GetWorld(), 0);
   const auto* Fahndung = ALaLaBergPolizei::Instanz.Get();
   const bool bKontaktEinsatz = bPolizei && Fahndung && Fahndung->HoleSterne() >= 3
-   && Fahndung->WirdGesehen() && Cast<ALaLaBergWagen>(Ziel);
+   && Cast<ALaLaBergWagen>(Ziel);
   float SpielerBremse = BremseVorSpieler(GetWorld(), Ort, Vorwaerts);
   if (bKontaktEinsatz) {
    const FVector Abstand = Ziel->GetActorLocation() - GetActorLocation();
    const float Distanz = Abstand.Size2D();
    const bool bVoraus = FVector::DotProduct(Abstand.GetSafeNormal2D(), Vorwaerts) > 0.65f;
-   FHitResult Sicht;
-   FCollisionQueryParams Fragen(TEXT("PolizeiKontakt"), false, this);
-   const bool bTreffer = GetWorld()->LineTraceSingleByChannel(Sicht, GetActorLocation() + FVector(0,0,60),
-    Ziel->GetActorLocation(), ECC_Visibility, Fragen);
-   if (bVoraus && bTreffer && Sicht.GetActor() == Ziel) {
-    // Begrenztes Andruecken, kein ungebremstes Durchfahren des Spielerwagens.
-    SpielerBremse = Distanz > 460.0f ? FMath::Min(1.0f, 600.0f / FMath::Max(Tempo, 1.0f)) : 0.0f;
-    if (Distanz < 480.0f && GetWorld()->GetTimeSeconds() >= NaechsterPolizeiKontakt) {
-     if (auto* Koerper = Cast<UPrimitiveComponent>(Ziel->GetRootComponent()); Koerper && Koerper->IsSimulatingPhysics()) {
-      Koerper->AddImpulse(Abstand.GetSafeNormal2D() * Koerper->GetMass() * 120.0f);
-      NaechsterPolizeiKontakt = GetWorld()->GetTimeSeconds() + 2.5;
-      UE_LOG(LogTemp, Display, TEXT("LALABERG_POLIZEI kontakt impuls_dv=120cm/s"));
-     }
-    }
-   }
+   if (bVoraus && Distanz < 850.0f) SpielerBremse = 0.75f;
   }
   const float BremseObjekt = FMath::Min(bUeberholtGerade ? 1.0f : BremseAndauto, SpielerBremse);
   const float Bremse = FMath::Min(FMath::Min(BremseObjekt, BremseAmpel), FMath::Min(BremseKreuzung, BremseKurve));
-  const FVector Richtung = Weg.Bewege(Ort, Tempo * Zeit * (bGestoert ? 0.08f : 1.0f) * Bremse);
-  SetActorLocation(Ort);
+  const float ManoeverTempo = bKontaktEinsatz && Ziel && Ziel->GetVelocity().Size2D() > 300.0f
+   && FVector::Dist2D(Ort,Ziel->GetActorLocation()) < 1200.0f ? FMath::Min(Tempo,Ziel->GetVelocity().Size2D()+280.0f) : Tempo;
+  const FVector Richtung = Weg.Bewege(Ort, ManoeverTempo * Zeit * (bGestoert ? 0.08f : 1.0f) * Bremse);
   if (!Richtung.IsNearlyZero()) SetActorRotation(FMath::RInterpTo(GetActorRotation(), Richtung.Rotation(), Zeit, 5.0f));
 
   // Weicht einem Auto oder dem Spieler direkt voraus zusaetzlich seitlich
@@ -543,12 +530,61 @@ void ALaLaBergVerkehrsauto::Tick(float Zeit) {
   const float BreiteHier = BreiteJetzt();
   const float SpurVersatz = BreiteHier * 0.25f;
   const float Rand = FMath::Max(0.0f, BreiteHier * 0.5f - HALBE_WAGENBREITE);
-  const float SeitZiel = Ueberholt.IsValid()
+  float SeitZiel = Ueberholt.IsValid()
    ? FMath::Clamp(-SpurVersatz, -Rand, Rand)
    : FMath::Min(SpurVersatz + (BremseObjekt < 0.9f ? MAX_SEITVERSATZ : 0.0f), Rand);
-  Seitversatz = FMath::FInterpTo(Seitversatz, SeitZiel, Zeit, 0.7f);
+  bool bSeitManoever = false;
+  if (bKontaktEinsatz && Ziel && Ziel->GetVelocity().Size2D() > 300.0f
+      && FVector::Dist2D(Ort, Ziel->GetActorLocation()) < 1200.0f
+      && FVector::DotProduct(Vorwaerts, Ziel->GetVelocity().GetSafeNormal2D()) > 0.7f) {
+   const float SeitAbstand = FVector::DotProduct(Ziel->GetActorLocation() - Ort, GetActorRightVector());
+   const float Gewuenscht = FMath::Clamp(SeitAbstand, -Rand, Rand);
+   const FVector Pruefort = Ort + GetActorRightVector() * Gewuenscht;
+   FHitResult Boden;
+   FCollisionQueryParams BodenQ(TEXT("PolizeiFahrbahn"), false, this);
+   BodenQ.AddIgnoredActor(Ziel);
+   if (GetWorld()->LineTraceSingleByChannel(Boden, Pruefort + FVector(0,0,180),
+       Pruefort - FVector(0,0,450), ECC_Visibility, BodenQ) && Boden.GetActor()
+       && Boden.ImpactNormal.Z > 0.85f) {
+    for (const FName& Tag : Boden.GetActor()->Tags)
+     if (Tag.ToString().StartsWith(TEXT("Road"))) { SeitZiel = Gewuenscht; bSeitManoever = true; break; }
+   }
+  }
+  Seitversatz = FMath::FInterpTo(Seitversatz, SeitZiel, Zeit, bSeitManoever ? 1.8f : 0.7f);
+  if (bSeitManoever) {
+   FHitResult Sicht;
+   FCollisionQueryParams SichtQ(TEXT("PolizeiSicht"), false, this);
+   if (GetWorld()->LineTraceSingleByChannel(Sicht, GetActorLocation() + FVector(0,0,60),
+       Ziel->GetActorLocation(), ECC_Visibility, SichtQ) && Sicht.GetActor() != Ziel)
+    bSeitManoever = false;
+  }
   Versatz = FMath::Abs(Seitversatz) > 0.5f ? GetActorRightVector() * Seitversatz : FVector::ZeroVector;
-  SetActorLocation(Ort + Versatz);
+  if (bSeitManoever) ++ManoeverTakte;
+  const FVector NeuerOrt = Ort + Versatz;
+  if (bSeitManoever && Ziel) {
+   FCollisionObjectQueryParams Fahrzeuge;
+   Fahrzeuge.AddObjectTypesToQuery(ECC_Vehicle);
+   FCollisionQueryParams Q(TEXT("PolizeiSeitenkontakt"), false, this);
+   FHitResult Kontakt;
+   const FVector Alt = GetActorLocation();
+   if (GetWorld()->SweepSingleByObjectType(Kontakt, Alt, NeuerOrt, GetActorQuat(),
+       Fahrzeuge, FCollisionShape::MakeBox(Rumpf->GetScaledBoxExtent()), Q)
+       ) {
+    SetActorLocation(FMath::Lerp(Alt, NeuerOrt, FMath::Clamp(Kontakt.Time - 0.02f, 0.0f, 1.0f)));
+    if (Kontakt.GetActor() == Ziel && !Kontakt.bStartPenetrating && GetWorld()->GetTimeSeconds() >= NaechsterPolizeiKontakt) {
+     if (auto* Koerper = Cast<UPrimitiveComponent>(Ziel->GetRootComponent()); Koerper && Koerper->IsSimulatingPhysics()) {
+      const FVector Stoss = (Ziel->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
+      const float Relativ = FVector::DotProduct((NeuerOrt - Alt) / FMath::Max(Zeit,0.01f) - Ziel->GetVelocity(), Stoss);
+      if (Relativ > 40.0f) {
+       Koerper->AddImpulseAtLocation(Stoss * Koerper->GetMass() * FMath::Min(Relativ * 0.2f, 90.0f), Kontakt.ImpactPoint);
+       NaechsterPolizeiKontakt = GetWorld()->GetTimeSeconds() + 2.5;
+       UE_LOG(LogTemp, Display, TEXT("LALABERG_POLIZEI seitenkontakt relativ=%.0f"), Relativ);
+       ++Seitenkontakte;
+      }
+     }
+    }
+   } else SetActorLocation(NeuerOrt);
+  } else SetActorLocation(NeuerOrt);
  }
 
  if (bPolizei && Blitz) {
@@ -663,6 +699,18 @@ FTransform ALaLaBergVerkehrsauto::SitzLage(bool bFahrer) const {
  const FRotator Lage = GetActorRotation();
  return FTransform(Lage.Quaternion(), GetActorLocation() + Lage.RotateVector(Sitzversatz),
                    FVector(INSASSE_MASSSTAB * FMath::Clamp(Hoehe / 115.0f, 1.0f, 1.25f)));
+}
+
+void ALaLaBergVerkehrsauto::TestVerstecke() {
+ if(Netz) Netz->SetVisibility(false);
+ PflegeInsassen(false);
+ if(!ALaLaBergAutoPool::Instanz) return;
+ if(FahrzeugTyp == -1) ALaLaBergAutoPool::Instanz->Verstecke(PoolIndizes);
+ else {
+  ALaLaBergAutoPool::Instanz->VersteckeTyp(FahrzeugTyp, TypPoolIndizes);
+  if(bTypFernBenutzt) ALaLaBergAutoPool::Instanz->VersteckeTypFern(FahrzeugTyp, TypFernIndex);
+ }
+ if(bKastenGepoolt && ALaLaBergKastenPool::Instanz) ALaLaBergKastenPool::Instanz->Verstecke(KastenGriff);
 }
 
 void ALaLaBergVerkehrsauto::PflegeInsassen(bool bSichtbar) {

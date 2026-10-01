@@ -674,6 +674,7 @@ void ALaLaBergGameMode::BeginPlay() {
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergAntriebTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergUebernahmeTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergSperrTest")) ||
+                         FParse::Param(FCommandLine::Get(),TEXT("LaLaBergManoeverTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergSonderTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergSchadenTest")) ||
                          FParse::Param(FCommandLine::Get(),TEXT("LaLaBergTaxiTest")) ||
@@ -1289,7 +1290,87 @@ void ALaLaBergGameMode::BeginPlay() {
   FTimerHandle Ende;
   GetWorldTimerManager().SetTimer(Ende,[]() { FPlatformMisc::RequestExitWithStatus(false,0); },10.5f,false);
  }
-// Die Bildrate zu Fuss - der Fahrtest misst sie nur am Steuer, und zu Fuss
+// Fuer die Ursachensuche an der Bildrate: einzelne Materialien ausblenden
+ // und dieselbe Messung noch einmal fahren. -LaLaBergOhneWasser blendet die
+ // Wasserflaechen aus, -LaLaBergOhneBaeume das Laub. Wenige Zeichenaufrufe
+ // mit langer Zeit heissen Pixelkosten - die kommen von dem, was den
+ // Bildschirm fuellt, nicht von dem, was viele Aufrufe kostet.
+ if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergOhneWasser"))||FParse::Param(FCommandLine::Get(),TEXT("LaLaBergOhneBaeume"))
+  ||FParse::Param(FCommandLine::Get(),TEXT("LaLaBergOhnePassanten"))||FParse::Param(FCommandLine::Get(),TEXT("LaLaBergOhneAutos"))) {
+  FTimerHandle Aus;
+  GetWorldTimerManager().SetTimer(Aus,[this]() {
+   const bool bOhneWasser=FParse::Param(FCommandLine::Get(),TEXT("LaLaBergOhneWasser"));
+   const bool bOhneBaeume=FParse::Param(FCommandLine::Get(),TEXT("LaLaBergOhneBaeume"));
+   const UMaterialInterface* MWasser=LoadObject<UMaterialInterface>(nullptr,TEXT("/Game/Art/Materials/M_Wasser.M_Wasser"));
+   const UMaterialInterface* MLaub=LoadObject<UMaterialInterface>(nullptr,TEXT("/Game/Art/Materials/M_Laub.M_Laub"));
+   int32 Versteckt=0;
+   for(TActorIterator<AActor> It(GetWorld());It;++It) {
+    TArray<UPrimitiveComponent*> Teile;
+    It->GetComponents<UPrimitiveComponent>(Teile);
+    for(UPrimitiveComponent* Teil:Teile) {
+     bool bTreffer=false;
+     for(int32 i=0;i<Teil->GetNumMaterials()&&!bTreffer;i++) {
+      const UMaterialInterface* M=Teil->GetMaterial(i);
+      bTreffer=(bOhneWasser&&M==MWasser)||(bOhneBaeume&&M==MLaub);
+     }
+     if(!bTreffer) continue;
+     Teil->SetVisibility(false);
+     Versteckt++;
+    }
+   }
+   // Ganze Akteure statt einzelner Materialien: die Passanten und die
+   // KI-Autos. Der Versuch mit dem kleineren Nahbereich (45 statt 120 m)
+   // hatte nichts gebracht - das beweist aber nur, dass der Nahbereich
+   // nicht greift, nicht dass die Figuren nichts kosten.
+   int32 Figuren=0, Autos=0;
+   // Wirklich entfernen, nicht nur ausblenden: ausgeblendet kostet nur die
+   // Grafik nichts, der Tick laeuft weiter. Und nach der Messreihe stand
+   // fest, dass es nicht die Grafik ist - Aufloesung, Beleuchtung, HUD und
+   // Lumen aendern an der Bildrate nichts.
+   if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergOhnePassanten"))) {
+    TArray<ALaLaBergPassantKI*> Weg(ALaLaBergPassantKI::Alle);
+    for(ALaLaBergPassantKI* P:Weg) { if(!P) continue; P->Destroy(); Figuren++; }
+   }
+   if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergOhneAutos"))) {
+    TArray<ALaLaBergVerkehrsauto*> Weg(ALaLaBergVerkehrsauto::Alle);
+    for(ALaLaBergVerkehrsauto* A:Weg) { if(!A) continue; A->TestVerstecke(); A->Destroy(); Autos++; }
+   }
+   UE_LOG(LogTemp,Display,TEXT("LALABERG_AUSGEBLENDET wasser=%d baeume=%d teile=%d passanten=%d autos=%d"),
+          bOhneWasser?1:0,bOhneBaeume?1:0,Versteckt,Figuren,Autos);
+  },3.5f,false);
+ }
+ // Fuer die Ursachensuche an der Bildrate: einzelne Materialien ausblenden
+ // und dieselbe Messung noch einmal fahren. -LaLaBergOhneWasser blendet die
+ // Wasserflaechen aus, -LaLaBergOhneBaeume das Laub. Wenige Zeichenaufrufe
+ // mit langer Zeit heissen Pixelkosten - die kommen von dem, was den
+ // Bildschirm fuellt, nicht von dem, was viele Aufrufe kostet.
+ if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergOhneWasser"))||FParse::Param(FCommandLine::Get(),TEXT("LaLaBergOhneBaeume"))) {
+  FTimerHandle Aus;
+  GetWorldTimerManager().SetTimer(Aus,[this]() {
+   const bool bOhneWasser=FParse::Param(FCommandLine::Get(),TEXT("LaLaBergOhneWasser"));
+   const bool bOhneBaeume=FParse::Param(FCommandLine::Get(),TEXT("LaLaBergOhneBaeume"));
+   const UMaterialInterface* MWasser=LoadObject<UMaterialInterface>(nullptr,TEXT("/Game/Art/Materials/M_Wasser.M_Wasser"));
+   const UMaterialInterface* MLaub=LoadObject<UMaterialInterface>(nullptr,TEXT("/Game/Art/Materials/M_Laub.M_Laub"));
+   int32 Versteckt=0;
+   for(TActorIterator<AActor> It(GetWorld());It;++It) {
+    TArray<UPrimitiveComponent*> Teile;
+    It->GetComponents<UPrimitiveComponent>(Teile);
+    for(UPrimitiveComponent* Teil:Teile) {
+     bool bTreffer=false;
+     for(int32 i=0;i<Teil->GetNumMaterials()&&!bTreffer;i++) {
+      const UMaterialInterface* M=Teil->GetMaterial(i);
+      bTreffer=(bOhneWasser&&M==MWasser)||(bOhneBaeume&&M==MLaub);
+     }
+     if(!bTreffer) continue;
+     Teil->SetVisibility(false);
+     Versteckt++;
+    }
+   }
+   UE_LOG(LogTemp,Display,TEXT("LALABERG_AUSGEBLENDET wasser=%d baeume=%d teile=%d"),
+          bOhneWasser?1:0,bOhneBaeume?1:0,Versteckt);
+  },3.5f,false);
+ }
+ // Die Bildrate zu Fuss - der Fahrtest misst sie nur am Steuer, und zu Fuss
  // steht die Kamera tiefer, sieht mehr Fassade und mehr Passanten. Drei
  // Stellen, je drei Sekunden: der Start am Klinikum, der Hauptplatz in der
  // Altstadt (die dichteste Bebauung) und das Lechufer, wo seit dem
@@ -1299,7 +1380,11 @@ void ALaLaBergGameMode::BeginPlay() {
  if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergBildrate"))) {
   struct FStelle { const TCHAR* Name; FVector Ort; FRotator Blick; };
   static const FStelle STELLEN[] = {
-   { TEXT("Klinikum"),   FVector(-159000.0f,15600.0f,0.0f),  FRotator(-4.0f,-90.0f,0.0f) },
+   // Der Startpunkt des Spiels, mit seiner tatsaechlichen Hoehe. Mit einem
+   // Strahl von oben landete die Messung auf dem Dach des Klinikums - von
+   // dort sieht man die ganze Stadt bis zum Horizont, und gemessen wurde
+   // dann der schlechteste Blick des Spiels statt eines gewoehnlichen.
+   { TEXT("Klinikum"),   FVector(-167210.0f,14530.0f,2965.0f), FRotator(-4.0f,-90.0f,0.0f) },
    { TEXT("Hauptplatz"), FVector(-1700.0f,-2600.0f,0.0f),    FRotator(-2.0f,42.0f,0.0f) },
    { TEXT("Lechufer"),   FVector(-14500.0f,22000.0f,600.0f), FRotator(-11.0f,35.0f,0.0f) },
   };
@@ -1339,6 +1424,10 @@ void ALaLaBergGameMode::BeginPlay() {
    FTimerHandle An;
    GetWorldTimerManager().SetTimer(An,[this,i]() {
     Stelle=i; Bilder=GFrameCounter; Uhr=FPlatformTime::Seconds(); LetzteUhr=0.0;
+    // Die Bildratentafel der Engine mitlaufen lassen: sie schreibt am Ende
+    // Spiel-, Render- und Grafikzeit ins Protokoll. Ohne diese Aufteilung
+    // raet man, welcher Faden bremst.
+    if(auto* PCT=GetWorld()->GetFirstPlayerController()) PCT->ConsoleCommand(TEXT("StartFPSChart"));
     // Mit -LaLaBergGpu zusaetzlich die Aufschluesselung eines Bildes ins
     // Protokoll - daran sieht man, welcher Durchlauf die Zeit kostet.
     if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergGpu")))
@@ -1352,6 +1441,10 @@ void ALaLaBergGameMode::BeginPlay() {
    GetWorldTimerManager().SetTimer(Aus,[this,i]() {
     Mittel[i]=(GFrameCounter-Bilder)/FMath::Max(0.001,FPlatformTime::Seconds()-Uhr);
     Stelle=-1;
+    if(auto* PCT=GetWorld()->GetFirstPlayerController()) PCT->ConsoleCommand(TEXT("StopFPSChart"));
+    // Ein Bild je Messstelle: ohne es weiss man nicht, was die Kamera dort
+    // ueberhaupt sieht - und ob sie nicht in einer Wand steht.
+    if(auto* PC=GetWorld()->GetFirstPlayerController()) PC->ConsoleCommand(TEXT("HighResShot 1280x720"));
     Beleg(FString::Printf(TEXT("LALABERG_BILDRATE %s mittel=%.0f schlechteste=%.0f"),
                           STELLEN[i].Name,Mittel[i],Schlechteste[i]));
    },20.0f+i*12.0f,false);
@@ -2147,6 +2240,77 @@ void ALaLaBergGameMode::BeginPlay() {
    FTimerHandle Schluss;
    GetWorldTimerManager().SetTimer(Schluss,[bPass]() { FPlatformMisc::RequestExitWithStatus(false,bPass?0:1); },1.5f,false);
   },16.0f,false);
+ }
+ // Nahbereichstest fuer den Polizeiwagen: fahrender Spieler, vier Sterne,
+ // eine Streife hinter ihm auf derselben Fahrbahn. Misst das Seitenmanoever
+ // und echten Kontakt getrennt von der bestehenden Strassensperre.
+ if(FParse::Param(FCommandLine::Get(),TEXT("LaLaBergManoeverTest"))) {
+  static TWeakObjectPtr<ALaLaBergVerkehrsauto> Probe;
+  FTimerHandle Hin;
+  GetWorldTimerManager().SetTimer(Hin,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr;
+   for(TActorIterator<ALaLaBergWagen> It(GetWorld());It&&Figur;++It) {
+    const FVector Ziel=It->GetActorLocation()-It->GetActorForwardVector()*450.0f
+     -It->GetActorRightVector()*250.0f+FVector(0,0,40);
+    Figur->SetActorLocation(Ziel,false,nullptr,ETeleportType::TeleportPhysics);
+    PC->SetControlRotation((It->GetActorLocation()-Ziel).Rotation());
+    break;
+   }
+  },4.6f,false);
+  FTimerHandle Start;
+  GetWorldTimerManager().SetTimer(Start,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   if(auto* Figur=PC?Cast<ALaLaBergCharacter>(PC->GetPawn()):nullptr) Figur->Einsteigen();
+   if(auto* Wagen=PC?Cast<ALaLaBergWagen>(PC->GetPawn()):nullptr) {
+    Wagen->TestSteuerung(1.0f,0.0f);
+    if(auto* P=ALaLaBergPolizei::Instanz.Get()) P->TestSetzeSterne(4);
+    Beleg(TEXT("LALABERG_MANOEVERTEST einstieg PASS"));
+   } else Beleg(TEXT("LALABERG_MANOEVERTEST einstieg FAIL"));
+  },6.0f,false);
+  FTimerHandle Streife;
+  GetWorldTimerManager().SetTimer(Streife,[this]() {
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   auto* Wagen=PC?Cast<ALaLaBergWagen>(PC->GetPawn()):nullptr;
+   if(!Wagen || Probe.IsValid() || Wagen->TempoKmh()<20.0f) return;
+   const FVector Vor=Wagen->GetVelocity().GetSafeNormal2D();
+   if(Vor.IsNearlyZero()) return;
+   const FVector Ort=Wagen->GetActorLocation()-Vor*750.0f+Wagen->GetActorRightVector()*170.0f;
+   const FRotator Blick=Vor.Rotation();
+   auto* Auto=GetWorld()->SpawnActorDeferred<ALaLaBergVerkehrsauto>(ALaLaBergVerkehrsauto::StaticClass(),
+    FTransform(Blick,Ort),nullptr,nullptr,ESpawnActorCollisionHandlingMethod::AlwaysSpawn);
+   if(!Auto) return;
+   Auto->bPolizei=true; Auto->WunschTyp=-1; Auto->SetzeStrassenbreite(6.0f);
+   Auto->FinishSpawning(FTransform(Blick,Ort));
+   Auto->FolgeWeg({Ort,Ort+Vor*3500.0f},70.0f);
+   Probe=Auto;
+   Beleg(FString::Printf(TEXT("LALABERG_MANOEVERTEST streife tempo=%.1fkmh abstand=%.0fcm"),
+    Wagen->TempoKmh(),FVector::Dist2D(Ort,Wagen->GetActorLocation())));
+  },0.25f,true,8.0f);
+  FTimerHandle Beobachtung;
+  GetWorldTimerManager().SetTimer(Beobachtung,[this]() {
+   const auto* Auto=Probe.Get();
+   const auto* PC=GetWorld()->GetFirstPlayerController();
+   const auto* Wagen=PC?Cast<ALaLaBergWagen>(PC->GetPawn()):nullptr;
+   if(!Auto||!Wagen) return;
+   const FVector Abstand=Wagen->GetActorLocation()-Auto->GetActorLocation();
+   Beleg(FString::Printf(TEXT("LALABERG_MANOEVERPOS laengs=%.0fcm seit=%.0fcm dist=%.0fcm wagen=%.1fkmh takte=%d kontakte=%d"),
+    FVector::DotProduct(Abstand,Auto->GetActorForwardVector()),
+    FVector::DotProduct(Abstand,Auto->GetActorRightVector()),Abstand.Size2D(),
+    Wagen->TempoKmh(),Auto->HoleManoeverTakte(),Auto->HoleSeitenkontakte()));
+  },0.5f,true,8.5f);
+  FTimerHandle Ende;
+  GetWorldTimerManager().SetTimer(Ende,[this]() {
+   const auto* Auto=Probe.Get();
+   auto* PC=GetWorld()->GetFirstPlayerController();
+   auto* Wagen=PC?Cast<ALaLaBergWagen>(PC->GetPawn()):nullptr;
+   const int32 Takte=Auto?Auto->HoleManoeverTakte():0;
+   const int32 Kontakte=Auto?Auto->HoleSeitenkontakte():0;
+   const bool bPass=Wagen&&Auto&&Takte>0&&Kontakte>0&&Wagen->RaederAmBoden()>=2;
+   Beleg(FString::Printf(TEXT("LALABERG_MANOEVERTEST %s takte=%d kontakte=%d tempo=%.1fkmh raeder=%d"),
+    bPass?TEXT("PASS"):TEXT("FAIL"),Takte,Kontakte,Wagen?Wagen->TempoKmh():0.0f,Wagen?Wagen->RaederAmBoden():0));
+   FPlatformMisc::RequestExitWithStatus(false,bPass?0:1);
+  },22.0f,false);
  }
  // Wer ein KI-Auto uebernimmt, soll in genau diesem Auto sitzen. Vorher
  // wuerfelte der neue Wagen sein Modell selbst, und man sass regelmaessig im

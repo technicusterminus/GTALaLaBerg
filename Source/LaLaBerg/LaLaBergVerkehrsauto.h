@@ -75,6 +75,9 @@ public:
  // Siehe SitzLage: die Sitzfigur passt nur verkleinert in diese Autos.
  static constexpr float INSASSE_MASSSTAB = 0.72f;
  bool HatFahrerFigur() const { return FahrerIndex >= 0; }
+ // Fuer die Bildratensuche (-LaLaBergOhneAutos): auch die Pool-Instanzen
+ // wegraeumen, die an einem anderen Akteur haengen.
+ void TestVerstecke();
  // Bauhoehe der Karosserie in cm ueber der Strasse - aus dem Mesh gelesen
  // (siehe HoleTypMass in der .cpp). Fuer -LaLaBergInsassenTest: der Kopf des
  // Fahrers muss darunter bleiben.
@@ -91,6 +94,8 @@ public:
  // sonst waere "die Streife hat eine Sirene" nur eine Behauptung ueber den
  // Code statt ueber das, was man hoert.
  bool SireneAn() const { return bSireneLaeuft; }
+ int32 HoleManoeverTakte() const { return ManoeverTakte; }
+ int32 HoleSeitenkontakte() const { return Seitenkontakte; }
  // Wagen einer Strassensperre: steht, aber im Einsatz - Blaulicht und Horn
  // laufen, obwohl keine Route anliegt.
  void SetzeSperre(bool bAn) { bSperre = bAn; }
@@ -152,6 +157,8 @@ private:
  // ein einfaches Sichtweiten-LOD: nur Autos nah am Spieler zeigen das
  // Detailmodell, weiter entfernte den leichten Kasten aus wagen.json.
  double NaechsterPolizeiKontakt = 0.0;
+ int32 ManoeverTakte = 0;
+ int32 Seitenkontakte = 0;
  TArray<int32> PoolIndizes;
  bool bPoolGenutzt = false;
  bool bDetailliert = false;
