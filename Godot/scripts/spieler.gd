@@ -14,6 +14,7 @@ const KLINIKUM := Vector3(-1672.1, 0.0, 145.3)
 
 var kamera: Kamera
 var waffe := Waffe.new()
+var gesperrt := false   ## im Film: keine Eingabe
 var leben := 100.0
 var krankenhausbesuche := 0
 
@@ -170,7 +171,9 @@ func _physics_process(delta: float) -> void:
 		_warte_boden = false
 		return
 	var faktor := 1.0 + 0.33 * Konto.anteil(Konto.Wert.AUSDAUER)
-	var eingabe := Input.get_vector("links", "rechts", "vorwaerts", "rueckwaerts")
+	var eingabe := Vector2.ZERO
+	if not gesperrt:
+		eingabe = Input.get_vector("links", "rechts", "vorwaerts", "rueckwaerts")
 	var richtung := Vector3.ZERO
 	if kamera != null:
 		richtung = kamera.rechts() * eingabe.x - kamera.vorwaerts() * eingabe.y
@@ -179,7 +182,7 @@ func _physics_process(delta: float) -> void:
 	velocity.z = move_toward(velocity.z, richtung.z * tempo, 40.0 * delta)
 	var war_am_boden := is_on_floor()
 	if war_am_boden:
-		if Input.is_action_just_pressed("springen"):
+		if Input.is_action_just_pressed("springen") and not gesperrt:
 			velocity.y = SPRUNG
 	else:
 		velocity.y -= _schwerkraft * delta
@@ -224,7 +227,8 @@ func _ziele_und_feuere() -> void:
 	var brust := global_position + Vector3(0, 1.35, 0)
 	var dir := (ziel - brust).normalized()
 	waffe.global_basis = Basis.looking_at(dir)
-	if Input.is_action_pressed("feuer") and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+	if Input.is_action_pressed("feuer") and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED \
+			and not gesperrt:
 		_koerper.rotation.y = atan2(-dir.x, -dir.z)
 		feuere_auf(ziel)
 

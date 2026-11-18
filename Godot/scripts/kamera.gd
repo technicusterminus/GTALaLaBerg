@@ -31,6 +31,11 @@ func _ready() -> void:
 	_kamera.current = true
 
 
+## Nach einem Film wieder die Kamera der Spielfigur einschalten.
+func aktivieren() -> void:
+	_kamera.current = true
+
+
 func abstand_setzen(a: float) -> void:
 	_arm.spring_length = a
 

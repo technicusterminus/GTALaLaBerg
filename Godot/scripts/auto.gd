@@ -24,6 +24,7 @@ var fahrer: Node3D:
 		else:
 			remove_from_group("spielerauto")
 var tempo_ms := 0.0
+var gesperrt := false   ## im Film: keine Eingabe, der Wagen bremst
 var leben := 100.0
 var _letzter_stoss := -10.0
 var _lenkung := 0.0
@@ -141,8 +142,8 @@ func _physics_process(delta: float) -> void:
 		brake = BREMSE * 0.2
 		steering = move_toward(steering, 0.0, delta)
 		return
-	var gas := Input.get_axis("rueckwaerts", "vorwaerts")
-	var lenk := Input.get_axis("rechts", "links")
+	var gas := 0.0 if gesperrt else Input.get_axis("rueckwaerts", "vorwaerts")
+	var lenk := 0.0 if gesperrt else Input.get_axis("rechts", "links")
 	var bremse := 0.0
 	var kraft := 0.0
 	if gas > 0.0:
@@ -154,7 +155,7 @@ func _physics_process(delta: float) -> void:
 			kraft = gas * RUECKWAERTS
 	if tempo_ms > HOECHST_MS:
 		kraft = 0.0
-	if Input.is_action_pressed("handbremse"):
+	if Input.is_action_pressed("handbremse") or gesperrt:
 		bremse = BREMSE * 1.5
 	if ist_ausgeschaltet():
 		kraft = 0.0

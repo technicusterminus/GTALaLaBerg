@@ -10,6 +10,7 @@ var status := ""
 var auftrag_text := ""
 var revier_text := ""
 var laden_text := ""
+var drehbuch_text := ""
 var sterne := 0
 var gesehen := true
 var such_anteil := 0.0
@@ -37,6 +38,7 @@ var _l_fahndung := Label.new()
 var _l_auftrag := Label.new()
 var _l_revier := Label.new()
 var _l_laden := Label.new()
+var _l_drehbuch := Label.new()
 var _rueck_bis := 0.0
 
 
@@ -48,6 +50,7 @@ func _ready() -> void:
 	_l_rueck.modulate.a = 0.0
 	_platziere(_l_auftrag, 16, 0.0, 0.0, 12, 32, 760, 24, HORIZONTAL_ALIGNMENT_LEFT)
 	_platziere(_l_revier, 14, 0.0, 0.0, 12, 58, 760, 22, HORIZONTAL_ALIGNMENT_LEFT)
+	_platziere(_l_drehbuch, 16, 0.0, 0.0, 12, 80, 900, 48, HORIZONTAL_ALIGNMENT_LEFT)
 	_platziere(_l_laden, 20, 0.5, 0.5, -300, -120, 600, 200, HORIZONTAL_ALIGNMENT_CENTER)
 	_platziere(_l_fahndung, 22, 0.5, 0.0, -300, 40, 600, 60, HORIZONTAL_ALIGNMENT_CENTER)
 	_platziere(_l_ort, 26, 0.0, 1.0, 44, -150, 520, 36, HORIZONTAL_ALIGNMENT_LEFT)
@@ -84,6 +87,7 @@ func _process(delta: float) -> void:
 	_l_auftrag.text = auftrag_text
 	_l_revier.text = revier_text
 	_l_laden.text = laden_text
+	_l_drehbuch.text = drehbuch_text
 	_l_rueck.modulate.a = clampf(_rueck_bis - Time.get_ticks_msec() / 1000.0, 0.0, 1.0)
 	_takt -= delta
 	if _takt <= 0.0 and ziel != null:

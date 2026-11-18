@@ -1,0 +1,2871 @@
+{
+ "schema": 2,
+ "titel": "FARBKRIEG",
+ "figuren": {
+  "lale": {
+   "name": "Lale",
+   "farbe": "#ffffff",
+   "gestalt": "#e76f51"
+  },
+  "lale_off": {
+   "name": "Lale (Off)",
+   "farbe": "#d9d9d9",
+   "gestalt": null
+  },
+  "marta": {
+   "name": "Schwester Marta",
+   "farbe": "#8ecae6",
+   "gestalt": "#8ecae6"
+  },
+  "funk": {
+   "name": "Der Schiedsrichter",
+   "farbe": "#c9c9c9",
+   "gestalt": null
+  },
+  "konrad": {
+   "name": "Konrad Weidinger",
+   "farbe": "#f6c90e",
+   "gestalt": "#f6c90e"
+  },
+  "anneliese": {
+   "name": "Anneliese Lechner",
+   "farbe": "#4d8bff",
+   "gestalt": "#4d8bff"
+  },
+  "ottmar": {
+   "name": "Ottmar Wald",
+   "farbe": "#4fbf6d",
+   "gestalt": "#4fbf6d"
+  },
+  "xaver": {
+   "name": "Xaver Gruber",
+   "farbe": "#f4f1e6",
+   "gestalt": "#f4f1e6"
+  },
+  "korbi": {
+   "name": "Wachtmeister Brandl",
+   "farbe": "#9aa5b1",
+   "gestalt": "#6c757d"
+  },
+  "schorsch": {
+   "name": "Schorsch",
+   "farbe": "#ff9f5a",
+   "gestalt": "#ff9f5a"
+  },
+  "pfarrer": {
+   "name": "Pfarrer Alois",
+   "farbe": "#d6b3ff",
+   "gestalt": "#b38ad6"
+  },
+  "chor": {
+   "name": "Menge",
+   "farbe": "#cfcfcf",
+   "gestalt": null
+  }
+ },
+ "missionen": [
+  {
+   "id": "s_p1",
+   "name": "Kaltstart",
+   "akt": 0,
+   "start": "auto",
+   "voraus": [],
+   "lohn": 0,
+   "ruf": 0,
+   "stufen": [
+    {
+     "art": "titel",
+     "text": "FARBKRIEG",
+     "unter": "Ein Film in vier Akten – gedreht in Landsberg am Lech",
+     "dauer": 5.0
+    },
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "kran",
+       "zeilen": [
+        {
+         "wer": "lale_off",
+         "text": "Landsberg am Lech. Ein Fluss, ein Turm, der aussieht wie ein Schmalzbrot – und vier Banden, die sich seit fünfundzwanzig Jahren mit Farbe bewerfen."
+        },
+        {
+         "wer": "lale_off",
+         "text": "Das ist die Geschichte, wie ich aufgewacht bin. Mit Kopfweh. Und einer Pistole, die nicht meine war."
+        }
+       ],
+       "ort": "Klinikum",
+       "hoehe": 70,
+       "abstand": 90,
+       "winkel": 200,
+       "dauer": 9
+      },
+      {
+       "art": "umkreise",
+       "zeilen": [
+        {
+         "wer": "marta",
+         "text": "Na, wieder da? Sie haben drei Stunden auf der Straße gelegen. Mit vier Farben auf der Jacke."
+        },
+        {
+         "wer": "lale",
+         "text": "Welche vier?"
+        },
+        {
+         "wer": "marta",
+         "text": "Gelb, Blau, Grün, Weiß. Alle. Das schafft sonst keiner, ohne dass es wehtut."
+        },
+        {
+         "wer": "lale",
+         "text": "Und die Pistole?"
+        },
+        {
+         "wer": "marta",
+         "text": "Steckte in Ihrer Hand. Paintball. Geliehen von jemandem, der sie zurückhaben will."
+        },
+        {
+         "wer": "lale",
+         "text": "Von wem?"
+        },
+        {
+         "wer": "marta",
+         "text": "Das steht auf dem Zettel in Ihrer Tasche."
+        },
+        {
+         "wer": "lale_off",
+         "text": "Der Waffenstillstand endet am Samstag. Komm zum Bahnhof. – S."
+        },
+        {
+         "wer": "marta",
+         "text": "S. wie Schiedsrichter. Oder wie: Sie haben ein Problem."
+        }
+       ],
+       "ort": "spieler",
+       "hoehe": 1.8,
+       "abstand": 4.5,
+       "figuren": [
+        "marta",
+        "lale"
+       ]
+      },
+      {
+       "art": "statisch",
+       "zeilen": [
+        {
+         "wer": "marta",
+         "text": "Hören Sie zu: Landsberg ist aufgeteilt. Gelb am Bahnhof, Blau am Lech, Grün rund um die Klinik, Weiß in der Altstadt."
+        },
+        {
+         "wer": "marta",
+         "text": "Seit dem Finale von 1999 herrscht Waffenstillstand. Frieden ist das nicht. Nur Pause."
+        },
+        {
+         "wer": "lale",
+         "text": "Und was habe ich damit zu tun?"
+        },
+        {
+         "wer": "marta",
+         "text": "Sie sind die Erste seit Jahren, die alle vier Farben gleichzeitig trägt. Das ist entweder ein Wunder oder ein Todesurteil."
+        },
+        {
+         "wer": "marta",
+         "text": "Der Wagen vor der Tür gehört Ihnen. Fragen Sie nicht, wem er vorher gehört hat."
+        }
+       ],
+       "ort": "spieler",
+       "hoehe": 1.6,
+       "abstand": 3.2,
+       "winkel": 40,
+       "figuren": [
+        "marta",
+        "lale"
+       ]
+      }
+     ]
+    },
+    {
+     "art": "im_wagen",
+     "text": "Steig in den Wagen vor dem Klinikum – Taste F"
+    }
+   ]
+  },
+  {
+   "id": "s_p2",
+   "name": "Der Schiedsrichter",
+   "akt": 0,
+   "start": "auto",
+   "voraus": [
+    "s_p1"
+   ],
+   "lohn": 200,
+   "ruf": 15,
+   "stufen": [
+    {
+     "art": "funk",
+     "wer": "funk",
+     "text": "Guten Morgen, Lale. Ja, ich kenne Ihren Namen. Ich kenne alle Namen."
+    },
+    {
+     "art": "funk",
+     "wer": "funk",
+     "text": "Fahren Sie zum Bahnhof. Die Gelben warten. Pünktlichkeit ist dort keine Tugend, sondern Religion."
+    },
+    {
+     "art": "hin",
+     "ort": "Bahnhof",
+     "text": "Zum Bahnhof fahren – die Gelben warten",
+     "zeit": 360,
+     "imWagen": true
+    },
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "fahrt",
+       "zeilen": [
+        {
+         "wer": "konrad",
+         "text": "Sieben Uhr einundvierzig. Eine Minute zu spät. Das sind sechzig Sekunden, in denen ein Zug hätte einfahren können."
+        },
+        {
+         "wer": "lale",
+         "text": "Ich wusste nicht, dass ich verabredet war."
+        },
+        {
+         "wer": "konrad",
+         "text": "Jeder ist verabredet. Mit dem Fahrplan. Konrad Weidinger, Dispatcher der Gelben. Sie tragen unsere Farbe auf der Schulter."
+        },
+        {
+         "wer": "lale",
+         "text": "Und drei andere auf der Jacke."
+        },
+        {
+         "wer": "konrad",
+         "text": "Das ist der Teil, der mir Sorgen macht."
+        }
+       ],
+       "ort": "Bahnhof",
+       "hoehe": 2.0,
+       "abstand": 14,
+       "winkel": 300,
+       "figuren": [
+        "konrad",
+        "lale"
+       ]
+      },
+      {
+       "art": "statisch",
+       "zeilen": [
+        {
+         "wer": "konrad",
+         "text": "In Landsberg fährt nichts ohne uns. Taxis, Lieferungen, Krankenfahrten – alles läuft über unsere Säulen."
+        },
+        {
+         "wer": "konrad",
+         "text": "Wer hier fährt, fährt für die Gelben. Oder gar nicht."
+        }
+       ],
+       "ort": "Bahnhof",
+       "hoehe": 1.7,
+       "abstand": 3.5,
+       "winkel": 20,
+       "figuren": [
+        "konrad",
+        "lale"
+       ]
+      }
+     ]
+    },
+    {
+     "art": "wahl",
+     "frage": "Wie antwortest du dem Dispatcher?",
+     "optionen": [
+      {
+       "text": "»Ich fahre für niemanden.«",
+       "setze": {
+        "ton": "frech"
+       }
+      },
+      {
+       "text": "»Ich höre erst einmal zu.«",
+       "setze": {
+        "ton": "klug"
+       }
+      }
+     ]
+    },
+    {
+     "art": "wenn",
+     "flag": "ton",
+     "ist": "frech",
+     "dann": [
+      {
+       "art": "szene",
+       "schnitte": [
+        {
+         "art": "statisch",
+         "zeilen": [
+          {
+           "wer": "konrad",
+           "text": "Mut. Bei uns nennt man das Verspätung im Kopf."
+          },
+          {
+           "wer": "konrad",
+           "text": "Aber gut. Frech fährt sich schneller. Drei Taxifahrten, Lale. Dann reden wir weiter."
+          }
+         ],
+         "ort": "Bahnhof",
+         "hoehe": 1.7,
+         "abstand": 3.5,
+         "winkel": 340,
+         "figuren": [
+          "konrad",
+          "lale"
+         ]
+        }
+       ]
+      }
+     ],
+     "sonst": [
+      {
+       "art": "szene",
+       "schnitte": [
+        {
+         "art": "statisch",
+         "zeilen": [
+          {
+           "wer": "konrad",
+           "text": "Zuhören. Der erste Schritt zur Pünktlichkeit. Sie gefallen mir."
+          },
+          {
+           "wer": "konrad",
+           "text": "Drei Taxifahrten, Lale. Zeigen Sie mir, dass Sie ankommen. Dann reden wir weiter."
+          }
+         ],
+         "ort": "Bahnhof",
+         "hoehe": 1.7,
+         "abstand": 3.5,
+         "winkel": 340,
+         "figuren": [
+          "konrad",
+          "lale"
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "art": "funk",
+     "wer": "funk",
+     "text": "Bemerkenswert. Er hat Ihnen kein einziges Mal gedroht. Das macht er sonst bei jedem zweiten Satz."
+    }
+   ]
+  },
+  {
+   "id": "s_a1_fahrplan",
+   "name": "Fahrplan",
+   "akt": 1,
+   "start": "Bahnhof",
+   "voraus": [
+    "s_p2"
+   ],
+   "lohn": 400,
+   "ruf": 25,
+   "stufen": [
+    {
+     "art": "titel",
+     "text": "AKT I",
+     "unter": "GELB – Die Pünktlichen",
+     "dauer": 4.0
+    },
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "umkreise",
+       "zeilen": [
+        {
+         "wer": "konrad",
+         "text": "Landsberg läuft nach Fahrplan. Meinem. Und heute ist ein Kurier der Gelben nicht angekommen."
+        },
+        {
+         "wer": "konrad",
+         "text": "Er trug ein Päckchen. Klein, schwer, in gelbes Papier gewickelt. Wachssiegel obendrauf."
+        },
+        {
+         "wer": "lale",
+         "text": "Was war drin?"
+        },
+        {
+         "wer": "konrad",
+         "text": "Das geht Sie nichts an. Fahren Sie zur Stadtverwaltung. Dort wurde er zuletzt gesehen."
+        }
+       ],
+       "ort": "Bahnhof",
+       "hoehe": 2.2,
+       "abstand": 5,
+       "figuren": [
+        "konrad",
+        "lale"
+       ]
+      }
+     ]
+    },
+    {
+     "art": "hin",
+     "ort": "Stadtverwaltung",
+     "text": "Zur Stadtverwaltung – dort wurde der Kurier zuletzt gesehen",
+     "zeit": 170,
+     "imWagen": true
+    },
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "statisch",
+       "zeilen": [
+        {
+         "wer": "lale_off",
+         "text": "Der Kurier war weg. Nur sein Mützenband lag noch da, blau von oben bis unten."
+        },
+        {
+         "wer": "lale_off",
+         "text": "Blau. Wer bei den Gelben ein blaues Band hinterlässt, will, dass man es findet."
+        },
+        {
+         "wer": "funk",
+         "text": "Das Päckchen sitzt in einem Wagen mit rosa Heckleuchte. Er fährt nach Westen. Schnell."
+        }
+       ],
+       "ort": "Stadtverwaltung",
+       "hoehe": 2.0,
+       "abstand": 7,
+       "winkel": 130
+      }
+     ]
+    },
+    {
+     "art": "stelle",
+     "text": "Den flüchtenden Wagen mit dem Päckchen stellen",
+     "zeit": 220
+    },
+    {
+     "art": "bring",
+     "ort": "Bahnhof",
+     "text": "Das Päckchen zurück zum Bahnhof bringen",
+     "zeit": 200
+    },
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "fahrt",
+       "zeilen": [
+        {
+         "wer": "konrad",
+         "text": "Siegel unversehrt. Und doch – sehen Sie das? Die Prägung."
+        },
+        {
+         "wer": "lale",
+         "text": "Ein Ball. Mit einem Sprung drin."
+        },
+        {
+         "wer": "konrad",
+         "text": "Eine von vier Hälften des Siegels von 1999. Wenn alle vier Mannschaften ihre Hälfte zusammenlegen, öffnet sich der Schmalzturm."
+        },
+        {
+         "wer": "konrad",
+         "text": "Und wer hinter diesem Päckchen her ist, will nicht, dass es zusammenkommt."
+        }
+       ],
+       "ort": "Bahnhof",
+       "hoehe": 1.9,
+       "abstand": 9,
+       "winkel": 40,
+       "figuren": [
+        "konrad",
+        "lale"
+       ]
+      }
+     ]
+    },
+    {
+     "art": "gib",
+     "geld": 0,
+     "ruf": 10
+    }
+   ]
+  },
+  {
+   "id": "s_a1_wache",
+   "name": "Wachtmeister Brandl",
+   "akt": 1,
+   "start": "Polizeiinspektion",
+   "voraus": [
+    "s_a1_fahrplan"
+   ],
+   "lohn": 450,
+   "ruf": 25,
+   "stufen": [
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "statisch",
+       "zeilen": [
+        {
+         "wer": "korbi",
+         "text": "Halt. Stopp. Polizei. Bitte steigen Sie nicht aus. Oder doch. Ich muss kurz im Handbuch nachsehen."
+        },
+        {
+         "wer": "lale",
+         "text": "Wachtmeister, wir stehen vor Ihrer Wache."
+        },
+        {
+         "wer": "korbi",
+         "text": "Eben. Das macht es einfacher. Korbinian Brandl, Polizeiinspektion Landsberg. Sie haben einen Paintball-Wagen."
+        },
+        {
+         "wer": "lale",
+         "text": "Ich habe auch ein Recht auf eine Meinung dazu."
+        },
+        {
+         "wer": "korbi",
+         "text": "Haben Sie nicht. Stillhalten bitte. Ich nehme Ihre Personalien auf. Das dauert."
+        }
+       ],
+       "ort": "Polizeiinspektion",
+       "hoehe": 1.7,
+       "abstand": 5,
+       "winkel": 200,
+       "figuren": [
+        "korbi",
+        "lale"
+       ]
+      }
+     ]
+    },
+    {
+     "art": "halte",
+     "text": "Stillhalten – der Wachtmeister blättert im Handbuch",
+     "zeit": 8,
+     "sterne": 1
+    },
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "statisch",
+       "zeilen": [
+        {
+         "wer": "korbi",
+         "text": "So. Verwarnung. Und noch etwas, vertraulich: Wenn Sie in meinem Bezirk Säulen anmalen, schreibe ich Sie auf."
+        },
+        {
+         "wer": "lale",
+         "text": "Verstanden."
+        },
+        {
+         "wer": "korbi",
+         "text": "Nicht dass ich es verhindern könnte. Ich bin allein. Aber schreiben, das kann ich."
+        }
+       ],
+       "ort": "Polizeiinspektion",
+       "hoehe": 1.7,
+       "abstand": 4.5,
+       "winkel": 150,
+       "figuren": [
+        "korbi",
+        "lale"
+       ]
+      }
+     ]
+    },
+    {
+     "art": "markiere",
+     "ort": "Polizeiinspektion",
+     "text": "Die Säule der Polizeiinspektion zeichnen – direkt vor seiner Nase",
+     "zeit": 0
+    },
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "statisch",
+       "zeilen": [
+        {
+         "wer": "korbi",
+         "text": "Das war jetzt Absicht."
+        },
+        {
+         "wer": "lale",
+         "text": "Sie standen im Weg."
+        },
+        {
+         "wer": "korbi",
+         "text": "Ich stehe immer im Weg. Das ist mein Beruf. – Ach, und Frau Lale: Im Archiv von Sankt Katharina liegen Fotos von 1999. Der Pfarrer weiß mehr, als er sagt."
+        }
+       ],
+       "ort": "Polizeiinspektion",
+       "hoehe": 1.7,
+       "abstand": 4.5,
+       "winkel": 60,
+       "figuren": [
+        "korbi",
+        "lale"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "s_a1_archiv",
+   "name": "Das Archiv",
+   "akt": 1,
+   "start": "Sankt Katharina",
+   "voraus": [
+    "s_a1_wache"
+   ],
+   "lohn": 520,
+   "ruf": 30,
+   "stufen": [
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "kran",
+       "zeilen": [
+        {
+         "wer": "pfarrer",
+         "text": "Der Herr sei mit dir. Und, wenn ich das sagen darf, die Gelben sind es nicht."
+        },
+        {
+         "wer": "lale",
+         "text": "Wachtmeister Brandl meinte, Sie hätten Fotos von 1999."
+        },
+        {
+         "wer": "pfarrer",
+         "text": "Ich habe Fotos von allem. Man nennt das Pfarrchronik. Kommen Sie mit in die Sakristei."
+        }
+       ],
+       "ort": "Sankt Katharina",
+       "hoehe": 14,
+       "abstand": 22,
+       "winkel": 250,
+       "figuren": [
+        "pfarrer",
+        "lale"
+       ]
+      }
+     ]
+    },
+    {
+     "art": "hin",
+     "ort": "Sankt Katharina",
+     "text": "In die Sakristei von Sankt Katharina",
+     "zeit": 0,
+     "imWagen": false
+    },
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "statisch",
+       "zeilen": [
+        {
+         "wer": "pfarrer",
+         "text": "Hier. Das Finale 1999. Vier Kapitäne, ein Schiedsrichter, die Goldene Kugel."
+        },
+        {
+         "wer": "lale",
+         "text": "Ein Gesicht ist durchgestrichen."
+        },
+        {
+         "wer": "pfarrer",
+         "text": "Franz Echter, Kapitän der Grünen. Nach dem Spiel hat man ihn des Betrugs beschuldigt. Er ist nie darüber hinweggekommen."
+        },
+        {
+         "wer": "lale",
+         "text": "Echter. Wie die Schwester im Klinikum."
+        },
+        {
+         "wer": "pfarrer",
+         "text": "Ja. Marta ist seine Schwester. Fragen Sie sie nicht danach. Noch nicht."
+        }
+       ],
+       "ort": "Sankt Katharina",
+       "hoehe": 1.5,
+       "abstand": 2.8,
+       "winkel": 330,
+       "figuren": [
+        "pfarrer",
+        "lale"
+       ]
+      },
+      {
+       "art": "umkreise",
+       "zeilen": [
+        {
+         "wer": "lale_off",
+         "text": "Ich sah mir das Foto lange an. Vier Männer in Farben. Einer in Weiß, sehr breit, sehr zufrieden. Der Ball in seiner Hand glänzte golden."
+        },
+        {
+         "wer": "lale_off",
+         "text": "Zu golden. Auf einem Foto von 1999 glänzt nichts so frisch wie Lack von gestern."
+        }
+       ],
+       "ort": "Sankt Katharina",
+       "hoehe": 2.2,
+       "abstand": 6
+      }
+     ]
+    },
+    {
+     "art": "bring",
+     "ort": "Bahnhof",
+     "text": "Das Foto zu Konrad Weidinger bringen",
+     "zeit": 260
+    },
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "statisch",
+       "zeilen": [
+        {
+         "wer": "konrad",
+         "text": "Der Ball war schon vor dem Anpfiff gestrichen worden? Das heißt, jemand hat das Finale entschieden, bevor es begann."
+        },
+        {
+         "wer": "lale",
+         "text": "Wer war der Mann in Weiß?"
+        },
+        {
+         "wer": "konrad",
+         "text": "Xaver Gruber. Der Wirt vom Hauptplatz. Der Mann, der immer gewinnt."
+        },
+        {
+         "wer": "konrad",
+         "text": "Das erklärt vieles. Und es macht mir Angst. Vor allem, dass ich es nie gesehen habe."
+        }
+       ],
+       "ort": "Bahnhof",
+       "hoehe": 1.8,
+       "abstand": 4,
+       "winkel": 100,
+       "figuren": [
+        "konrad",
+        "lale"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "s_a1_dispatcher",
+   "name": "Der Dispatcher",
+   "akt": 1,
+   "start": "Bahnhof",
+   "voraus": [
+    "s_a1_archiv"
+   ],
+   "lohn": 800,
+   "ruf": 50,
+   "stufen": [
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "umkreise",
+       "zeilen": [
+        {
+         "wer": "konrad",
+         "text": "Ich helfe Ihnen, Lale. Aber nicht aus Freundschaft. Aus Berechnung."
+        },
+        {
+         "wer": "konrad",
+         "text": "Beweisen Sie, dass Sie nicht nur fahren, sondern ankommen: Zeichnen Sie die vier Wahrzeichen der Gelben, fahren Sie drei Taxifahrten – und stellen Sie mich."
+        },
+        {
+         "wer": "lale",
+         "text": "Sie stellen? Ich dachte, Sie helfen mir."
+        },
+        {
+         "wer": "konrad",
+         "text": "Eben. Ein Dispatcher, der sich nicht fangen lässt, ist kein Dispatcher. Ich fahre dann los. Pünktlich."
+        }
+       ],
+       "ort": "Bahnhof",
+       "hoehe": 2.0,
+       "abstand": 6,
+       "figuren": [
+        "konrad",
+        "lale"
+       ]
+      }
+     ]
+    },
+    {
+     "art": "warte_revier",
+     "nr": 0,
+     "text": "Revier Vorstadt-Nord nehmen: vier Wahrzeichen zeichnen, drei Taxifahrten, den Dispatcher stellen"
+    },
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "statisch",
+       "zeilen": [
+        {
+         "wer": "konrad",
+         "text": "Sieben Uhr einundvierzig. Schon wieder zu spät. Diesmal ich."
+        },
+        {
+         "wer": "konrad",
+         "text": "Hier. Der Werkstattschlüssel. Die Lackiererei arbeitet ab sofort umsonst für Sie, und Ihr Wagen steckt mehr weg."
+        },
+        {
+         "wer": "lale",
+         "text": "Warum tun Sie das?"
+        },
+        {
+         "wer": "konrad",
+         "text": "Weil Sie angekommen sind, Lale. Das war die Prüfung. Alles andere war Fahrplan."
+        }
+       ],
+       "ort": "spieler",
+       "hoehe": 1.6,
+       "abstand": 4,
+       "winkel": 20,
+       "figuren": [
+        "konrad",
+        "lale"
+       ]
+      },
+      {
+       "art": "umkreise",
+       "zeilen": [
+        {
+         "wer": "konrad",
+         "text": "Und noch etwas: Fragen Sie in der Lackiererei nach Schorsch. Er hat eine Farbe gemischt, die es nicht geben dürfte."
+        },
+        {
+         "wer": "konrad",
+         "text": "Ein Gold, das in der Sonne grün wird. Das war 1999 auf dem Ball."
+        }
+       ],
+       "ort": "spieler",
+       "hoehe": 1.8,
+       "abstand": 5,
+       "figuren": [
+        "konrad",
+        "lale"
+       ]
+      }
+     ]
+    },
+    {
+     "art": "gib",
+     "geld": 300,
+     "ruf": 0
+    }
+   ]
+  },
+  {
+   "id": "s_a1_schorsch",
+   "name": "Gold, das grün wird",
+   "akt": 1,
+   "start": "Lackiererei",
+   "voraus": [
+    "s_a1_dispatcher"
+   ],
+   "lohn": 600,
+   "ruf": 40,
+   "stufen": [
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "statisch",
+       "zeilen": [
+        {
+         "wer": "schorsch",
+         "text": "Servus! Konrad hat angerufen. Sie sind die mit den vier Farben. Mei, das hab ich noch nie gesehen."
+        },
+        {
+         "wer": "lale",
+         "text": "Er sagte, Sie hätten ein Gold gemischt, das grün wird."
+        },
+        {
+         "wer": "schorsch",
+         "text": "Ich hab's nicht gemischt, ich hab's gefunden. In einer Dose, hinten im Regal, Aufschrift: ›Ball, Final 99, Rückgabe unerwünscht‹."
+        },
+        {
+         "wer": "schorsch",
+         "text": "Das Gold ist ein Lack mit Kupferanteil. In der Sonne wird er grün. Auf dem Foto sieht man's nicht. In echt schon."
+        }
+       ],
+       "ort": "Lackiererei",
+       "hoehe": 1.8,
+       "abstand": 5,
+       "winkel": 160,
+       "figuren": [
+        "schorsch",
+        "lale"
+       ]
+      }
+     ]
+    },
+    {
+     "art": "hin",
+     "ort": "Lackiererei",
+     "text": "In die Lackiererei fahren – Schorsch wartet",
+     "zeit": 0,
+     "imWagen": true
+    },
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "umkreise",
+       "zeilen": [
+        {
+         "wer": "schorsch",
+         "text": "Der echte Pokal der Goldenen Kugel ist grün geworden, als man ihn in die Sonne stellte. Man hat ihn also ausgetauscht."
+        },
+        {
+         "wer": "lale",
+         "text": "Gegen was?"
+        },
+        {
+         "wer": "schorsch",
+         "text": "Gegen einen gestrichenen. Gelb. Dann gold. Wer das gemacht hat, brauchte Zeit, Lack und eine Werkstatt wie meine."
+        },
+        {
+         "wer": "schorsch",
+         "text": "Mir fällt nur einer ein, der hier damals so viel Farbe bestellt hat: Xaver Gruber. Der Wirt."
+        },
+        {
+         "wer": "lale",
+         "text": "Wieder er."
+        }
+       ],
+       "ort": "Lackiererei",
+       "hoehe": 1.9,
+       "abstand": 5.5,
+       "figuren": [
+        "schorsch",
+        "lale"
+       ]
+      }
+     ]
+    },
+    {
+     "art": "funk",
+     "wer": "funk",
+     "text": "Akt I ist vorbei. Einer von vier Köpfen liegt am Boden. Die Blauen am Lech wissen es bereits."
+    }
+   ]
+  },
+  {
+   "id": "s_a2_ufer",
+   "name": "Über den Lech",
+   "akt": 2,
+   "start": "Mutterturm",
+   "voraus": [
+    "s_a1_schorsch"
+   ],
+   "lohn": 700,
+   "ruf": 40,
+   "stufen": [
+    {
+     "art": "titel",
+     "text": "AKT II",
+     "unter": "BLAU – Die Schnellen",
+     "dauer": 4.0
+    },
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "kran",
+       "zeilen": [
+        {
+         "wer": "anneliese",
+         "text": "Da ist sie ja. Die Frau mit allen vier Farben. Anneliese Lechner. Mir gehört der Fluss, und was am Fluss liegt."
+        },
+        {
+         "wer": "lale",
+         "text": "Konrad hat Sie erwähnt."
+        },
+        {
+         "wer": "anneliese",
+         "text": "Konrad erwähnt jeden, den er für gefährlich hält. Das sind sehr wenige. Sie sind also gefährlich."
+        },
+        {
+         "wer": "anneliese",
+         "text": "Ich fahre die schnellsten Boote am Lech und die schnellsten Wagen am Ufer. Wer zu den Blauen will, muss mich überholen."
+        },
+        {
+         "wer": "lale",
+         "text": "Ich überhole nur, wenn jemand vor mir fährt."
+        },
+        {
+         "wer": "anneliese",
+         "text": "Dann fahren Sie jetzt zur Johanniskirche. Mein Vorfahrer wartet dort. Er hat etwas, das Ihnen gehört."
+        }
+       ],
+       "ort": "Mutterturm",
+       "hoehe": 22,
+       "abstand": 30,
+       "winkel": 60,
+       "figuren": [
+        "anneliese",
+        "lale"
+       ]
+      }
+     ]
+    },
+    {
+     "art": "hin",
+     "ort": "Johanniskirche",
+     "text": "Ans andere Ufer zur Johanniskirche – der Vorfahrer der Blauen wartet",
+     "zeit": 170,
+     "imWagen": true
+    },
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "statisch",
+       "zeilen": [
+        {
+         "wer": "lale_off",
+         "text": "Der Vorfahrer wartete nicht. Er fuhr los, kaum dass ich bremste. Ein blauer Wagen, der aussah, als würde er auf dem Wasser fahren."
+        },
+        {
+         "wer": "funk",
+         "text": "Er trägt die zweite Siegelhälfte. Bringen Sie ihn zum Stehen. Und zwar so, dass er noch weiß, wer ihn gestellt hat."
+        }
+       ],
+       "ort": "Johanniskirche",
+       "hoehe": 2.0,
+       "abstand": 8,
+       "winkel": 210
+      }
+     ]
+    },
+    {
+     "art": "stelle",
+     "text": "Den Vorfahrer der Blauen stellen",
+     "zeit": 230
+    },
+    {
+     "art": "bring",
+     "ort": "Mutterturm",
+     "text": "Zurück zum Mutterturm",
+     "zeit": 180
+    },
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "statisch",
+       "zeilen": [
+        {
+         "wer": "anneliese",
+         "text": "Nicht schlecht. Eine halbe Sekunde langsamer als ich. Aber ich bin ja auch unfair gut."
+        },
+        {
+         "wer": "anneliese",
+         "text": "Die Siegelhälfte bleibt bei mir. Noch. Wenn Sie wirklich wollen, dass sie Ihnen gehört, dann beweisen Sie es bei der Regatta."
+        }
+       ],
+       "ort": "Mutterturm",
+       "hoehe": 1.8,
+       "abstand": 4.5,
+       "winkel": 300,
+       "figuren": [
+        "anneliese",
+        "lale"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "s_a2_regatta",
+   "name": "Regatta",
+   "akt": 2,
+   "start": "Holzmarkt",
+   "voraus": [
+    "s_a2_ufer"
+   ],
+   "lohn": 900,
+   "ruf": 50,
+   "stufen": [
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "umkreise",
+       "zeilen": [
+        {
+         "wer": "anneliese",
+         "text": "Die Regatta der Blauen ist keine auf dem Wasser. Sie führt über die Brücken und Gassen am Lech. Wer als Erster wieder auf dem Holzmarkt ist, gewinnt."
+        },
+        {
+         "wer": "anneliese",
+         "text": "Infanterieplatz, Lady-Herkomer-Steg, zurück. Zwei Minuten dreißig. Ich fahre es in zwei zwanzig."
+        },
+        {
+         "wer": "lale",
+         "text": "Dann fahre ich es in zwei zehn."
+        },
+        {
+         "wer": "anneliese",
+         "text": "Schön. Zum ersten Mal in zehn Jahren macht jemand mir das Rennen interessant."
+        }
+       ],
+       "ort": "Holzmarkt",
+       "hoehe": 2.0,
+       "abstand": 6,
+       "figuren": [
+        "anneliese",
+        "lale"
+       ]
+      }
+     ]
+    },
+    {
+     "art": "hin",
+     "ort": "Infanterieplatz",
+     "text": "Erster Kontrollpunkt: Infanterieplatz",
+     "zeit": 130,
+     "imWagen": true
+    },
+    {
+     "art": "funk",
+     "wer": "anneliese",
+     "text": "Zehn Meter vor Ihnen, Lale. Neun. Acht – ach, ich werde langsamer, damit es spannend bleibt!"
+    },
+    {
+     "art": "hin",
+     "ort": "Lady-Herkomer-Steg",
+     "text": "Zweiter Kontrollpunkt: Lady-Herkomer-Steg",
+     "zeit": 110,
+     "imWagen": true
+    },
+    {
+     "art": "bring",
+     "ort": "Holzmarkt",
+     "text": "Zurück zum Holzmarkt – wer zuerst da ist, gewinnt",
+     "zeit": 110
+    },
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "statisch",
+       "zeilen": [
+        {
+         "wer": "anneliese",
+         "text": "Zwei Sekunden. Zwei Sekunden vor mir. Das gibt es nicht."
+        },
+        {
+         "wer": "lale",
+         "text": "Ich hatte einen guten Lehrer. Er war schnell und eingebildet."
+        },
+        {
+         "wer": "anneliese",
+         "text": "Ha! Hier – die zweite Siegelhälfte. Sie haben sie sich verdient. Aber heute Abend im Stadttheater gibt's was zu holen, das Sie noch mehr interessieren wird."
+        }
+       ],
+       "ort": "Holzmarkt",
+       "hoehe": 1.7,
+       "abstand": 4.2,
+       "winkel": 20,
+       "figuren": [
+        "anneliese",
+        "lale"
+       ]
+      }
+     ]
+    },
+    {
+     "art": "gib",
+     "geld": 0,
+     "ruf": 15
+    }
+   ]
+  },
+  {
+   "id": "s_a2_theater",
+   "name": "Vorhang auf",
+   "akt": 2,
+   "start": "Stadttheater",
+   "voraus": [
+    "s_a2_regatta"
+   ],
+   "lohn": 1000,
+   "ruf": 55,
+   "stufen": [
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "fahrt",
+       "zeilen": [
+        {
+         "wer": "anneliese",
+         "text": "Im Stadttheater gibt man heute ›Der Fischer und seine Farbe‹. Das Stück hat nur einen Zweck: Es hält die Polizei beschäftigt."
+        },
+        {
+         "wer": "anneliese",
+         "text": "Hinter der Bühne lagert ein Koffer. Gelb, Grün und Weiß haben ihn dort versteckt. Nicht aus Freundschaft. Aus Furcht."
+        },
+        {
+         "wer": "lale",
+         "text": "Wovor?"
+        },
+        {
+         "wer": "anneliese",
+         "text": "Vor dem, was darin liegt. Zeichnen Sie das Färbertor – das ist das Signal. Danach geht es los."
+        }
+       ],
+       "ort": "Stadttheater",
+       "hoehe": 2.0,
+       "abstand": 12,
+       "winkel": 130,
+       "figuren": [
+        "anneliese",
+        "lale"
+       ]
+      }
+     ]
+    },
+    {
+     "art": "markiere",
+     "ort": "Färbertor",
+     "text": "Das Färbertor zeichnen – das Signal für die Blauen",
+     "zeit": 200
+    },
+    {
+     "art": "halte",
+     "text": "Durchhalten, bis der Vorhang fällt – die Polizei ist unterwegs",
+     "zeit": 12,
+     "sterne": 2
+    },
+    {
+     "art": "hin",
+     "ort": "Stadttheater",
+     "text": "Zurück ins Stadttheater, hinter die Bühne",
+     "zeit": 120,
+     "imWagen": true
+    },
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "statisch",
+       "zeilen": [
+        {
+         "wer": "lale_off",
+         "text": "Hinter der Bühne roch es nach Staub und alter Farbe. Der Koffer war kleiner, als ich dachte."
+        },
+        {
+         "wer": "anneliese",
+         "text": "Machen Sie ihn auf. Ich habe ihn nie geöffnet. Ich wollte nicht wissen, wer von uns lügt."
+        }
+       ],
+       "ort": "Stadttheater",
+       "hoehe": 1.6,
+       "abstand": 3,
+       "winkel": 250,
+       "figuren": [
+        "anneliese",
+        "lale"
+       ]
+      },
+      {
+       "art": "umkreise",
+       "zeilen": [
+        {
+         "wer": "lale",
+         "text": "Ein Brief. Mit Franz Echters Handschrift."
+        },
+        {
+         "wer": "anneliese",
+         "text": "Lesen Sie vor."
+        },
+        {
+         "wer": "lale",
+         "text": "›Ich habe den Ball nicht getauscht. Er lag schon so da, als ich ihn bekam. Wer das liest, soll wissen: Ich war es nicht.‹"
+        },
+        {
+         "wer": "anneliese",
+         "text": "Er war es nicht. Das wusste ich. Alle haben es immer gewusst, nur keiner hat es gesagt."
+        }
+       ],
+       "ort": "Stadttheater",
+       "hoehe": 1.8,
+       "abstand": 3.5,
+       "figuren": [
+        "anneliese",
+        "lale"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "s_a2_wache",
+   "name": "Zum dritten Mal",
+   "akt": 2,
+   "start": "Polizeiinspektion",
+   "voraus": [
+    "s_a2_theater"
+   ],
+   "lohn": 500,
+   "ruf": 30,
+   "stufen": [
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "statisch",
+       "zeilen": [
+        {
+         "wer": "korbi",
+         "text": "Das ist das dritte Mal diese Woche. Ich zähle mit."
+        },
+        {
+         "wer": "lale",
+         "text": "Ich habe nichts getan. Außer das Stadttheater zu verlassen."
+        },
+        {
+         "wer": "korbi",
+         "text": "Mit sieben Streifenwagen im Rücken. Nehmen Sie Platz. Ich habe Kaffee. Er ist schlecht."
+        }
+       ],
+       "ort": "Polizeiinspektion",
+       "hoehe": 1.7,
+       "abstand": 4.5,
+       "winkel": 20,
+       "figuren": [
+        "korbi",
+        "lale"
+       ]
+      }
+     ]
+    },
+    {
+     "art": "hin",
+     "ort": "Polizeiinspektion",
+     "text": "Zur Polizeiinspektion – Wachtmeister Brandl will reden",
+     "zeit": 180,
+     "imWagen": false
+    },
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "umkreise",
+       "zeilen": [
+        {
+         "wer": "korbi",
+         "text": "Passen Sie auf, Frau Lale. Ich bin allein auf der Wache, aber ich habe Augen."
+        },
+        {
+         "wer": "korbi",
+         "text": "Der Förster hat Schlüssel zu meinen Zellen. Eigene. Ich kann sie ihm nicht abnehmen, weil er sie von meinem Vorgesetzten hat."
+        },
+        {
+         "wer": "lale",
+         "text": "Warum sagen Sie mir das?"
+        },
+        {
+         "wer": "korbi",
+         "text": "Weil ich ein ehrlicher Polizist bin. Das ist ein einsamer Beruf."
+        },
+        {
+         "wer": "korbi",
+         "text": "Wenn Sie in den Süden fahren, zu den Grünen: Rechnen Sie damit, dass die Polizei nicht auf Ihrer Seite ist. Auch wenn ich es bin."
+        }
+       ],
+       "ort": "Polizeiinspektion",
+       "hoehe": 1.7,
+       "abstand": 4,
+       "figuren": [
+        "korbi",
+        "lale"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "s_a2_fluss",
+   "name": "Die Fährfrau",
+   "akt": 2,
+   "start": "Mutterturm",
+   "voraus": [
+    "s_a2_wache"
+   ],
+   "lohn": 1200,
+   "ruf": 70,
+   "stufen": [
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "kran",
+       "zeilen": [
+        {
+         "wer": "anneliese",
+         "text": "Jetzt zeigen Sie mir, dass Sie nicht nur schnell sind, sondern auch hartnäckig."
+        },
+        {
+         "wer": "anneliese",
+         "text": "Zeichnen Sie die vier Wahrzeichen der Blauen. Drei Rennen. Und dann stellen Sie mich, Lale. Ich fahre schnell. Ich fahre sehr schnell."
+        },
+        {
+         "wer": "lale",
+         "text": "Ich weiß."
+        },
+        {
+         "wer": "anneliese",
+         "text": "Dann wissen Sie, dass es ein Vergnügen wird."
+        }
+       ],
+       "ort": "Mutterturm",
+       "hoehe": 18,
+       "abstand": 28,
+       "winkel": 330,
+       "figuren": [
+        "anneliese",
+        "lale"
+       ]
+      }
+     ]
+    },
+    {
+     "art": "warte_revier",
+     "nr": 1,
+     "text": "Revier Lechviertel nehmen: vier Wahrzeichen zeichnen, drei Rennen, die Fährfrau stellen"
+    },
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "statisch",
+       "zeilen": [
+        {
+         "wer": "anneliese",
+         "text": "Au. Mein Lack. Mein schöner Lack. Das war's. Ich gebe auf."
+        },
+        {
+         "wer": "anneliese",
+         "text": "Hier. Der Rotorschlüssel. Der Hubschrauber auf dem Klinikumsdach gehört jetzt Ihnen. Ich habe ihn nie benutzt, ich fahre lieber."
+        },
+        {
+         "wer": "lale",
+         "text": "Sie lassen mich einfach gewinnen?"
+        },
+        {
+         "wer": "anneliese",
+         "text": "Ich lasse niemanden gewinnen. Sie haben gewonnen. Das ist ein großer Unterschied."
+        }
+       ],
+       "ort": "spieler",
+       "hoehe": 1.6,
+       "abstand": 4,
+       "winkel": 40,
+       "figuren": [
+        "anneliese",
+        "lale"
+       ]
+      },
+      {
+       "art": "umkreise",
+       "zeilen": [
+        {
+         "wer": "anneliese",
+         "text": "Und hören Sie, Lale. Franz hat es nicht getan. Ich war dabei, als er seine Hälfte vergraben hat. Er hat geweint."
+        },
+        {
+         "wer": "anneliese",
+         "text": "Der Wirt hat getauscht. Und der Förster hat es gesehen und geschwiegen. Er ist der Nächste. Passen Sie auf sich auf. Er sieht alles, was sich im Wald bewegt."
+        }
+       ],
+       "ort": "spieler",
+       "hoehe": 1.8,
+       "abstand": 5,
+       "figuren": [
+        "anneliese",
+        "lale"
+       ]
+      }
+     ]
+    },
+    {
+     "art": "gib",
+     "geld": 300,
+     "ruf": 0
+    }
+   ]
+  },
+  {
+   "id": "s_a3_klinik",
+   "name": "Nachtschicht",
+   "akt": 3,
+   "start": "kbo-Lech-Mangfall-Klinik",
+   "voraus": [
+    "s_a2_fluss"
+   ],
+   "lohn": 1100,
+   "ruf": 55,
+   "stufen": [
+    {
+     "art": "titel",
+     "text": "AKT III",
+     "unter": "GRÜN – Die Stillen",
+     "dauer": 4.0
+    },
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "statisch",
+       "zeilen": [
+        {
+         "wer": "marta",
+         "text": "Sie sind weit gekommen. Weiter, als ich dachte. Setzen Sie sich. Nein, nicht dahin – dort liegen Akten."
+        },
+        {
+         "wer": "lale",
+         "text": "Franz Echters Akten?"
+        },
+        {
+         "wer": "marta",
+         "text": "Sie wissen es also. Pfarrer Alois, nehme ich an. Er konnte noch nie schweigen."
+        },
+        {
+         "wer": "marta",
+         "text": "Franz war mein Bruder. Er war Kapitän der Grünen. Und er war ein anständiger Mensch."
+        },
+        {
+         "wer": "marta",
+         "text": "Man hat ihn beschuldigt, den Ball getauscht zu haben. Er hat nie wieder gesprochen. Zwei Jahre später war er tot."
+        }
+       ],
+       "ort": "kbo-Lech-Mangfall-Klinik",
+       "hoehe": 1.6,
+       "abstand": 3.6,
+       "winkel": 290,
+       "figuren": [
+        "marta",
+        "lale"
+       ]
+      }
+     ]
+    },
+    {
+     "art": "hin",
+     "ort": "kbo-Lech-Mangfall-Klinik",
+     "text": "In die kbo-Lech-Mangfall-Klinik – Marta wartet im Archiv",
+     "zeit": 0,
+     "imWagen": false
+    },
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "umkreise",
+       "zeilen": [
+        {
+         "wer": "marta",
+         "text": "In der Nacht, als Franz starb, hatte ich Dienst. Er sagte nur: ›Der Wirt hat es gewusst.‹ Dann war er still."
+        },
+        {
+         "wer": "lale",
+         "text": "Wissen Sie, wer der Schiedsrichter ist?"
+        },
+        {
+         "wer": "marta",
+         "text": "Ich? Nein. Nicht, dass ich wüsste."
+        },
+        {
+         "wer": "lale_off",
+         "text": "Sie hatte zu schnell geantwortet. Ich merkte es mir."
+        }
+       ],
+       "ort": "kbo-Lech-Mangfall-Klinik",
+       "hoehe": 1.7,
+       "abstand": 4,
+       "figuren": [
+        "marta",
+        "lale"
+       ]
+      }
+     ]
+    },
+    {
+     "art": "bring",
+     "ort": "Klinikum",
+     "text": "Einen Patienten ins Klinikum bringen – schnell und ohne Rempler",
+     "zeit": 150
+    },
+    {
+     "art": "funk",
+     "wer": "marta",
+     "text": "Danke. Er lebt. Das ist selten genug, wenn Sie fahren."
+    }
+   ]
+  },
+  {
+   "id": "s_a3_friedhof",
+   "name": "Stille Schicht",
+   "akt": 3,
+   "start": "Friedhofskirche zur Heiligen Dreifaltigkeit",
+   "voraus": [
+    "s_a3_klinik"
+   ],
+   "lohn": 1300,
+   "ruf": 65,
+   "stufen": [
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "kran",
+       "zeilen": [
+        {
+         "wer": "lale_off",
+         "text": "Der Friedhof lag still wie ein ausgeschaltetes Radio. Franz Echters Grab hatte frische Blumen. Weiß."
+        },
+        {
+         "wer": "ottmar",
+         "text": "Er hat Weiß nie gemocht."
+        }
+       ],
+       "ort": "Friedhofskirche zur Heiligen Dreifaltigkeit",
+       "hoehe": 16,
+       "abstand": 24,
+       "winkel": 180
+      }
+     ]
+    },
+    {
+     "art": "hin",
+     "ort": "Friedhofskirche zur Heiligen Dreifaltigkeit",
+     "text": "Zur Friedhofskirche – ein Grab hat frische Blumen",
+     "zeit": 0,
+     "imWagen": false
+    },
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "statisch",
+       "zeilen": [
+        {
+         "wer": "ottmar",
+         "text": "Ottmar Wald. Förster. Wer in den Wald geht, kommt an mir vorbei. Sie sind die Frau mit den vier Farben."
+        },
+        {
+         "wer": "lale",
+         "text": "Sie waren dabei, damals."
+        },
+        {
+         "wer": "ottmar",
+         "text": "Im Wald fällt ein Baum, und keiner sieht ihn. Ich habe vieles gesehen. Ich habe nichts gesagt."
+        },
+        {
+         "wer": "ottmar",
+         "text": "Gehen Sie. Sofort. Die Polizei kommt gleich. Meine Polizei."
+        }
+       ],
+       "ort": "Friedhofskirche zur Heiligen Dreifaltigkeit",
+       "hoehe": 1.8,
+       "abstand": 4.5,
+       "winkel": 100,
+       "figuren": [
+        "ottmar",
+        "lale"
+       ]
+      }
+     ]
+    },
+    {
+     "art": "halte",
+     "text": "Durchhalten – der Förster hat die Polizei gerufen",
+     "zeit": 12,
+     "sterne": 2
+    },
+    {
+     "art": "hin",
+     "ort": "Christuskirche",
+     "text": "Weg von hier – zur Christuskirche",
+     "zeit": 140,
+     "imWagen": true
+    }
+   ]
+  },
+  {
+   "id": "s_a3_wald",
+   "name": "Der Waldweg",
+   "akt": 3,
+   "start": "Christuskirche",
+   "voraus": [
+    "s_a3_friedhof"
+   ],
+   "lohn": 1400,
+   "ruf": 70,
+   "stufen": [
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "umkreise",
+       "zeilen": [
+        {
+         "wer": "funk",
+         "text": "Der Förster schickt einen Boten in den Wald. Er trägt den Schlüsselbund. Wenn Sie den Boten stellen, hat der Förster nichts mehr in der Hand."
+        },
+        {
+         "wer": "lale",
+         "text": "Wo ist der Wald?"
+        },
+        {
+         "wer": "funk",
+         "text": "Überall. Aber heute nur dort, wo ein Panzer als Hochsitz dient. Ja, ein Panzer. Ich mache keine Scherze."
+        }
+       ],
+       "ort": "Christuskirche",
+       "hoehe": 2.4,
+       "abstand": 9
+      }
+     ]
+    },
+    {
+     "art": "stelle",
+     "text": "Den Boten des Försters stellen",
+     "zeit": 240
+    },
+    {
+     "art": "bring",
+     "ort": "Klinikum",
+     "text": "Den Schlüsselbund ins Klinikum zu Marta bringen",
+     "zeit": 200
+    },
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "statisch",
+       "zeilen": [
+        {
+         "wer": "marta",
+         "text": "Diese Schlüssel … ich kenne sie. Der große passt in die Tür zum Schmalzturm. Der kleine zu Franz' Spind."
+        },
+        {
+         "wer": "lale",
+         "text": "Der Förster wollte ihn behalten."
+        },
+        {
+         "wer": "marta",
+         "text": "Natürlich. Wer das Schloss hat, hat die Wahrheit."
+        }
+       ],
+       "ort": "Klinikum",
+       "hoehe": 1.7,
+       "abstand": 4,
+       "winkel": 330,
+       "figuren": [
+        "marta",
+        "lale"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "s_a3_foerster",
+   "name": "Der Förster",
+   "akt": 3,
+   "start": "Klinikum",
+   "voraus": [
+    "s_a3_wald"
+   ],
+   "lohn": 1800,
+   "ruf": 90,
+   "stufen": [
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "kran",
+       "zeilen": [
+        {
+         "wer": "marta",
+         "text": "Der Förster hat zu viel gesehen. Er hat meinen Bruder untergehen lassen. Er muss reden."
+        },
+        {
+         "wer": "lale",
+         "text": "Er hat die Polizei auf seiner Seite."
+        },
+        {
+         "wer": "marta",
+         "text": "Dann sorgen Sie dafür, dass sie ihn nicht erreichen. Zeichnen Sie das Revier, fahren Sie drei Verfolgungen, und stellen Sie ihn."
+        },
+        {
+         "wer": "marta",
+         "text": "Ich verlasse mich auf Sie, Lale."
+        }
+       ],
+       "ort": "Klinikum",
+       "hoehe": 45,
+       "abstand": 70,
+       "winkel": 100,
+       "figuren": [
+        "marta",
+        "lale"
+       ]
+      }
+     ]
+    },
+    {
+     "art": "warte_revier",
+     "nr": 2,
+     "text": "Revier Klinikum und Süd nehmen: vier Wahrzeichen zeichnen, drei Verfolgungen, den Förster stellen"
+    },
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "statisch",
+       "zeilen": [
+        {
+         "wer": "ottmar",
+         "text": "Ich habe mein ganzes Leben lang nichts gesagt. Jetzt sage ich es."
+        },
+        {
+         "wer": "ottmar",
+         "text": "Der Wirt hat den Ball getauscht. Mit Hilfe der Gelben, der Blauen und mir. Wir haben alle mitgemacht."
+        },
+        {
+         "wer": "ottmar",
+         "text": "Franz hat es herausgefunden. Er wollte reden. Wir haben ihn zum Schweigen gebracht – nicht mit Gewalt. Mit Schuldzuweisung."
+        },
+        {
+         "wer": "lale",
+         "text": "Das Einzige, was ein ehrlicher Mensch nicht überlebt."
+        },
+        {
+         "wer": "ottmar",
+         "text": "Hier. Der Zündschlüssel. Der Panzer im Wald gehört Ihnen. Er ist alt, aber er fährt. Und der kleine, hier – der Spindschlüssel. Franz' Beweise liegen im Turm."
+        }
+       ],
+       "ort": "spieler",
+       "hoehe": 1.7,
+       "abstand": 4.5,
+       "winkel": 300,
+       "figuren": [
+        "ottmar",
+        "lale"
+       ]
+      },
+      {
+       "art": "umkreise",
+       "zeilen": [
+        {
+         "wer": "ottmar",
+         "text": "Sagen Sie Marta, dass es mir leidtut. Und sagen Sie ihr: Sie soll das nicht für Rache tun. Rache macht einsam."
+        }
+       ],
+       "ort": "spieler",
+       "hoehe": 1.9,
+       "abstand": 5,
+       "figuren": [
+        "ottmar",
+        "lale"
+       ]
+      }
+     ]
+    },
+    {
+     "art": "gib",
+     "geld": 500,
+     "ruf": 0
+    }
+   ]
+  },
+  {
+   "id": "s_a4_hauptplatz",
+   "name": "Der Wirt",
+   "akt": 4,
+   "start": "Historisches Rathaus",
+   "voraus": [
+    "s_a3_foerster"
+   ],
+   "lohn": 1500,
+   "ruf": 70,
+   "stufen": [
+    {
+     "art": "titel",
+     "text": "AKT IV",
+     "unter": "WEISS – Die Sieger",
+     "dauer": 4.0
+    },
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "kran",
+       "zeilen": [
+        {
+         "wer": "xaver",
+         "text": "Da kommt sie! Die Frau mit allen vier Farben! Setzen Sie sich, essen Sie, trinken Sie – der Wirt lädt ein!"
+        },
+        {
+         "wer": "lale",
+         "text": "Xaver Gruber."
+        },
+        {
+         "wer": "xaver",
+         "text": "Der Einzige und Letzte. Ich habe ein Gasthaus am schönsten Platz Bayerns, einen Keller voller Bier und einen Ruf wie Donnerhall."
+        },
+        {
+         "wer": "xaver",
+         "text": "Und Sie haben in den letzten Tagen drei meiner Freunde besiegt. Das ist beeindruckend. Das ist auch unhöflich."
+        },
+        {
+         "wer": "lale",
+         "text": "Ich hätte gern über den Ball von 1999 geredet."
+        },
+        {
+         "wer": "xaver",
+         "text": "Der Ball. Immer der Ball. Ein hübscher Ball. Aus Gold, wie jeder weiß."
+        }
+       ],
+       "ort": "Hauptplatz",
+       "hoehe": 28,
+       "abstand": 40,
+       "winkel": 20,
+       "figuren": [
+        "xaver",
+        "lale"
+       ]
+      }
+     ]
+    },
+    {
+     "art": "hin",
+     "ort": "Hauptplatz",
+     "text": "Auf den Hauptplatz – der Wirt wartet beim Marienbrunnen",
+     "zeit": 0,
+     "imWagen": false
+    },
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "umkreise",
+       "zeilen": [
+        {
+         "wer": "xaver",
+         "text": "Hören Sie, Lale. Ich mache Ihnen ein Angebot. Alle vier Farben auf einer Jacke – das ist keine Verletzung, das ist eine Krone."
+        },
+        {
+         "wer": "xaver",
+         "text": "Werden Sie meine Nachfolgerin. Der Wirt von morgen. Ein Haus, ein Platz, eine Stadt, die einem zu Füßen liegt."
+        },
+        {
+         "wer": "lale",
+         "text": "Und Franz Echter?"
+        },
+        {
+         "wer": "xaver",
+         "text": "Wer? – Ach der. Ein Mann, der nicht verlieren konnte."
+        },
+        {
+         "wer": "lale_off",
+         "text": "Ich sah ihn an. Er lächelte wie jemand, der sich seit fünfundzwanzig Jahren nicht mehr daran erinnern will, wie man aufhört zu lächeln."
+        }
+       ],
+       "ort": "Hauptplatz",
+       "hoehe": 1.8,
+       "abstand": 5,
+       "figuren": [
+        "xaver",
+        "lale"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "s_a4_marktnacht",
+   "name": "Marktnacht",
+   "akt": 4,
+   "start": "Holzmarkt",
+   "voraus": [
+    "s_a4_hauptplatz"
+   ],
+   "lohn": 1900,
+   "ruf": 90,
+   "stufen": [
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "kran",
+       "zeilen": [
+        {
+         "wer": "funk",
+         "text": "Der Wirt hat seine Leute auf den Holzmarkt geschickt. Sie sollen verhindern, dass Sie zum Turm kommen. Man nennt das Marktnacht."
+        },
+        {
+         "wer": "funk",
+         "text": "Es ist die gefährlichste Nacht des Jahres. Und die lauteste."
+        }
+       ],
+       "ort": "Holzmarkt",
+       "hoehe": 22,
+       "abstand": 30,
+       "winkel": 270
+      }
+     ]
+    },
+    {
+     "art": "hin",
+     "ort": "Holzmarkt",
+     "text": "Zum Holzmarkt – hier sammeln sich die Leute des Wirts",
+     "zeit": 150,
+     "imWagen": true
+    },
+    {
+     "art": "stelle",
+     "text": "Den Anführer der Weißen auf dem Holzmarkt stellen",
+     "zeit": 240
+    },
+    {
+     "art": "halte",
+     "text": "Durchhalten – der ganze Platz ist aufgebracht",
+     "zeit": 15,
+     "sterne": 3
+    },
+    {
+     "art": "bring",
+     "ort": "Historisches Rathaus",
+     "text": "Durch die Gassen zum Historischen Rathaus",
+     "zeit": 160
+    },
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "statisch",
+       "zeilen": [
+        {
+         "wer": "lale_off",
+         "text": "Als der Morgen kam, war der Holzmarkt leer. Nur Farbe auf dem Pflaster. Gelb, Blau, Grün – und ein bisschen Weiß."
+        },
+        {
+         "wer": "funk",
+         "text": "Der Weg zum Schmalzturm ist frei. Gehen Sie. Bevor er sich besinnt."
+        }
+       ],
+       "ort": "Historisches Rathaus",
+       "hoehe": 2.0,
+       "abstand": 9,
+       "winkel": 60
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "s_a4_turm",
+   "name": "Der Schmalzturm",
+   "akt": 4,
+   "start": "Schmalzturm",
+   "voraus": [
+    "s_a4_marktnacht"
+   ],
+   "lohn": 2000,
+   "ruf": 100,
+   "stufen": [
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "kran",
+       "zeilen": [
+        {
+         "wer": "lale_off",
+         "text": "Der Schmalzturm. Unten ein Tor, oben ein Dach, das aussieht wie ein Schmalzbrot. Und in der Mitte ein Geheimnis."
+        }
+       ],
+       "ort": "Schmalzturm",
+       "hoehe": 60,
+       "abstand": 45,
+       "winkel": 150
+      }
+     ]
+    },
+    {
+     "art": "hin",
+     "ort": "Schmalzturm",
+     "text": "Zum Schmalzturm – die Schlüssel passen",
+     "zeit": 0,
+     "imWagen": false
+    },
+    {
+     "art": "markiere",
+     "ort": "Schmalzturm",
+     "text": "Die Säule am Schmalzturm zeichnen – das Siegel öffnet sich nur unter Farbe",
+     "zeit": 0
+    },
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "statisch",
+       "zeilen": [
+        {
+         "wer": "lale_off",
+         "text": "Die vier Siegelhälften passten zusammen wie ein Puzzle. Das Tor ging auf mit einem Seufzer, als hätte es fünfundzwanzig Jahre die Luft angehalten."
+        },
+        {
+         "wer": "lale_off",
+         "text": "Im Turm stand ein Sockel. Darauf eine Kugel. Nicht golden. Grün."
+        }
+       ],
+       "ort": "Schmalzturm",
+       "hoehe": 1.5,
+       "abstand": 3,
+       "winkel": 30,
+       "figuren": [
+        "lale"
+       ]
+      },
+      {
+       "art": "umkreise",
+       "zeilen": [
+        {
+         "wer": "lale",
+         "text": "Das Original. Sie ist grün geworden. Die Goldene Kugel war nie golden."
+        },
+        {
+         "wer": "lale_off",
+         "text": "Unter der Kugel lag ein Brief. Franz Echters Handschrift. Datiert auf die Nacht nach dem Finale."
+        },
+        {
+         "wer": "lale_off",
+         "text": "›Ich habe gesehen, wer den Ball getauscht hat. Xaver, Konrad, Anneliese, Ottmar. Wir alle haben es getan. Ich wollte es gestehen. Man hat mich daran gehindert.‹"
+        },
+        {
+         "wer": "lale_off",
+         "text": "›Wenn jemand das liest: Erzähl es der Stadt. Aber erzähl es mit Mitleid.‹"
+        }
+       ],
+       "ort": "Schmalzturm",
+       "hoehe": 1.6,
+       "abstand": 3.2,
+       "figuren": [
+        "lale"
+       ]
+      }
+     ]
+    },
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "statisch",
+       "zeilen": [
+        {
+         "wer": "funk",
+         "text": "Gut gemacht, Lale. Jetzt nehmen Sie die Kugel und den Brief. Und kommen zum Hauptplatz."
+        },
+        {
+         "wer": "lale",
+         "text": "Sie klingen anders als sonst."
+        },
+        {
+         "wer": "funk",
+         "text": "Ich weiß. Die Stimme hat jetzt einen Namen. Marta Echter. Ich war der Schiedsrichter. Ich war immer der Schiedsrichter."
+        },
+        {
+         "wer": "lale",
+         "text": "Sie haben mich benutzt."
+        },
+        {
+         "wer": "marta",
+         "text": "Ich habe Sie geführt. Das ist ein Unterschied – und manchmal auch nicht. Jetzt kommen Sie. Es geht um alles."
+        }
+       ],
+       "ort": "Schmalzturm",
+       "hoehe": 1.7,
+       "abstand": 4,
+       "winkel": 210,
+       "figuren": [
+        "lale"
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "s_a4_wirt",
+   "name": "Der Wirt vom Hauptplatz",
+   "akt": 4,
+   "start": "Bayertor",
+   "voraus": [
+    "s_a4_turm"
+   ],
+   "lohn": 3000,
+   "ruf": 120,
+   "stufen": [
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "umkreise",
+       "zeilen": [
+        {
+         "wer": "marta",
+         "text": "Der Wirt hat von der Kugel erfahren. Er weiß, dass es zu Ende ist. Er wird um sein Gasthaus kämpfen, um seinen Namen, um alles."
+        },
+        {
+         "wer": "marta",
+         "text": "Zeichnen Sie das Revier der Weißen, stellen Sie ihn. Und kommen Sie dann zu mir. Ich warte am Hauptplatz."
+        },
+        {
+         "wer": "lale",
+         "text": "Marta."
+        },
+        {
+         "wer": "marta",
+         "text": "Ja?"
+        },
+        {
+         "wer": "lale",
+         "text": "Ich bin noch nicht fertig mit Ihnen."
+        },
+        {
+         "wer": "marta",
+         "text": "Das hoffe ich. Ich wäre sonst enttäuscht."
+        }
+       ],
+       "ort": "Bayertor",
+       "hoehe": 3.0,
+       "abstand": 14,
+       "figuren": [
+        "marta",
+        "lale"
+       ]
+      }
+     ]
+    },
+    {
+     "art": "warte_revier",
+     "nr": 3,
+     "text": "Revier Altstadt nehmen: vier Wahrzeichen zeichnen, acht Lieferungen, den Wirt vom Hauptplatz stellen"
+    },
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "statisch",
+       "zeilen": [
+        {
+         "wer": "xaver",
+         "text": "Gut. Gut. Sie haben gewonnen. Ich habe immer gewonnen. Ich habe vergessen, wie man verliert."
+        },
+        {
+         "wer": "xaver",
+         "text": "Ich wollte nur, dass die Stadt nicht zerbricht. Ein Sieger braucht ein Ende. Ein Ende braucht einen Ball. Einen goldenen."
+        },
+        {
+         "wer": "lale",
+         "text": "Sie haben einen Mann dafür kaputtgemacht."
+        },
+        {
+         "wer": "xaver",
+         "text": "Ja. Das habe ich. Und ich habe jeden Tag daran gedacht. Ich habe nur nie wieder darüber gesprochen."
+        },
+        {
+         "wer": "lale_off",
+         "text": "Er saß auf dem Pflaster, in seiner weißen Jacke, und sah plötzlich sehr klein aus."
+        }
+       ],
+       "ort": "spieler",
+       "hoehe": 1.5,
+       "abstand": 3.5,
+       "winkel": 300,
+       "figuren": [
+        "xaver",
+        "lale"
+       ]
+      }
+     ]
+    },
+    {
+     "art": "gib",
+     "geld": 500,
+     "ruf": 0
+    }
+   ]
+  },
+  {
+   "id": "s_f_hauptplatz",
+   "name": "Samstagmorgen",
+   "akt": 5,
+   "start": "Hauptplatz",
+   "voraus": [
+    "s_a4_wirt"
+   ],
+   "lohn": 5000,
+   "ruf": 150,
+   "stufen": [
+    {
+     "art": "titel",
+     "text": "FINALE",
+     "unter": "Samstag, kurz vor Sonnenaufgang",
+     "dauer": 4.0
+    },
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "kran",
+       "zeilen": [
+        {
+         "wer": "lale_off",
+         "text": "Der Hauptplatz im Morgengrauen. Auf dem Marienbrunnen: vier Dosen. Gelb, Blau, Grün, Weiß. Davor ein Dutzend Leute, die so taten, als wären sie zufällig da."
+        }
+       ],
+       "ort": "Hauptplatz",
+       "hoehe": 45,
+       "abstand": 60,
+       "winkel": 60,
+       "dauer": 7
+      }
+     ]
+    },
+    {
+     "art": "hin",
+     "ort": "Hauptplatz",
+     "text": "Zum Hauptplatz – Samstag, kurz vor Sonnenaufgang",
+     "zeit": 0,
+     "imWagen": false
+    },
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "umkreise",
+       "zeilen": [
+        {
+         "wer": "konrad",
+         "text": "Pünktlich. Auf die Minute. Das ist ein Kompliment."
+        },
+        {
+         "wer": "anneliese",
+         "text": "Und zwei Sekunden schneller als erwartet."
+        },
+        {
+         "wer": "ottmar",
+         "text": "Ich habe geschwiegen. Jetzt stehe ich hier. Das muss reichen."
+        },
+        {
+         "wer": "korbi",
+         "text": "Ich bin offiziell nicht hier. Ich habe nur zufällig Dienstschluss."
+        }
+       ],
+       "ort": "Hauptplatz",
+       "hoehe": 2.2,
+       "abstand": 9,
+       "figuren": [
+        "marta",
+        "xaver",
+        "konrad",
+        "anneliese",
+        "ottmar",
+        "korbi",
+        "lale"
+       ]
+      },
+      {
+       "art": "statisch",
+       "zeilen": [
+        {
+         "wer": "marta",
+         "text": "Lale. Sie haben die Kugel. Sie haben den Brief. Jetzt gehört die Stadt Ihnen."
+        },
+        {
+         "wer": "xaver",
+         "text": "Es ist nicht zu spät. Sie müssen es nicht lesen."
+        },
+        {
+         "wer": "marta",
+         "text": "Doch. Das müssen Sie. Mein Bruder hat dafür bezahlt."
+        },
+        {
+         "wer": "lale_off",
+         "text": "Zehn Gesichter. Zwanzig Augen. Und ich hatte einen Brief in der Hand, der fünfundzwanzig Jahre alt war."
+        }
+       ],
+       "ort": "Hauptplatz",
+       "hoehe": 1.7,
+       "abstand": 7,
+       "winkel": 190,
+       "figuren": [
+        "marta",
+        "xaver",
+        "konrad",
+        "anneliese",
+        "ottmar",
+        "korbi",
+        "lale"
+       ]
+      }
+     ]
+    },
+    {
+     "art": "wahl",
+     "frage": "Was tust du mit der Wahrheit?",
+     "optionen": [
+      {
+       "text": "Den Brief vorlesen – die ganze Stadt soll es hören.",
+       "setze": {
+        "ende": "wahrheit"
+       }
+      },
+      {
+       "text": "Die Farben mischen – ein Fest statt eines Prozesses.",
+       "setze": {
+        "ende": "frieden"
+       }
+      },
+      {
+       "text": "Die Kugel behalten – die Stadt gehört jetzt dir.",
+       "setze": {
+        "ende": "macht"
+       }
+      }
+     ]
+    },
+    {
+     "art": "wenn",
+     "flag": "ende",
+     "ist": "wahrheit",
+     "dann": [
+      {
+       "art": "szene",
+       "schnitte": [
+        {
+         "art": "kran",
+         "zeilen": [
+          {
+           "wer": "lale",
+           "text": "›Ich habe den Ball nicht getauscht. Wer das liest, soll wissen: Ich war es nicht.‹"
+          },
+          {
+           "wer": "lale",
+           "text": "›Aber erzähl es mit Mitleid.‹"
+          },
+          {
+           "wer": "chor",
+           "text": "…"
+          }
+         ],
+         "ort": "Hauptplatz",
+         "hoehe": 14,
+         "abstand": 20,
+         "winkel": 100,
+         "figuren": [
+          "marta",
+          "xaver",
+          "konrad",
+          "anneliese",
+          "ottmar",
+          "korbi",
+          "lale"
+         ]
+        },
+        {
+         "art": "umkreise",
+         "zeilen": [
+          {
+           "wer": "xaver",
+           "text": "Das war ich. Ich habe den Ball getauscht. Es tut mir leid."
+          },
+          {
+           "wer": "konrad",
+           "text": "Und ich habe den Fahrplan verschoben, damit niemand es merkt."
+          },
+          {
+           "wer": "anneliese",
+           "text": "Ich habe die Boote bereitgestellt. Es tut mir leid."
+          },
+          {
+           "wer": "ottmar",
+           "text": "Ich habe geschwiegen. Es tut mir mehr leid als alles andere."
+          },
+          {
+           "wer": "marta",
+           "text": "Danke. Das war alles, was ich wollte. Dass jemand es laut sagt."
+          },
+          {
+           "wer": "korbi",
+           "text": "Nach Paragraph 14 des Handbuchs muss ich Sie jetzt festnehmen. Alle. Das wird eine lange Schicht."
+          }
+         ],
+         "ort": "Hauptplatz",
+         "hoehe": 2.0,
+         "abstand": 8,
+         "figuren": [
+          "marta",
+          "xaver",
+          "konrad",
+          "anneliese",
+          "ottmar",
+          "korbi",
+          "lale"
+         ]
+        }
+       ]
+      }
+     ],
+     "sonst": [
+      {
+       "art": "wenn",
+       "flag": "ende",
+       "ist": "frieden",
+       "dann": [
+        {
+         "art": "szene",
+         "schnitte": [
+          {
+           "art": "kran",
+           "zeilen": [
+            {
+             "wer": "lale",
+             "text": "Hier. Gelb, Blau, Grün, Weiß. Alle vier Farben. Wir kippen sie zusammen."
+            },
+            {
+             "wer": "xaver",
+             "text": "Das wird braun."
+            },
+            {
+             "wer": "lale",
+             "text": "Probieren wir's."
+            },
+            {
+             "wer": "lale_off",
+             "text": "Ich nahm die vier Dosen, eine nach der anderen. Das Wasser im Marienbrunnen färbte sich zuerst gelb, dann grün, dann blau – und am Ende wurde es doch kein Braun. Es wurde bunt."
+            }
+           ],
+           "ort": "Hauptplatz",
+           "hoehe": 16,
+           "abstand": 22,
+           "winkel": 40,
+           "figuren": [
+            "marta",
+            "xaver",
+            "konrad",
+            "anneliese",
+            "ottmar",
+            "korbi",
+            "lale"
+           ]
+          },
+          {
+           "art": "umkreise",
+           "zeilen": [
+            {
+             "wer": "marta",
+             "text": "Das ist nicht, was ich wollte."
+            },
+            {
+             "wer": "lale",
+             "text": "Das weiß ich. Aber Franz wollte es mit Mitleid. Das hier ist Mitleid."
+            },
+            {
+             "wer": "marta",
+             "text": "…Vielleicht hatte er recht."
+            },
+            {
+             "wer": "anneliese",
+             "text": "Ich fahre Sie alle ans Ufer. Zum ersten Farbfest."
+            },
+            {
+             "wer": "konrad",
+             "text": "Pünktlich um zehn."
+            },
+            {
+             "wer": "korbi",
+             "text": "Ich schreibe nur die Falschparker auf. Alles andere ist heute nicht mein Beruf."
+            }
+           ],
+           "ort": "Hauptplatz",
+           "hoehe": 2.2,
+           "abstand": 9,
+           "figuren": [
+            "marta",
+            "xaver",
+            "konrad",
+            "anneliese",
+            "ottmar",
+            "korbi",
+            "lale"
+           ]
+          }
+         ]
+        }
+       ],
+       "sonst": [
+        {
+         "art": "szene",
+         "schnitte": [
+          {
+           "art": "statisch",
+           "zeilen": [
+            {
+             "wer": "lale",
+             "text": "Ich behalte die Kugel."
+            },
+            {
+             "wer": "marta",
+             "text": "Was?"
+            },
+            {
+             "wer": "lale",
+             "text": "Wenn die Stadt eine Farbe haben will, dann bin ich sie. Vier Farben auf einer Jacke. Mehr als jeder von euch."
+            },
+            {
+             "wer": "xaver",
+             "text": "Das hätte ich sagen können."
+            },
+            {
+             "wer": "konrad",
+             "text": "Das hat er gesagt. Nur schlechter."
+            }
+           ],
+           "ort": "Hauptplatz",
+           "hoehe": 1.8,
+           "abstand": 6,
+           "winkel": 240,
+           "figuren": [
+            "marta",
+            "xaver",
+            "konrad",
+            "anneliese",
+            "ottmar",
+            "korbi",
+            "lale"
+           ]
+          },
+          {
+           "art": "umkreise",
+           "zeilen": [
+            {
+             "wer": "marta",
+             "text": "Ich habe Sie gebaut, Lale. Ich habe Sie gebaut, damit Sie die Wahrheit sagen. Nicht, damit Sie die Krone aufsetzen."
+            },
+            {
+             "wer": "lale",
+             "text": "Man baut nie nur eine Sache."
+            },
+            {
+             "wer": "lale_off",
+             "text": "Sie sah mich an wie jemand, der eine Maschine gebaut hat und merkt, dass sie schneller wird als er selbst."
+            },
+            {
+             "wer": "korbi",
+             "text": "Ich … ich glaube, ich muss mir das Handbuch noch einmal ansehen."
+            }
+           ],
+           "ort": "Hauptplatz",
+           "hoehe": 2.0,
+           "abstand": 7,
+           "figuren": [
+            "marta",
+            "xaver",
+            "konrad",
+            "anneliese",
+            "ottmar",
+            "korbi",
+            "lale"
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "s_f_epilog",
+   "name": "Abspann",
+   "akt": 5,
+   "start": "auto",
+   "voraus": [
+    "s_f_hauptplatz"
+   ],
+   "lohn": 0,
+   "ruf": 0,
+   "stufen": [
+    {
+     "art": "wenn",
+     "flag": "ende",
+     "ist": "wahrheit",
+     "dann": [
+      {
+       "art": "szene",
+       "schnitte": [
+        {
+         "art": "kran",
+         "zeilen": [
+          {
+           "wer": "lale_off",
+           "text": "Es dauerte drei Wochen, bis die Zeitungen aufhörten. Der Wirt bekam ein Jahr auf Bewährung. Die anderen kamen mit Sozialstunden davon."
+          },
+          {
+           "wer": "lale_off",
+           "text": "Franz Echters Name steht jetzt auf einer Tafel im Schmalzturm. Marta hat sie selbst angebracht."
+          },
+          {
+           "wer": "lale_off",
+           "text": "Sie sagt, sie hat keinen Hass mehr. Ich glaube ihr zur Hälfte. Das ist mehr, als ich erwartet hatte."
+          }
+         ],
+         "ort": "Schmalzturm",
+         "hoehe": 50,
+         "abstand": 55,
+         "winkel": 300
+        }
+       ]
+      }
+     ],
+     "sonst": [
+      {
+       "art": "wenn",
+       "flag": "ende",
+       "ist": "frieden",
+       "dann": [
+        {
+         "art": "szene",
+         "schnitte": [
+          {
+           "art": "kran",
+           "zeilen": [
+            {
+             "wer": "lale_off",
+             "text": "Das erste Farbfest war ein Chaos. Der Lech wurde an einer Stelle blau, an einer anderen grün. Die Fische sahen sehr überrascht aus."
+            },
+            {
+             "wer": "lale_off",
+             "text": "Die Goldene Kugel liegt jetzt im Rathaus. Neben einem Zettel: ›Hier ist nie etwas gewesen.‹ Alle wissen, dass das gelogen ist. Alle sind sehr höflich."
+            }
+           ],
+           "ort": "Hauptplatz",
+           "hoehe": 26,
+           "abstand": 34,
+           "winkel": 210
+          }
+         ]
+        }
+       ],
+       "sonst": [
+        {
+         "art": "szene",
+         "schnitte": [
+          {
+           "art": "kran",
+           "zeilen": [
+            {
+             "wer": "lale_off",
+             "text": "Landsberg hatte eine neue Farbe. Ich trug sie jeden Tag. Sie stand mir nicht schlecht."
+            },
+            {
+             "wer": "lale_off",
+             "text": "Marta verließ die Stadt in der ersten Woche. Sie hat nichts mitgenommen außer ein Foto von ihrem Bruder."
+            },
+            {
+             "wer": "lale_off",
+             "text": "Manchmal, spät nachts, kommt über Funk eine Stimme: ›Gut gemacht, Lale.‹ Und ich weiß nicht mehr, ob ich sie gehört habe oder erfunden."
+            }
+           ],
+           "ort": "Hauptplatz",
+           "hoehe": 26,
+           "abstand": 34,
+           "winkel": 210
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "art": "titel",
+     "text": "FARBKRIEG",
+     "unter": "Mitwirkende: Lale · Schwester Marta · Konrad Weidinger · Anneliese Lechner · Ottmar Wald · Xaver Gruber · Wachtmeister Brandl · Schorsch · Pfarrer Alois",
+     "dauer": 6.0
+    },
+    {
+     "art": "titel",
+     "text": "Kein echter Ball wurde bei diesem Film verletzt.",
+     "unter": "Alle Namen und Handlungen sind frei erfunden. Nur Landsberg ist echt.",
+     "dauer": 5.0
+    },
+    {
+     "art": "szene",
+     "schnitte": [
+      {
+       "art": "statisch",
+       "zeilen": [
+        {
+         "wer": "korbi",
+         "text": "Frau Lale. Hier. Ein Strafzettel. Wegen falsch geparktem Paintball-Wagen. Hauptplatz. Sonntag, elf Uhr."
+        },
+        {
+         "wer": "lale",
+         "text": "Das war mitten im Farbfest."
+        },
+        {
+         "wer": "korbi",
+         "text": "Eben. Falsch ist falsch, auch wenn alle lachen."
+        }
+       ],
+       "ort": "Hauptplatz",
+       "hoehe": 1.7,
+       "abstand": 5,
+       "winkel": 20,
+       "figuren": [
+        "korbi",
+        "lale"
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

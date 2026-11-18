@@ -207,6 +207,16 @@ func setze_mission(id: String) -> void:
 	speichere()
 
 
+## Fuer den Rauchtest: die Hauptgeschichte von vorn.
+func test_story_zuruecksetzen() -> void:
+	_stand["missionen"] = {}
+	_stand["flags"] = {}
+
+
+func test_mission_loeschen(id: String) -> void:
+	_stand["missionen"].erase(id)
+
+
 func missionen_zahl() -> int:
 	return _stand["missionen"].size()
 

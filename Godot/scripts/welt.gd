@@ -18,6 +18,7 @@ var polizei := Polizei.new()
 var auftraege := Auftraege.new()
 var laeden := Laeden.new()
 var revier := Revier.new()
+var drehbuch := Drehbuch.new()
 var auto: Auto
 var aktuelles_auto: Auto
 var farbtreffer := 0
@@ -49,6 +50,14 @@ func _ready() -> void:
 	add_child(auftraege)
 	add_child(laeden)
 	add_child(revier)
+	drehbuch.spieler = spieler
+	drehbuch.polizei = polizei
+	drehbuch.laeden = laeden
+	drehbuch.revier = revier
+	drehbuch.stadt = stadt
+	drehbuch.welt = self
+	drehbuch.automatisch = not _rauchtest
+	add_child(drehbuch)
 	spieler.kamera = kamera
 	spieler.aktiv(false)  # bis unter dem Spawn der Boden steht
 	kamera.ziel = spieler
@@ -77,7 +86,22 @@ func _fokus_auf(wer: Node3D) -> void:
 	auftraege.fokus = wer
 	laeden.fokus = wer
 	revier.fokus = wer
+	drehbuch.fokus = wer
 	hud.ziel = wer
+
+
+## Vom Drehbuch bei Szenen: Film an, die Spielfigur und der Wagen stehen still, das
+## HUD ist weg und die Polizei ruht. Nach dem Film kommt die Spielkamera zurueck.
+func kino_modus(an: bool) -> void:
+	spieler.gesperrt = an
+	if auto != null:
+		auto.gesperrt = an
+	for a: Auto in get_tree().get_nodes_in_group("auto"):
+		a.gesperrt = an
+	hud.visible = not an
+	polizei.pausiert = an
+	if not an:
+		kamera.aktivieren()
 
 
 func zaehle_farbtreffer() -> void:
@@ -124,6 +148,7 @@ func _stelle_marken(start: Vector3) -> void:
 	auftraege.setze_start_ort(polizei.naechster_punkt(mitte))
 	laeden.stelle(Laeden.Ladenart.LACKIEREREI, polizei.naechster_punkt(Vector3(-1500.0, 0, 120.0)))
 	laeden.stelle(Laeden.Ladenart.PAINTBALL, polizei.naechster_punkt(Vector3(-376.3, 0, 260.0)))
+	drehbuch.bereit = true
 
 
 ## Hoehe des Bodens unter einer Stelle; faellt auf die Stelle selbst zurueck.
@@ -237,6 +262,7 @@ func _process(delta: float) -> void:
 	hud.gesehen = polizei.wird_gesehen()
 	hud.such_anteil = polizei.such_anteil()
 	hud.festnahme_anteil = polizei.festnahme_anteil()
+	hud.drehbuch_text = drehbuch.hud_text(kamera.vorwaerts())
 	hud.auftrag_text = _auftrag_text()
 	hud.revier_text = revier.hud_text()
 	hud.laden_text = laeden.menue_text()
@@ -342,6 +368,9 @@ func _rauchtest_ablauf() -> void:
 	# Auftraege, Laeden, Lackiererei und Reviere.
 	ok = await _pruefe_wirtschaft() and ok
 
+	# Drehbuch: die ganze Hauptgeschichte im Zeitraffer, alle drei Enden.
+	ok = await _pruefe_drehbuch() and ok
+
 	await get_tree().create_timer(maxf(0.0, 22.0 - _rauch_zeit)).timeout
 	var ki := verkehr.bewegung()
 	ok = _pruefe("verkehr", ki > 1.0) and ok
@@ -349,6 +378,24 @@ func _rauchtest_ablauf() -> void:
 		spieler.global_position, auto.global_position, ki,
 		Engine.get_frames_per_second(), ok])
 	get_tree().quit(0 if ok else 1)
+
+
+func _pruefe_drehbuch() -> bool:
+	var ok := _pruefe("drehbuch_daten missionen=%d fehlende_orte=%d" % [
+			drehbuch.missionen_zahl(), drehbuch.fehlende_orte],
+			drehbuch.missionen_zahl() == 44 and drehbuch.fehlende_orte == 0)
+	var fertig := await drehbuch.test_durchlauf()
+	polizei.setze_sterne(0)
+	ok = _pruefe("drehbuch_durchlauf fertig=%d" % fertig, fertig == 22) and ok
+	ok = _pruefe("drehbuch_wahl ton=%s" % Konto.hole_flag("ton", "?"),
+			Konto.hole_flag("ton", "") == "frech") and ok
+	ok = _pruefe("ende_wahrheit", Konto.hole_flag("ende", "") == "wahrheit") and ok
+	await drehbuch.test_wiederhole("s_f_hauptplatz", 1)
+	ok = _pruefe("ende_frieden", Konto.hole_flag("ende", "") == "frieden") and ok
+	await drehbuch.test_wiederhole("s_f_hauptplatz", 2)
+	ok = _pruefe("ende_macht", Konto.hole_flag("ende", "") == "macht") and ok
+	ok = _pruefe("kino_aus", not spieler.gesperrt and hud.visible and not polizei.pausiert) and ok
+	return ok
 
 
 ## Setzt die Figur an einen Ort und wartet, bis sie auf dem Boden steht.

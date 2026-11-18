@@ -27,6 +27,7 @@ const STREIFE_LACK := Color(0.85, 0.86, 0.9)
 var fokus: Node3D           ## wer gerade gesteuert wird: Figur oder Wagen
 var sterne := 0
 var festnahmen := 0
+var pausiert := false       ## im Film: keine Fahndungslogik
 var sperre_steht := false
 var sperr_ort := Vector3.ZERO
 ## Wo neue Streifen einsetzen (Meter vom Spieler); der Rauchtest verkuerzt das.
@@ -480,6 +481,8 @@ func _stelle_sperre(wo: Vector3, fahrt: Vector3) -> void:
 # --- Takt -------------------------------------------------------------------
 
 func _physics_process(delta: float) -> void:
+	if pausiert:
+		return
 	_takt += delta
 	if _takt < 0.1:
 		return

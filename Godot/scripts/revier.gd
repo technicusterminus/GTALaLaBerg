@@ -133,6 +133,24 @@ func _melde(text: String) -> void:
 	Schaden.rueckmeldung(get_tree(), text)
 
 
+## Ist das Wahrzeichen dieses Namens markiert? (Drehbuch: Stufe "markiere".)
+func ist_markiert(name: String) -> bool:
+	for r: Dictionary in reviere:
+		for m: Dictionary in r["marken"]:
+			if m["name"] == name:
+				return m["markiert"]
+	return false
+
+
+## Ort der Saeule am Wahrzeichen dieses Namens; Null, wenn es keine gibt.
+func marke_ort(name: String) -> Vector3:
+	for r: Dictionary in reviere:
+		for m: Dictionary in r["marken"]:
+			if m["name"] == name:
+				return m["ort"]
+	return Vector3.ZERO
+
+
 ## Von der Farbkugel gerufen: ein Treffer auf diesen Koerper.
 func markiere(koerper: Object, farbe: Color) -> void:
 	var offen := offenes()
