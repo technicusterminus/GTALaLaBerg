@@ -11,6 +11,8 @@ var index := 0
 var richtung := 1
 var rund := false
 var wenden := 0       ## wie oft umgekehrt wurde; auf einem Rundkurs bleibt es 0
+var halten := false   ## am letzten Wegpunkt stehen bleiben statt umzukehren (Polizei)
+var am_ende := false  ## der letzte Wegpunkt ist erreicht (nur mit halten)
 var blick := Vector3.ZERO  ## letzte waagerechte Bewegungsrichtung, Null wenn nichts bewegt
 
 
@@ -24,6 +26,7 @@ func setze(neue_route: PackedVector3Array, ist_rund: bool) -> void:
 	index = 0
 	richtung = 1
 	wenden = 0
+	am_ende = false
 	if gueltig():
 		ort = route[0]
 
@@ -45,6 +48,9 @@ func bewege(strecke: float) -> void:
 		var abstand := delta.length()
 		if abstand < 0.01:
 			if index + richtung < 0 or index + richtung >= route.size():
+				if halten and not rund:
+					am_ende = true
+					break
 				if rund:
 					index = (index + richtung + route.size()) % route.size()
 				else:

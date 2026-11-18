@@ -91,7 +91,7 @@ def main() -> int:
         "sektoren": verzeichnis}, separators=(",", ":")))
 
     # Kleine Datensaetze unveraendert mitnehmen; die Skripte lesen sie aus res://daten.
-    for datei in ("Orte/orte.json", "Fahrzeug/wagen.json", "Verkehr/verkehr.json"):
+    for datei in ("Orte/orte.json", "Fahrzeug/wagen.json", "Verkehr/verkehr.json", "Verkehr/netz.json"):
         shutil.copy(QUELLE / datei, ZIEL / Path(datei).name)
 
     print(f"{len(verzeichnis)} Sektoren, {dreiecke} Dreiecke, "

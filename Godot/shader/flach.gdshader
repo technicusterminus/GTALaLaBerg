@@ -8,7 +8,7 @@ render_mode cull_disabled;
 uniform vec3 farbe = vec3(0.7);
 uniform float rauheit : hint_range(0.0, 1.0) = 0.9;
 uniform float glanz : hint_range(0.0, 1.0) = 0.0;
-// Waagerechte Flaechen (Boden, Strassen): feste Normale nach oben. Die Daten
+// Waagerechte Flaechen (Boden, Strassen, Daecher): feste Normale nach oben. Die Daten
 // haben keine Vertex-Normalen, ohne sie greift der Normal-Bias der Schatten
 // nicht und der Boden zeigt Ringe (Shadow-Acne).
 uniform bool oben = false;

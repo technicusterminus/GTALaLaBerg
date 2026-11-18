@@ -7,8 +7,10 @@ extends CharacterBody3D
 const GEHEN := 4.5
 const RENNEN := 8.5
 const SPRUNG := 5.2
-## Vorplatz des Klinikums: hier wacht man nach einem Zusammenbruch auf.
-const KLINIKUM := Vector3(-1590.0, 0.0, 156.0)
+## Hier wacht man nach einem Zusammenbruch auf: der Spawn-Punkt am Klinikum. Der
+## Punkt der Unreal-Version (-1590, 156) liegt unter einem Dach; der Bodenstrahl
+## von oben traefe zuerst das Dach.
+const KLINIKUM := Vector3(-1672.1, 0.0, 145.3)
 
 var kamera: Kamera
 var waffe := Waffe.new()
@@ -89,6 +91,10 @@ func verletze(schaden: float, richtung: Vector3, art: Schaden.Art) -> void:
 		ins_krankenhaus()
 
 
+func geschwindigkeit_ms() -> Vector3:
+	return velocity
+
+
 func ist_ausgeschaltet() -> bool:
 	return leben <= 0.0
 
@@ -106,7 +112,7 @@ func ins_krankenhaus() -> void:
 	if kosten > 0:
 		Konto.bezahle(kosten)
 	get_tree().call_group("polizei", "verwische")
-	_setze_auf_boden(KLINIKUM)
+	setze_auf_boden(KLINIKUM)
 	Schaden.rueckmeldung(get_tree(), "Klinikum – wieder auf den Beinen, Behandlung %d €" % kosten
 			if kosten > 0 else "Klinikum – wieder auf den Beinen")
 	print("LALABERG_KRANKENHAUS besuch=%d kosten=%d" % [krankenhausbesuche, kosten])
@@ -114,7 +120,7 @@ func ins_krankenhaus() -> void:
 
 ## Setzt die Figur auf den Boden unter (x, z). Steht dort noch keine
 ## Kollision (der Sektor laedt erst), bleibt sie in der Luft stehen und wartet.
-func _setze_auf_boden(ziel: Vector3) -> void:
+func setze_auf_boden(ziel: Vector3) -> void:
 	_lande_schonzeit = Time.get_ticks_msec() / 1000.0 + 1.5
 	velocity = Vector3.ZERO
 	var boden := _boden_unter(ziel)

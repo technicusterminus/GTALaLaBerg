@@ -14,6 +14,7 @@ var spieler := Spieler.new()
 var kamera := Kamera.new()
 var hud := Hud.new()
 var verkehr := Verkehr.new()
+var polizei := Polizei.new()
 var auto: Auto
 var aktuelles_auto: Auto
 var farbtreffer := 0
@@ -38,6 +39,8 @@ func _ready() -> void:
 	add_child(spieler)
 	add_child(hud)
 	add_child(verkehr)
+	add_child(polizei)
+	polizei.fokus = spieler
 	spieler.kamera = kamera
 	spieler.aktiv(false)  # bis unter dem Spawn der Boden steht
 	kamera.ziel = spieler
@@ -60,6 +63,17 @@ func _ready() -> void:
 
 func zaehle_farbtreffer() -> void:
 	farbtreffer += 1
+
+
+## Von der Polizei bei einer Festnahme: aus dem Wagen aussteigen.
+func aussteigen_erzwingen() -> void:
+	if aktuelles_auto != null:
+		_aussteigen()
+
+
+## Von der Polizei bei einer Festnahme: die Figur an einen Ort setzen.
+func versetze_spieler(ort: Vector3) -> void:
+	spieler.setze_auf_boden(Vector3(ort.x, 0.0, ort.z))
 
 
 func _sektor_bereit(id: String, start: Vector3) -> void:
@@ -161,6 +175,7 @@ func _steige_ein(wagen: Auto) -> void:
 	kamera.abstand_setzen(7.0)
 	kamera.ausnehmen(wagen)
 	stadt.fokus = wagen
+	polizei.fokus = wagen
 	hud.ziel = wagen
 	Schaden.rueckmeldung(get_tree(), "Eingestiegen – W/S fahren, Leertaste bremsen, F aussteigen")
 
@@ -177,6 +192,7 @@ func _aussteigen() -> void:
 	kamera.ausnehmen(spieler)
 	kamera.folge_yaw = NAN
 	stadt.fokus = spieler
+	polizei.fokus = spieler
 	hud.ziel = spieler
 	hud.tempo_ms = 0.0
 
@@ -191,6 +207,10 @@ func _process(delta: float) -> void:
 		hud.hinweis = "F  einsteigen"
 	else:
 		hud.hinweis = ""
+	hud.sterne = polizei.hole_sterne()
+	hud.gesehen = polizei.wird_gesehen()
+	hud.such_anteil = polizei.such_anteil()
+	hud.festnahme_anteil = polizei.festnahme_anteil()
 	hud.status = "Leben %d    %d €    %s    Ruf %d" % [
 		ceili(spieler.leben), Konto.geld(), spieler.waffe.art_name(),
 		Konto.stufe(Konto.Wert.RUF)]
@@ -259,6 +279,9 @@ func _rauchtest_ablauf() -> void:
 	ok = _pruefe("krankenhaus", spieler.krankenhausbesuche == 1 and spieler.leben == 100.0
 			and am_klinikum and Konto.geld() == vor_geld - vor_geld / 4) and ok
 
+	# Fahndung: zwei Sterne, die Streife kommt, wer stehen bleibt, wird festgenommen.
+	ok = await _pruefe_fahndung() and ok
+
 	await get_tree().create_timer(maxf(0.0, 22.0 - _rauch_zeit)).timeout
 	var ki := verkehr.bewegung()
 	ok = _pruefe("verkehr", ki > 1.0) and ok
@@ -266,6 +289,42 @@ func _rauchtest_ablauf() -> void:
 		spieler.global_position, auto.global_position, ki,
 		Engine.get_frames_per_second(), ok])
 	get_tree().quit(0 if ok else 1)
+
+
+func _pruefe_fahndung() -> bool:
+	var ok := true
+	polizei.einsatz_min_m = 30.0
+	polizei.einsatz_max_m = 60.0
+	var geld_vor := Konto.geld()
+	polizei.melde(Schaden.Tat.PASSANT_ANGEFAHREN)
+	polizei.melde(Schaden.Tat.AUTO_GESTOHLEN)
+	polizei.melde(Schaden.Tat.PASSANT_BESCHOSSEN)
+	# 2 + 2 + 1 Punkte: ein Stern ab 1, zwei ab 4.
+	ok = _pruefe("sterne", polizei.hole_sterne() == 2) and ok
+	var frist := 60.0
+	var wartet := 0.0
+	while polizei.festnahmen == 0 and frist > 0.0:
+		await get_tree().create_timer(0.5).timeout
+		frist -= 0.5
+		wartet += 0.5
+		if fmod(wartet, 3.0) < 0.5:
+			print("LALABERG_DIAGNOSE sterne=%d gesehen=%s balken=%.2f %s" % [
+				polizei.hole_sterne(), polizei.wird_gesehen(),
+				polizei.festnahme_anteil(), polizei.debug_streifen()])
+	ok = _pruefe("festnahme", polizei.festnahmen == 1 and polizei.hole_sterne() == 0) and ok
+	ok = _pruefe("strafe", Konto.geld() < geld_vor) and ok
+	await get_tree().create_timer(3.0).timeout
+	var zur_inspektion := Vector2(spieler.global_position.x - Polizei.INSPEKTION.x,
+			spieler.global_position.z - Polizei.INSPEKTION.z).length() < 25.0
+	ok = _pruefe("inspektion", zur_inspektion) and ok
+	# Ab drei Sternen steht voraus eine Sperre.
+	polizei.test_setze_sterne(3)
+	await get_tree().create_timer(1.0).timeout
+	ok = _pruefe("sperre", polizei.sperre_steht) and ok
+	polizei.test_setze_sterne(0)
+	await get_tree().create_timer(0.5).timeout
+	ok = _pruefe("sperre_weg", not polizei.sperre_steht) and ok
+	return ok
 
 
 # --- Aufbau -----------------------------------------------------------------

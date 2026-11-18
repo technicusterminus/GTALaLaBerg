@@ -7,6 +7,10 @@ var ziel: Node3D
 var tempo_ms := 0.0
 var hinweis := ""
 var status := ""
+var sterne := 0
+var gesehen := true
+var such_anteil := 0.0
+var festnahme_anteil := 0.0
 
 var _stadt := ""
 var _altstadt: Rect2
@@ -26,6 +30,7 @@ var _l_fps := Label.new()
 var _l_hinweis := Label.new()
 var _l_status := Label.new()
 var _l_rueck := Label.new()
+var _l_fahndung := Label.new()
 var _rueck_bis := 0.0
 
 
@@ -35,6 +40,7 @@ func _ready() -> void:
 	_platziere(_l_status, 16, 1.0, 0.0, -560, 8, 548, 24, HORIZONTAL_ALIGNMENT_RIGHT)
 	_platziere(_l_rueck, 20, 0.5, 1.0, -350, -270, 700, 30, HORIZONTAL_ALIGNMENT_CENTER)
 	_l_rueck.modulate.a = 0.0
+	_platziere(_l_fahndung, 22, 0.5, 0.0, -300, 40, 600, 60, HORIZONTAL_ALIGNMENT_CENTER)
 	_platziere(_l_ort, 26, 0.0, 1.0, 44, -150, 520, 36, HORIZONTAL_ALIGNMENT_LEFT)
 	_platziere(_l_zusatz, 14, 0.0, 1.0, 45, -110, 520, 22, HORIZONTAL_ALIGNMENT_LEFT)
 	_platziere(_l_tempo, 30, 1.0, 1.0, -260, -110, 220, 40, HORIZONTAL_ALIGNMENT_RIGHT)
@@ -65,6 +71,7 @@ func _process(delta: float) -> void:
 	_l_tempo.text = "%d km/h" % roundi(tempo_ms * 3.6) if tempo_ms > 0.5 else ""
 	_l_hinweis.text = hinweis
 	_l_status.text = status
+	_l_fahndung.text = _fahndungstext()
 	_l_rueck.modulate.a = clampf(_rueck_bis - Time.get_ticks_msec() / 1000.0, 0.0, 1.0)
 	_takt -= delta
 	if _takt <= 0.0 and ziel != null:
@@ -75,6 +82,21 @@ func _process(delta: float) -> void:
 	_l_zusatz.modulate.a = deckung * 0.7
 	_l_ort.text = _ort_name
 	_l_zusatz.text = _ort_zusatz
+
+
+## Sterne oben in der Mitte; darunter, ob man gesehen wird und wie weit Suche
+## oder Festnahme sind.
+func _fahndungstext() -> String:
+	if sterne == 0:
+		return ""
+	var text := "★".repeat(sterne) + "☆".repeat(5 - sterne)
+	if festnahme_anteil > 0.05:
+		text += "\nFestnahme  %d %%" % roundi(festnahme_anteil * 100.0)
+	elif gesehen:
+		text += "\nGesucht"
+	else:
+		text += "\nUntergetaucht  %d %%" % roundi(such_anteil * 100.0)
+	return text
 
 
 ## Kurze Meldung unten im Bild, blendet nach dreieinhalb Sekunden aus.
