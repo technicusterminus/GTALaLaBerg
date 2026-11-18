@@ -41,6 +41,7 @@ func _ready() -> void:
 	add_child(verkehr)
 	add_child(polizei)
 	polizei.fokus = spieler
+	Verkehrsauto.fokus = spieler
 	spieler.kamera = kamera
 	spieler.aktiv(false)  # bis unter dem Spawn der Boden steht
 	kamera.ziel = spieler
@@ -176,6 +177,7 @@ func _steige_ein(wagen: Auto) -> void:
 	kamera.ausnehmen(wagen)
 	stadt.fokus = wagen
 	polizei.fokus = wagen
+	Verkehrsauto.fokus = wagen
 	hud.ziel = wagen
 	Schaden.rueckmeldung(get_tree(), "Eingestiegen – W/S fahren, Leertaste bremsen, F aussteigen")
 
@@ -193,6 +195,7 @@ func _aussteigen() -> void:
 	kamera.folge_yaw = NAN
 	stadt.fokus = spieler
 	polizei.fokus = spieler
+	Verkehrsauto.fokus = spieler
 	hud.ziel = spieler
 	hud.tempo_ms = 0.0
 
@@ -282,6 +285,10 @@ func _rauchtest_ablauf() -> void:
 	# Fahndung: zwei Sterne, die Streife kommt, wer stehen bleibt, wird festgenommen.
 	ok = await _pruefe_fahndung() and ok
 
+	# Ampeln und Bremsen.
+	ok = _pruefe_ampelplan() and ok
+	ok = await _pruefe_bremsen() and ok
+
 	await get_tree().create_timer(maxf(0.0, 22.0 - _rauch_zeit)).timeout
 	var ki := verkehr.bewegung()
 	ok = _pruefe("verkehr", ki > 1.0) and ok
@@ -289,6 +296,52 @@ func _rauchtest_ablauf() -> void:
 		spieler.global_position, auto.global_position, ki,
 		Engine.get_frames_per_second(), ok])
 	get_tree().quit(0 if ok else 1)
+
+
+## Es gibt die 44 Ampeln und die 1726 Kreuzungen, und an keiner Kreuzung zeigen zwei
+## Phasen gleichzeitig Gruen.
+func _pruefe_ampelplan() -> bool:
+	var ok := _pruefe("ampeln", verkehr.ampeln.size() == 44
+			and Verkehrsauto.kreuzung_orte.size() == 1726)
+	var konflikte := 0
+	for a in verkehr.ampeln:
+		for b in verkehr.ampeln:
+			if a.gruppe != b.gruppe or a.phase >= b.phase:
+				continue
+			for i in 400:
+				var t := i * 0.5
+				if Ampel.zustand_bei(t, a.phase, a.anzahl_phasen) == Ampel.Zustand.GRUEN \
+						and Ampel.zustand_bei(t, b.phase, b.anzahl_phasen) == Ampel.Zustand.GRUEN:
+					konflikte += 1
+	return _pruefe("ampelplan konflikte=%d" % konflikte, konflikte == 0) and ok
+
+
+## Ein Auto faehrt auf eine rote Ampel zu und muss davor stehen bleiben, bei Gruen
+## weiterfahren.
+func _pruefe_bremsen() -> bool:
+	var x0 := 0.0
+	var y := 60.0
+	var z0 := -3000.0
+	var ampel := Ampel.new()
+	ampel.anzahl_phasen = 1
+	add_child(ampel)
+	ampel.global_position = Vector3(x0 + 60.0, y, z0 + 3.0)
+	ampel.test_erzwinge(Ampel.Zustand.ROT)
+	var wagen := Verkehrsauto.new()
+	wagen.tempo_ms = 10.0
+	wagen.weg.setze(PackedVector3Array([Vector3(x0, y, z0), Vector3(x0 + 150.0, y, z0)]), false)
+	add_child(wagen)
+	await get_tree().create_timer(11.0).timeout
+	var x := wagen.position_jetzt().x
+	var steht := wagen.geschwindigkeit_ms().length() < 0.5
+	var ok := _pruefe("bremst_vor_rot x=%.1f" % x, x > x0 + 40.0 and x < x0 + 58.0 and steht)
+	ampel.test_erzwinge(Ampel.Zustand.GRUEN)
+	await get_tree().create_timer(6.0).timeout
+	ok = _pruefe("faehrt_bei_gruen x=%.1f" % wagen.position_jetzt().x,
+			wagen.position_jetzt().x > x0 + 70.0) and ok
+	wagen.queue_free()
+	ampel.queue_free()
+	return ok
 
 
 func _pruefe_fahndung() -> bool:

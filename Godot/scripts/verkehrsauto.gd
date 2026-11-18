@@ -1,18 +1,33 @@
 class_name Verkehrsauto
 extends AnimatableBody3D
 ## Ein KI-Auto auf einer festen Route (Rundkurs). Es wird nicht von der Physik
-## bewegt, schiebt aber Spieler und Wagen beiseite (sync_to_physics).
-## Noch ohne Ampeln und Kreuzungsbremsen.
+## bewegt, schiebt aber Spieler und Wagen beiseite (sync_to_physics). Es bremst
+## vor Autos, Ampeln, Kurven, dem Spieler und wartepflichtigen Kreuzungen (siehe
+## Verkehrsbremse). Noch ohne Ueberholen und ohne Ausweichen nach rechts.
 
 const HALBE_LAENGE := 2.15
+const HALBE_WAGENBREITE := 0.88
+const MAX_SEITVERSATZ := 2.2   ## so weit weicht ein Wagen einem Hindernis nach rechts aus
 
 const RUSS := Color(0.06, 0.055, 0.05)
+
+## Kreuzungen aus dem Strassengraphen (verkehr.json): Ort in Meter (x, z), Klasse
+## der Strasse, Breite; dazu je Kreuzung die Autos, deren Route sie kreuzt.
+static var kreuzung_orte := PackedVector2Array()
+static var kreuzung_klassen := PackedInt32Array()
+static var kreuzung_breiten := PackedFloat32Array()
+static var kreuzung_autos := {}
+## Wer gesteuert wird (Figur oder Wagen): davor bremsen die KI-Autos.
+static var fokus: Node3D
 
 var weg := Wegfolger.new()
 var tempo_ms := 10.0
 var leben := 100.0
 var polizei := false   ## Streifenwagen: Treffer melden sich bei der Polizei
 var breiten := PackedFloat32Array()  ## Fahrbahnbreite je Wegpunkt in Metern
+var klasse := 3                      ## Strassenklasse, niedriger heisst wichtiger
+var klassen := PackedInt32Array()    ## Klasse je Wegpunkt (die Route verkettet Strassen)
+var kreuzungen := PackedInt32Array() ## Kreuzungen auf der Route
 var lack := Color(0.5, 0.5, 0.5)
 
 var geparkt := false   ## abgestellt: weit unter der Stadt, unsichtbar, ohne Route
@@ -25,6 +40,10 @@ var _lage := Vector3.ZERO   ## zuletzt gesetzte Position, sofort gueltig (siehe 
 var _geschwindigkeit := Vector3.ZERO
 var _stoerung_bis := 0.0
 var _faktor := 1.0
+var _bremse := 1.0
+var _bremse_objekt := 1.0
+var _bremse_in := randf() * 0.12   ## Sekunden bis zur naechsten Berechnung, versetzt
+var _seitversatz := 0.0
 var _leuchten: Array[MeshInstance3D] = []
 var _blaulicht := OmniLight3D.new()
 
@@ -137,6 +156,26 @@ func vorwaerts() -> Vector3:
 	return _blick
 
 
+## Strassenklasse an der aktuellen Stelle der Route.
+func klasse_jetzt() -> int:
+	if weg.index < klassen.size():
+		return klassen[weg.index]
+	return klasse
+
+
+## Rechte Seite in der Ebene, fuer Rechts-vor-Links.
+func rechts2() -> Vector2:
+	return Vector2(_rechts.x, _rechts.z)
+
+
+func _berechne_bremse() -> void:
+	_bremse_objekt = minf(Verkehrsbremse.vor_auto(self), Verkehrsbremse.vor_spieler(self))
+	# Mit Blaulicht gelten weder Rot noch Vorfahrt.
+	var ampel := 1.0 if polizei else Verkehrsbremse.vor_ampel(self)
+	var kreuzung := 1.0 if polizei else Verkehrsbremse.vor_kreuzung(self)
+	_bremse = minf(minf(_bremse_objekt, ampel), minf(kreuzung, Verkehrsbremse.in_kurve(weg)))
+
+
 ## Stellt den Wagen an einen Ort und dreht ihn in eine Richtung.
 func setze_lage(ort: Vector3, blick: Vector3) -> void:
 	weg.ort = ort
@@ -218,8 +257,12 @@ func _physics_process(delta: float) -> void:
 	# waere ein Treffer nur eine Farbe, kein Ereignis.
 	var soll := 0.1 if Time.get_ticks_msec() / 1000.0 < _stoerung_bis else 1.0
 	_faktor = move_toward(_faktor, soll, 3.0 * delta)
+	_bremse_in -= delta
+	if _bremse_in <= 0.0:
+		_bremse_in = 0.12
+		_berechne_bremse()
 	var vorher := _lage
-	weg.bewege(tempo_ms * _faktor * delta)
+	weg.bewege(tempo_ms * _faktor * _bremse * delta)
 	if weg.blick != Vector3.ZERO:
 		_blick = _blick.lerp(weg.blick, minf(8.0 * delta, 1.0)).normalized()
 	var rechts_soll := Vector3(-_blick.z, 0.0, _blick.x)
@@ -227,9 +270,14 @@ func _physics_process(delta: float) -> void:
 	var breite := 6.0
 	if weg.index < breiten.size():
 		breite = breiten[weg.index]
-	# Rechtsverkehr: eine Spur rechts von der Strassenmitte
-	var versatz := clampf(breite / 4.0, 0.9, 2.2)
-	_setze_position(weg.ort + _rechts * versatz)
+	# Rechtsverkehr: eine Spur rechts von der Strassenmitte (bei zwei Spuren ein
+	# Viertel der Breite). Vor einem Hindernis weicht der Wagen zusaetzlich nach
+	# rechts aus, nie ueber den Fahrbahnrand hinaus.
+	var spur := breite * 0.25
+	var rand := maxf(0.0, breite * 0.5 - HALBE_WAGENBREITE)
+	var ziel := minf(spur + (MAX_SEITVERSATZ if _bremse_objekt < 0.9 else 0.0), rand)
+	_seitversatz = lerpf(_seitversatz, ziel, minf(0.7 * delta, 1.0))
+	_setze_position(weg.ort + _rechts * _seitversatz)
 	_geschwindigkeit = (_lage - vorher) / delta
 	# Das Netz schaut nach +X; Drehung um Y bringt +X auf die Blickrichtung.
 	rotation.y = -atan2(_blick.z, _blick.x)

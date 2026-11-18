@@ -3,7 +3,6 @@ extends Node3D
 ## Liest daten/verkehr.json und stellt KI-Autos, Passanten und geparkte Autos
 ## in die Stadt. Geparkte Autos sind je Sektor ein MultiMesh (ein Zeichenaufruf
 ## je Karosserieteil und Sektor, Lack aus der Instanzfarbe).
-## Noch nicht portiert: Ampeln (44) und Kreuzungsbremsen (1726 Kreuzungen).
 
 const SEKTOR_M := 500.0
 const PARKSICHT := 700.0
@@ -13,6 +12,7 @@ const LACKE := [
 ]
 
 var autos: Array[Verkehrsauto] = []
+var ampeln: Array[Ampel] = []
 var passanten: Array[Passant] = []
 var geparkt := 0
 var _start_auto := Vector3.ZERO
@@ -23,6 +23,7 @@ func _ready() -> void:
 	if d == null:
 		push_warning("daten/verkehr.json fehlt: python3 Tools/konvertiere_sektoren.py ausfuehren")
 		return
+	_lade_kreuzungen(d["kreuzungen"])
 	for a: Dictionary in d["autos"]:
 		var route := _route(a["p"])
 		if route.size() < 2:
@@ -31,6 +32,17 @@ func _ready() -> void:
 		auto.tempo_ms = randf_range(28.0, 46.0) / 3.6
 		auto.lack = LACKE[autos.size() % LACKE.size()]
 		auto.breiten = PackedFloat32Array(a.get("bp", []))
+		auto.klasse = int(a.get("klasse", 3))
+		auto.klassen = PackedInt32Array(a.get("kp", []))
+		auto.kreuzungen = PackedInt32Array(a.get("kreuzungen", []))
+		# Die Spurdaten gelten nur, wenn sie zu den Wegpunkten passen.
+		if auto.breiten.size() != route.size() or auto.klassen.size() != route.size():
+			auto.breiten = PackedFloat32Array()
+			auto.klassen = PackedInt32Array()
+		for k in auto.kreuzungen:
+			if not Verkehrsauto.kreuzung_autos.has(k):
+				Verkehrsauto.kreuzung_autos[k] = []
+			Verkehrsauto.kreuzung_autos[k].append(auto)
 		auto.weg.setze(route, a.get("rund", false))
 		autos.append(auto)
 		add_child(auto)
@@ -44,11 +56,34 @@ func _ready() -> void:
 		passant.weg.setze(route, false)
 		passanten.append(passant)
 		add_child(passant)
+	for a: Dictionary in d["ampeln"]:
+		var ampel := Ampel.new()
+		ampel.gruppe = int(a["gruppe"])
+		ampel.phase = int(a["phase"])
+		ampel.anzahl_phasen = int(a.get("phasen", 2))
+		add_child(ampel)
+		ampel.global_position = Vector3(a["x"], a["z"], a["y"]) / 100.0
+		# Das Modell schaut nach +X; die Gier (Grad) dreht in Unreal +X Richtung +Y.
+		ampel.rotation.y = -deg_to_rad(float(a["gier"]))
+		ampeln.append(ampel)
 	_stelle_geparkte(d["geparkt"])
 	if not autos.is_empty():
 		_start_auto = autos[0].weg.ort
-	print("LALABERG_VERKEHR autos=%d passanten=%d geparkt=%d ampeln=%d (noch ohne Wirkung)"
-			% [autos.size(), passanten.size(), geparkt, d["ampeln"].size()])
+	print("LALABERG_VERKEHR autos=%d passanten=%d geparkt=%d ampeln=%d kreuzungen=%d"
+			% [autos.size(), passanten.size(), geparkt, ampeln.size(),
+			Verkehrsauto.kreuzung_orte.size()])
+
+
+func _lade_kreuzungen(liste: Array) -> void:
+	Verkehrsauto.kreuzung_orte = PackedVector2Array()
+	Verkehrsauto.kreuzung_klassen = PackedInt32Array()
+	Verkehrsauto.kreuzung_breiten = PackedFloat32Array()
+	Verkehrsauto.kreuzung_autos = {}
+	for k: Dictionary in liste:
+		Verkehrsauto.kreuzung_orte.append(Vector2(k["x"], k["y"]) / 100.0)
+		Verkehrsauto.kreuzung_klassen.append(int(k["klasse"]))
+		# Fehlt die Breite (alte Staende), gilt 3,8 m wie die mittlere Klasse.
+		Verkehrsauto.kreuzung_breiten.append(float(k.get("breite", 3.8)))
 
 
 ## Wie weit sich das erste KI-Auto seit dem Start bewegt hat (Rauchtest).
