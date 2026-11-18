@@ -10,6 +10,7 @@ var stadt := Stadt.new()
 var spieler := Spieler.new()
 var kamera := Kamera.new()
 var hud := Hud.new()
+var verkehr := Verkehr.new()
 var auto: Auto
 var aktuelles_auto: Auto
 
@@ -26,6 +27,7 @@ func _ready() -> void:
 	add_child(kamera)
 	add_child(spieler)
 	add_child(hud)
+	add_child(verkehr)
 	spieler.kamera = kamera
 	spieler.aktiv(false)  # bis unter dem Spawn der Boden steht
 	kamera.ziel = spieler
@@ -136,9 +138,11 @@ func _process(delta: float) -> void:
 		_rauch_zeit += delta
 		if _rauch_zeit > 25.0:
 			var p := spieler.global_position
-			print("LALABERG_RAUCHTEST ende pos=%s auto=%s fps=%d"
-					% [p, auto.global_position if auto != null else "-", Engine.get_frames_per_second()])
-			get_tree().quit(0 if auto != null else 1)
+			var ki := verkehr.bewegung()
+			print("LALABERG_RAUCHTEST ende pos=%s auto=%s ki_bewegt=%.1f fps=%d"
+					% [p, auto.global_position if auto != null else "-", ki,
+					Engine.get_frames_per_second()])
+			get_tree().quit(0 if auto != null and ki > 1.0 else 1)
 
 
 # --- Aufbau -----------------------------------------------------------------

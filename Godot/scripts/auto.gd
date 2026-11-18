@@ -5,8 +5,6 @@ extends VehicleBody3D
 ## Vorwaerts ist in Godot -Z, die Quelldaten schauen nach +X: die Huelle ist
 ## deshalb um 90 Grad gedreht.
 
-const SHADER := preload("res://shader/flach.gdshader")
-
 const MOTOR := 7500.0
 const RUECKWAERTS := 4000.0
 const BREMSE := 45.0
@@ -90,39 +88,6 @@ func _physics_process(delta: float) -> void:
 
 
 func _baue_karosserie() -> MeshInstance3D:
-	var text := FileAccess.get_file_as_string("res://daten/wagen.json")
-	var wagen = JSON.parse_string(text)
-	var netz := ArrayMesh.new()
-	if wagen == null:
-		push_error("daten/wagen.json fehlt: python3 Tools/konvertiere_sektoren.py ausfuehren")
-	else:
-		for teil: Dictionary in wagen["teile"]:
-			var roh: Array = teil["positions"]
-			var ecken := PackedVector3Array()
-			ecken.resize(roh.size() / 3)
-			for i in ecken.size():
-				# Zentimeter, (x vorwaerts, y rechts, z oben) -> Meter, (x, y oben, z)
-				ecken[i] = Vector3(roh[i * 3], roh[i * 3 + 2], roh[i * 3 + 1]) / 100.0
-			var roh_idx: Array = teil["indices"]
-			var indizes := PackedInt32Array()
-			indizes.resize(roh_idx.size())
-			for i in indizes.size():
-				indizes[i] = int(roh_idx[i])
-			var felder := []
-			felder.resize(Mesh.ARRAY_MAX)
-			felder[Mesh.ARRAY_VERTEX] = ecken
-			felder[Mesh.ARRAY_INDEX] = indizes
-			netz.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, felder)
-			var m := ShaderMaterial.new()
-			m.shader = SHADER
-			var c: Array = teil["color"]
-			var lackiert: bool = teil.get("lack", false)
-			var farbe := Vector3(lack.r, lack.g, lack.b) if lackiert else Vector3(c[0], c[1], c[2])
-			m.set_shader_parameter("farbe", farbe)
-			var glatt: bool = teil["klasse"] == "Glas" or lackiert
-			m.set_shader_parameter("rauheit", 0.25 if glatt else 0.8)
-			m.set_shader_parameter("glanz", 1.0 if glatt else 0.0)
-			netz.surface_set_material(netz.get_surface_count() - 1, m)
 	var instanz := MeshInstance3D.new()
-	instanz.mesh = netz
+	instanz.mesh = Wagenmesh.netz(lack)
 	return instanz
