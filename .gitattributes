@@ -9,3 +9,14 @@ Content/SourceData/**/*.png filter=lfs diff=lfs merge=lfs -text
 
 # Shell-Skripte brauchen Unix-Zeilenenden, sonst startet der Mac sie nicht
 *.sh text eol=lf
+
+# Godot: Skripte, Szenen und Projektdatei mit Unix-Zeilenenden
+*.gd text eol=lf
+*.gdshader text eol=lf
+*.tscn text eol=lf
+*.tres text eol=lf
+project.godot text eol=lf
+
+# Das Drehbuch ist klein und entsteht aus Text (Tools/drehbuch): ohne LFS, damit
+# es sich normal vergleichen und zusammenfuehren laesst.
+Content/SourceData/Story/drehbuch.json -filter -diff -merge text

@@ -22,3 +22,7 @@ Tools/Musik/
 # Die importierten Radiotitel (rund 0,5 GB) - stellt Tools/importiere_radio.py
 # jederzeit wieder her, siehe Content/SourceData/Audio/LIZENZ.md
 Content/Audio/Radio/
+
+# Godot: Editor-Cache und die aus Content/SourceData erzeugten Stadtdaten
+Godot/.godot/
+Godot/daten/
