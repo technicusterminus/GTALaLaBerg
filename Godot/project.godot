@@ -1,0 +1,28 @@
+; Godot-Projekt von GTA LaLaBerg. Wird mit Godot 4.5 geoeffnet (Ordner Godot/).
+; Die Stadtdaten entstehen vorher mit: python3 Tools/konvertiere_sektoren.py
+
+config_version=5
+
+[application]
+
+config/name="GTA LaLaBerg"
+config/description="Landsberg am Lech als begehbare und befahrbare Stadt, Godot-Umsetzung"
+run/main_scene="res://szenen/welt.tscn"
+config/features=PackedStringArray("4.5", "Forward Plus")
+
+[display]
+
+window/size/viewport_width=1600
+window/size/viewport_height=900
+window/stretch/mode="canvas_items"
+
+[physics]
+
+; Fahrzeuge brauchen die eingebaute Physik: VehicleBody3D laeuft nicht mit Jolt.
+common/physics_ticks_per_second=60
+
+[rendering]
+
+anti_aliasing/quality/msaa_3d=0
+anti_aliasing/quality/screen_space_aa=1
+lights_and_shadows/directional_shadow/size=4096
