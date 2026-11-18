@@ -15,6 +15,7 @@ var auto: Auto
 var aktuelles_auto: Auto
 
 var _rauchtest := false
+var _boden_y := 0.0
 var _rauch_zeit := 0.0
 
 
@@ -55,6 +56,7 @@ func _sektor_bereit(id: String, start: Vector3) -> void:
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	var boden := _boden(start)
+	_boden_y = boden.y
 	spieler.global_position = boden + Vector3(0, 0.1, 0)
 	spieler.aktiv(true)
 	auto = Auto.new()
@@ -142,7 +144,11 @@ func _process(delta: float) -> void:
 			print("LALABERG_RAUCHTEST ende pos=%s auto=%s ki_bewegt=%.1f fps=%d"
 					% [p, auto.global_position if auto != null else "-", ki,
 					Engine.get_frames_per_second()])
-			get_tree().quit(0 if auto != null and ki > 1.0 else 1)
+			# Bestanden nur, wenn niemand durch den Boden gefallen ist.
+			var steht := absf(p.y - _boden_y) < 15.0 and auto != null \
+					and auto.global_position.y > _boden_y - 15.0
+			print("LALABERG_RAUCHTEST boden_y=%.2f steht=%s" % [_boden_y, steht])
+			get_tree().quit(0 if steht and ki > 1.0 else 1)
 
 
 # --- Aufbau -----------------------------------------------------------------

@@ -111,7 +111,7 @@ func _bestimme_ort(p: Vector2) -> void:
 	if ort.is_empty():
 		var beste := 1.0
 		for m: Dictionary in _marken:
-			var anteil := p.distance_to(m["ort"]) / m["r"]
+			var anteil: float = p.distance_to(m["ort"]) / m["r"]
 			if anteil < beste:
 				beste = anteil
 				ort = m["n"]
@@ -130,7 +130,7 @@ func _bestimme_ort(p: Vector2) -> void:
 	else:
 		var beste := 1.0
 		for t: Dictionary in _ortsteile:
-			var anteil := p.distance_to(t["ort"]) / t["r"]
+			var anteil: float = p.distance_to(t["ort"]) / t["r"]
 			if anteil < beste:
 				beste = anteil
 				teil = t["n"]

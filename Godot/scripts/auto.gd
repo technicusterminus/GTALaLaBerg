@@ -75,7 +75,7 @@ func _physics_process(delta: float) -> void:
 		if vorwaerts_ms > 1.0:
 			bremse = BREMSE * -gas
 		else:
-			kraft = gas * RUECKWAERS
+			kraft = gas * RUECKWAERTS
 	if tempo_ms > HOECHST_MS:
 		kraft = 0.0
 	if Input.is_action_pressed("handbremse"):

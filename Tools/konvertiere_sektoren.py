@@ -7,8 +7,11 @@ Aufruf:  python3 Tools/konvertiere_sektoren.py
 Koordinaten: Die Quelle liegt in Zentimetern, x vorwaerts, y rechts, z oben.
 Godot bekommt Meter und (x, z, y), also y nach oben. Die Achsen werden dabei
 getauscht (Determinante -1); das gleicht den Wechsel von Unreals linkshaendigem
-zum rechtshaendigen Godot-System aus. Die Reihenfolge der Indizes bleibt
-deshalb unveraendert, die Flaechen behalten ihre Blickseite.
+zum rechtshaendigen Godot-System aus. Die Wicklung muss dabei gedreht werden:
+nach dem Achsentausch laeuft sie gegen den Uhrzeigersinn, Godot erwartet die
+Vorderseite im Uhrzeigersinn. Ohne Drehung traegt der Boden von oben nicht
+(Kollisionsform) und liegt mit der Rueckseite nach oben. Gemessen am Spawn:
+Normale vorher +1, nachher -1 (rechtshaendig gerechnet, Godot-Vorderseite).
 
 Je Sektor entstehen zwei Dateien in Godot/daten/sektoren/:
   <id>.msh  je Abschnitt hintereinander: float32 Positionen (3 je Ecke),
@@ -62,6 +65,7 @@ def main() -> int:
                 idx = np.asarray(a["indices"], dtype=np.int32)
                 if len(idx) % 3 or idx.max(initial=-1) >= len(pos):
                     raise ValueError(f"{eintrag['id']}/{a['name']}: Indizes passen nicht zu den Ecken")
+                idx = np.ascontiguousarray(idx.reshape(-1, 3)[:, [0, 2, 1]]).reshape(-1)
                 msh.write(pos.tobytes())
                 msh.write(idx.tobytes())
                 abschnitte.append({"n": a["name"], "a": art(a["name"]),
