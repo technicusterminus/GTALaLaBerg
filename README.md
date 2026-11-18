@@ -1,5 +1,10 @@
 # GTALaLaBerg – Unreal Engine 5.8
 
+> **Umstellung auf Godot läuft.** Unter [`Godot/`](Godot/README.md) entsteht die Godot-4.5-Umsetzung
+> (Stadt-Streaming, Spieler, Auto, HUD sind portiert, Verkehr, Missionen, Waffen usw. noch nicht).
+> Die Unreal-Version unten bleibt vorerst unverändert, bis die Godot-Etappe nachweislich läuft.
+> Die Quelldaten in `Content/SourceData` gelten für beide Projekte.
+
 > **Landsberg am Lech als begehbare und befahrbare Open World im Maßstab 1:1.**
 > Native Unreal-Engine-5.8-Umsetzung mit amtlichen LoD2-Gebäudedaten, Laserscan-Gelände, OpenStreetMap-Straßennetz, Nanite-Sektorstreaming, KI-Verkehr, interaktiven Fahrzeugen, Paintball-Waffen und Tageszeiten.
 
