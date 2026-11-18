@@ -38,16 +38,21 @@ Verkehr (`verkehr.gd`): 70 KI-Autos auf Rundkursen (schieben Spieler und Wagen
 beiseite), 204 Passanten als Platzhalter-Kapseln, 1078 geparkte Autos als
 MultiMesh je Sektor.
 
-Noch offen gegenueber der Unreal-Version: Ampeln (44) und Kreuzungsbremsen
-(1726) beim Verkehr, Polizei, Drehbuch und Missionen, Laeden und Konto,
-Waffen, Wasser, Radio, Menue, Figuren statt Kapseln.
-Die Unreal-Teile (`Source/`, `Config/`, `*.uproject`, `Content/Art`, `Content/City`)
-bleiben stehen, bis diese Etappe auf einem Rechner nachweislich laeuft.
+Noch offen gegenueber der Unreal-Version (Stand in der Git-Historie, Commit
+`dea4cec`; die Dokumentation in `Docs/README-Unreal-Archiv.md`): Ampeln (44) und
+Kreuzungsbremsen (1726) beim Verkehr, Polizei, Drehbuch und Missionen, Laeden und
+Konto, Waffen, Wasser, Radio, Menue, Karte, Figuren statt Kapseln.
 
 ## Hinweise
 
-- Die Skripte sind mit `gdtoolkit` auf Syntax geprueft (`gdparse`, `gdlint`),
-  aber noch nicht in Godot gestartet.
+- Geprueft unter Godot 4.5.1: Import ohne Fehler, Rauchtest bestanden (Headless
+  und mit Software-OpenGL unter Xvfb). Nicht geprueft: echte GPU-Leistung,
+  Vulkan-Renderer, Ton.
+- Screenshot im Rauchtest: `-- --rauchtest --bild=/pfad/bild.png` (nicht headless;
+  ohne GPU z. B. `xvfb-run godot --rendering-method gl_compatibility
+  --rendering-driver opengl3 --path Godot -- --rauchtest --bild=bild.png`).
+- Die Dreiecks-Wicklung wird im Konverter gedreht (siehe dessen Kopf); ohne das
+  traegt der Boden von oben nicht.
 - Fahrzeuge brauchen die eingebaute Physik (`VehicleBody3D`), nicht Jolt.
 - Fuer einen Export muessen `*.msh,*.col,*.json` im Export-Filter fuer
   Nicht-Ressourcen stehen, sonst fehlen die Stadtdaten im Build.
