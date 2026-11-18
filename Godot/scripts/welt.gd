@@ -3,8 +3,11 @@ extends Node3D
 ## und kuemmert sich um Ein- und Aussteigen.
 ##
 ## Rauchtest ohne Fenster:  godot --path Godot --headless -- --rauchtest
+## Mit Screenshot:          ... -- --rauchtest --bild=/pfad/bild.png
+## Ohne Schatten:           ... -- --rauchtest --ohneschatten
 
 const EINSTEIGEN_M := 4.0
+const STEHLEN_M := 8.0
 
 var stadt := Stadt.new()
 var spieler := Spieler.new()
@@ -13,6 +16,7 @@ var hud := Hud.new()
 var verkehr := Verkehr.new()
 var auto: Auto
 var aktuelles_auto: Auto
+var farbtreffer := 0
 
 var _rauchtest := false
 var _boden_y := 0.0
@@ -21,6 +25,7 @@ var _rauch_zeit := 0.0
 
 
 func _ready() -> void:
+	add_to_group("welt")
 	_eingaben()
 	_umgebung()
 	_rauchtest = "--rauchtest" in OS.get_cmdline_user_args()
@@ -47,8 +52,14 @@ func _ready() -> void:
 	spieler.global_position = start + Vector3(0, 3, 0)
 	kamera.yaw = deg_to_rad(float(s["blick"]))
 	stadt.sektor_bereit.connect(_sektor_bereit.bind(start), CONNECT_ONE_SHOT)
-	if not _rauchtest:
+	if _rauchtest:
+		_rauchtest_ablauf()
+	else:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+func zaehle_farbtreffer() -> void:
+	farbtreffer += 1
 
 
 func _sektor_bereit(id: String, start: Vector3) -> void:
@@ -94,24 +105,64 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _einsteigen() -> void:
+	# Zuerst ein freier eigener Wagen in der Naehe ...
 	var nah: Auto = null
 	var bester := EINSTEIGEN_M
 	for a: Auto in get_tree().get_nodes_in_group("auto"):
+		if a.fahrer != null:
+			continue
 		var d := a.global_position.distance_to(spieler.global_position)
 		if d < bester:
 			bester = d
 			nah = a
+	# ... sonst ein fahrendes oder parkendes KI-Auto: wer es uebernimmt, stiehlt es.
 	if nah == null:
-		return
-	aktuelles_auto = nah
-	nah.fahrer = spieler
+		var ki: Verkehrsauto = null
+		var beste := STEHLEN_M
+		for v: Verkehrsauto in get_tree().get_nodes_in_group("verkehrsauto"):
+			if v.ist_ausgeschaltet():
+				continue
+			var d := v.global_position.distance_to(spieler.global_position)
+			if d < beste:
+				beste = d
+				ki = v
+		if ki == null:
+			Schaden.rueckmeldung(get_tree(), "Kein freies Fahrzeug in Reichweite – näher herangehen")
+			return
+		nah = _uebernimm(ki)
+	_steige_ein(nah)
+
+
+## Ein KI-Auto wird zum fahrbaren Wagen; das KI-Auto verschwindet. Das ist
+## Diebstahl, und ein Streifenwagen wiegt doppelt.
+func _uebernimm(ki: Verkehrsauto) -> Auto:
+	var neu := Auto.new()
+	neu.lack = ki.lack
+	neu.uebernommen = true
+	add_child(neu)
+	neu.global_position = ki.global_position + Vector3(0, 0.4, 0)
+	# Das Netz der KI schaut nach +X, der fahrbare Wagen nach -Z.
+	neu.rotation.y = ki.rotation.y - PI / 2.0
+	ki.remove_from_group("verkehrsauto")
+	ki.remove_from_group("verletzbar")
+	Schaden.melde(get_tree(), Schaden.Tat.AUTO_GESTOHLEN)
+	if ki.polizei:
+		Schaden.melde(get_tree(), Schaden.Tat.POLIZEI_BESCHOSSEN)
+	ki.queue_free()
+	return neu
+
+
+func _steige_ein(wagen: Auto) -> void:
+	aktuelles_auto = wagen
+	wagen.fahrer = spieler
 	spieler.aktiv(false)
-	kamera.ziel = nah
+	kamera.ziel = wagen
 	kamera.hoehe = 1.2
 	kamera.abstand_setzen(7.0)
-	kamera.ausnehmen(nah)
-	stadt.fokus = nah
-	hud.ziel = nah
+	kamera.ausnehmen(wagen)
+	stadt.fokus = wagen
+	hud.ziel = wagen
+	Schaden.rueckmeldung(get_tree(), "Eingestiegen – W/S fahren, Leertaste bremsen, F aussteigen")
 
 
 func _aussteigen() -> void:
@@ -140,6 +191,9 @@ func _process(delta: float) -> void:
 		hud.hinweis = "F  einsteigen"
 	else:
 		hud.hinweis = ""
+	hud.status = "Leben %d    %d €    %s    Ruf %d" % [
+		ceili(spieler.leben), Konto.geld(), spieler.waffe.art_name(),
+		Konto.stufe(Konto.Wert.RUF)]
 	if _rauchtest:
 		_rauch_zeit += delta
 		if not _bildpfad.is_empty() and _rauch_zeit > 15.0:
@@ -148,17 +202,70 @@ func _process(delta: float) -> void:
 				bild.save_png(_bildpfad)
 				print("LALABERG_BILD %s %s" % [_bildpfad, bild.get_size()])
 			_bildpfad = ""
-		if _rauch_zeit > 25.0:
-			var p := spieler.global_position
-			var ki := verkehr.bewegung()
-			print("LALABERG_RAUCHTEST ende pos=%s auto=%s ki_bewegt=%.1f fps=%d"
-					% [p, auto.global_position if auto != null else "-", ki,
-					Engine.get_frames_per_second()])
-			# Bestanden nur, wenn niemand durch den Boden gefallen ist.
-			var steht := absf(p.y - _boden_y) < 15.0 and auto != null \
-					and auto.global_position.y > _boden_y - 15.0
-			print("LALABERG_RAUCHTEST boden_y=%.2f steht=%s" % [_boden_y, steht])
-			get_tree().quit(0 if steht and ki > 1.0 else 1)
+
+
+# --- Rauchtest ----------------------------------------------------------------
+
+func _pruefe(name: String, bedingung: bool) -> bool:
+	print("LALABERG_PRUEFUNG %s ok=%s" % [name, bedingung])
+	return bedingung
+
+
+## Laeuft nur mit --rauchtest: prueft die Spielsysteme der Reihe nach und beendet
+## das Spiel mit Exit-Code 0, wenn alles stimmt.
+func _rauchtest_ablauf() -> void:
+	var ok := true
+	while auto == null:
+		await get_tree().process_frame
+	await get_tree().create_timer(6.0).timeout
+
+	# Stehen Spieler und Auto auf dem Boden, ist niemand durchgefallen?
+	var p := spieler.global_position
+	var steht := absf(p.y - _boden_y) < 15.0 and auto.global_position.y > _boden_y - 15.0
+	ok = _pruefe("steht", steht) and ok
+
+	# Konto: gutschreiben, bezahlen, nicht ueberziehen.
+	var geld0 := Konto.geld()
+	Konto.gutschrift(100)
+	var bezahlt := Konto.bezahle(30)
+	var ueberzogen := Konto.bezahle(1000000)
+	ok = _pruefe("konto", bezahlt and not ueberzogen and Konto.geld() == geld0 + 70) and ok
+
+	# Treffer: ein Passant und ein KI-Auto ohne Route stehen vor dem Spieler.
+	var vorn := spieler.global_position + kamera.vorwaerts() * 8.0
+	var passant := Passant.new()
+	add_child(passant)
+	passant.global_position = _boden(vorn)
+	var wagen := Verkehrsauto.new()
+	add_child(wagen)
+	wagen.global_position = _boden(vorn + kamera.rechts() * 5.0)
+	for i in 4:
+		await get_tree().physics_frame
+	spieler.feuere_auf(passant.global_position + Vector3(0, 1.0, 0))
+	await get_tree().create_timer(1.0).timeout
+	ok = _pruefe("treffer_passant", passant.leben < 100.0 and farbtreffer > 0) and ok
+	ok = _pruefe("zielsicherheit", Konto.hole_wert(Konto.Wert.ZIELSICHERHEIT) > 0) and ok
+	spieler.feuere_auf(wagen.global_position + Vector3(0, 0.8, 0))
+	await get_tree().create_timer(1.0).timeout
+	ok = _pruefe("treffer_auto", wagen.leben < 100.0) and ok
+
+	# Zusammenbruch: Krankenhaus, Leben voll, ein Viertel des Geldes weg.
+	var vor_geld := Konto.geld()
+	spieler.verletze(150.0, Vector3.UP, Schaden.Art.ANPRALL)
+	for i in 10:
+		await get_tree().physics_frame
+	var am_klinikum := Vector2(spieler.global_position.x - Spieler.KLINIKUM.x,
+			spieler.global_position.z - Spieler.KLINIKUM.z).length() < 15.0
+	ok = _pruefe("krankenhaus", spieler.krankenhausbesuche == 1 and spieler.leben == 100.0
+			and am_klinikum and Konto.geld() == vor_geld - vor_geld / 4) and ok
+
+	await get_tree().create_timer(maxf(0.0, 22.0 - _rauch_zeit)).timeout
+	var ki := verkehr.bewegung()
+	ok = _pruefe("verkehr", ki > 1.0) and ok
+	print("LALABERG_RAUCHTEST ende pos=%s auto=%s ki_bewegt=%.1f fps=%d ok=%s" % [
+		spieler.global_position, auto.global_position, ki,
+		Engine.get_frames_per_second(), ok])
+	get_tree().quit(0 if ok else 1)
 
 
 # --- Aufbau -----------------------------------------------------------------
@@ -196,6 +303,7 @@ func _eingaben() -> void:
 		"links": [KEY_A, KEY_LEFT], "rechts": [KEY_D, KEY_RIGHT],
 		"rennen": [KEY_SHIFT], "springen": [KEY_SPACE], "handbremse": [KEY_SPACE],
 		"einsteigen": [KEY_F, KEY_ENTER], "menue": [KEY_ESCAPE],
+		"waffe1": [KEY_1], "waffe2": [KEY_2], "waffe3": [KEY_3], "waffe4": [KEY_4],
 	}
 	for aktion: String in tasten:
 		if not InputMap.has_action(aktion):
@@ -204,3 +312,7 @@ func _eingaben() -> void:
 			var e := InputEventKey.new()
 			e.physical_keycode = taste as Key
 			InputMap.action_add_event(aktion, e)
+	InputMap.add_action("feuer")
+	var maus := InputEventMouseButton.new()
+	maus.button_index = MOUSE_BUTTON_LEFT
+	InputMap.action_add_event("feuer", maus)

@@ -59,6 +59,11 @@ func _process(delta: float) -> void:
 	_arm.rotation = Vector3(pitch, 0, 0)
 
 
+## Strahl durch die Bildmitte: Ursprung und Richtung in Weltkoordinaten.
+func blick_strahl() -> Dictionary:
+	return {"von": _kamera.global_position, "richtung": -_kamera.global_basis.z}
+
+
 ## Blickrichtung waagerecht, fuer Bewegung relativ zur Kamera.
 func vorwaerts() -> Vector3:
 	return Vector3(-sin(yaw), 0, -cos(yaw))

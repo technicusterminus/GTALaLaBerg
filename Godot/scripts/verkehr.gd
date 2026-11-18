@@ -53,7 +53,9 @@ func _ready() -> void:
 
 ## Wie weit sich das erste KI-Auto seit dem Start bewegt hat (Rauchtest).
 func bewegung() -> float:
-	return 0.0 if autos.is_empty() else autos[0].weg.ort.distance_to(_start_auto)
+	if autos.is_empty() or not is_instance_valid(autos[0]):
+		return 0.0
+	return autos[0].weg.ort.distance_to(_start_auto)
 
 
 ## Quelle: Zentimeter (x, y, z oben) in dreier-Gruppen -> Meter (x, z, y).

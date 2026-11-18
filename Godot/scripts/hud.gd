@@ -6,6 +6,7 @@ extends CanvasLayer
 var ziel: Node3D
 var tempo_ms := 0.0
 var hinweis := ""
+var status := ""
 
 var _stadt := ""
 var _altstadt: Rect2
@@ -23,10 +24,17 @@ var _l_zusatz := Label.new()
 var _l_tempo := Label.new()
 var _l_fps := Label.new()
 var _l_hinweis := Label.new()
+var _l_status := Label.new()
+var _l_rueck := Label.new()
+var _rueck_bis := 0.0
 
 
 func _ready() -> void:
+	add_to_group("hud")
 	_lade_orte()
+	_platziere(_l_status, 16, 1.0, 0.0, -560, 8, 548, 24, HORIZONTAL_ALIGNMENT_RIGHT)
+	_platziere(_l_rueck, 20, 0.5, 1.0, -350, -270, 700, 30, HORIZONTAL_ALIGNMENT_CENTER)
+	_l_rueck.modulate.a = 0.0
 	_platziere(_l_ort, 26, 0.0, 1.0, 44, -150, 520, 36, HORIZONTAL_ALIGNMENT_LEFT)
 	_platziere(_l_zusatz, 14, 0.0, 1.0, 45, -110, 520, 22, HORIZONTAL_ALIGNMENT_LEFT)
 	_platziere(_l_tempo, 30, 1.0, 1.0, -260, -110, 220, 40, HORIZONTAL_ALIGNMENT_RIGHT)
@@ -56,6 +64,8 @@ func _process(delta: float) -> void:
 	_l_fps.text = "%d FPS" % Engine.get_frames_per_second()
 	_l_tempo.text = "%d km/h" % roundi(tempo_ms * 3.6) if tempo_ms > 0.5 else ""
 	_l_hinweis.text = hinweis
+	_l_status.text = status
+	_l_rueck.modulate.a = clampf(_rueck_bis - Time.get_ticks_msec() / 1000.0, 0.0, 1.0)
 	_takt -= delta
 	if _takt <= 0.0 and ziel != null:
 		_takt = 0.5
@@ -65,6 +75,12 @@ func _process(delta: float) -> void:
 	_l_zusatz.modulate.a = deckung * 0.7
 	_l_ort.text = _ort_name
 	_l_zusatz.text = _ort_zusatz
+
+
+## Kurze Meldung unten im Bild, blendet nach dreieinhalb Sekunden aus.
+func zeige_rueckmeldung(text: String) -> void:
+	_l_rueck.text = text
+	_rueck_bis = Time.get_ticks_msec() / 1000.0 + 3.5
 
 
 # --- Orte -------------------------------------------------------------------

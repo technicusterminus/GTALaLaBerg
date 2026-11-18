@@ -11,14 +11,27 @@ const BREMSE := 45.0
 const HOECHST_MS := 48.0
 
 @export var lack := Color(0.55, 0.06, 0.05)
+## Ein gestohlenes KI-Auto behaelt seinen Lack statt den des eigenen Wagens.
+var uebernommen := false
 
-var fahrer: Node3D
+## Wer gerade faehrt; solange jemand am Steuer sitzt, zaehlt der Wagen fuer
+## Anprall und Polizei als "spielerauto".
+var fahrer: Node3D:
+	set(neu):
+		fahrer = neu
+		if neu != null:
+			add_to_group("spielerauto")
+		else:
+			remove_from_group("spielerauto")
 var tempo_ms := 0.0
 var _lenkung := 0.0
+var _karosserie: MeshInstance3D
 
 
 func _ready() -> void:
 	add_to_group("auto")
+	if Konto.hat_lack() and not uebernommen:
+		lack = Konto.lack()
 	mass = 1300.0
 	center_of_mass_mode = RigidBody3D.CENTER_OF_MASS_MODE_CUSTOM
 	center_of_mass = Vector3(0, -0.15, 0)
@@ -87,7 +100,22 @@ func _physics_process(delta: float) -> void:
 	steering = _lenkung
 
 
+func geschwindigkeit_ms() -> Vector3:
+	return linear_velocity
+
+
+## Ein Paintball-Treffer faerbt den fahrbaren Wagen um.
+func erhalte_farbe(farbe: Color, _richtung: Vector3) -> void:
+	setze_lack(farbe)
+
+
+func setze_lack(farbe: Color) -> void:
+	lack = farbe
+	if _karosserie != null:
+		_karosserie.mesh = Wagenmesh.netz(lack)
+
+
 func _baue_karosserie() -> MeshInstance3D:
-	var instanz := MeshInstance3D.new()
-	instanz.mesh = Wagenmesh.netz(lack)
-	return instanz
+	_karosserie = MeshInstance3D.new()
+	_karosserie.mesh = Wagenmesh.netz(lack)
+	return _karosserie

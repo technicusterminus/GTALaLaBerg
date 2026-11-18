@@ -10,6 +10,10 @@ config/description="Landsberg am Lech als begehbare und befahrbare Stadt, Godot-
 run/main_scene="res://szenen/welt.tscn"
 config/features=PackedStringArray("4.5", "Forward Plus")
 
+[autoload]
+
+Konto="*res://scripts/konto.gd"
+
 [display]
 
 window/size/viewport_width=1600
