@@ -15,6 +15,9 @@ var kamera := Kamera.new()
 var hud := Hud.new()
 var verkehr := Verkehr.new()
 var polizei := Polizei.new()
+var auftraege := Auftraege.new()
+var laeden := Laeden.new()
+var revier := Revier.new()
 var auto: Auto
 var aktuelles_auto: Auto
 var farbtreffer := 0
@@ -40,14 +43,17 @@ func _ready() -> void:
 	add_child(hud)
 	add_child(verkehr)
 	add_child(polizei)
-	polizei.fokus = spieler
-	Verkehrsauto.fokus = spieler
+	# Aufträge und Reviere brauchen das Strassennetz der Polizei (Hoehe der Ziele).
+	auftraege.polizei = polizei
+	revier.polizei = polizei
+	add_child(auftraege)
+	add_child(laeden)
+	add_child(revier)
 	spieler.kamera = kamera
 	spieler.aktiv(false)  # bis unter dem Spawn der Boden steht
 	kamera.ziel = spieler
 	kamera.ausnehmen(spieler)
-	stadt.fokus = spieler
-	hud.ziel = spieler
+	_fokus_auf(spieler)
 
 	var s: Dictionary = stadt.spawn
 	if s.is_empty():
@@ -60,6 +66,18 @@ func _ready() -> void:
 		_rauchtest_ablauf()
 	else:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+## Wer gerade gesteuert wird (Figur oder Wagen): darauf schauen Stadt, Polizei,
+## Verkehr, Auftraege, Laeden, Reviere und HUD.
+func _fokus_auf(wer: Node3D) -> void:
+	stadt.fokus = wer
+	polizei.fokus = wer
+	Verkehrsauto.fokus = wer
+	auftraege.fokus = wer
+	laeden.fokus = wer
+	revier.fokus = wer
+	hud.ziel = wer
 
 
 func zaehle_farbtreffer() -> void:
@@ -94,7 +112,18 @@ func _sektor_bereit(id: String, start: Vector3) -> void:
 	var voraus := kamera.vorwaerts() * 7.0
 	auto.global_position = _boden(boden + voraus) + Vector3(0, 0.9, 0)
 	auto.rotation.y = kamera.yaw
+	_stelle_marken(start)
 	print("LALABERG_START boden=%s auto=%s" % [boden, auto.global_position])
+
+
+## Die erste blaue Saeule zwischen Startpunkt und Wagen, die Lackiererei nah am
+## Start und der Paintball-Laden am Weg in die Stadt (beim Bahnhof), alle auf einer
+## Fahrbahn.
+func _stelle_marken(start: Vector3) -> void:
+	var mitte := (start + auto.global_position) * 0.5
+	auftraege.setze_start_ort(polizei.naechster_punkt(mitte))
+	laeden.stelle(Laeden.Ladenart.LACKIEREREI, polizei.naechster_punkt(Vector3(-1500.0, 0, 120.0)))
+	laeden.stelle(Laeden.Ladenart.PAINTBALL, polizei.naechster_punkt(Vector3(-376.3, 0, 260.0)))
 
 
 ## Hoehe des Bodens unter einer Stelle; faellt auf die Stelle selbst zurueck.
@@ -175,10 +204,7 @@ func _steige_ein(wagen: Auto) -> void:
 	kamera.hoehe = 1.2
 	kamera.abstand_setzen(7.0)
 	kamera.ausnehmen(wagen)
-	stadt.fokus = wagen
-	polizei.fokus = wagen
-	Verkehrsauto.fokus = wagen
-	hud.ziel = wagen
+	_fokus_auf(wagen)
 	Schaden.rueckmeldung(get_tree(), "Eingestiegen – W/S fahren, Leertaste bremsen, F aussteigen")
 
 
@@ -193,10 +219,7 @@ func _aussteigen() -> void:
 	kamera.abstand_setzen(4.5)
 	kamera.ausnehmen(spieler)
 	kamera.folge_yaw = NAN
-	stadt.fokus = spieler
-	polizei.fokus = spieler
-	Verkehrsauto.fokus = spieler
-	hud.ziel = spieler
+	_fokus_auf(spieler)
 	hud.tempo_ms = 0.0
 
 
@@ -214,6 +237,9 @@ func _process(delta: float) -> void:
 	hud.gesehen = polizei.wird_gesehen()
 	hud.such_anteil = polizei.such_anteil()
 	hud.festnahme_anteil = polizei.festnahme_anteil()
+	hud.auftrag_text = _auftrag_text()
+	hud.revier_text = revier.hud_text()
+	hud.laden_text = laeden.menue_text()
 	hud.status = "Leben %d    %d €    %s    Ruf %d" % [
 		ceili(spieler.leben), Konto.geld(), spieler.waffe.art_name(),
 		Konto.stufe(Konto.Wert.RUF)]
@@ -225,6 +251,30 @@ func _process(delta: float) -> void:
 				bild.save_png(_bildpfad)
 				print("LALABERG_BILD %s %s" % [_bildpfad, bild.get_size()])
 			_bildpfad = ""
+
+
+## Auftragszeile mit Richtungspfeil zur Kamera, Entfernung und Restzeit.
+func _auftrag_text() -> String:
+	var gesteuert: Node3D = aktuelles_auto if aktuelles_auto != null else spieler
+	var fokus_pos: Vector3 = gesteuert.global_position
+	if not auftraege.unterwegs and not auftraege.angebot:
+		return ""
+	var ziel := auftraege.hole_wegpunkt()
+	var d := Vector2(ziel.x - fokus_pos.x, ziel.z - fokus_pos.z)
+	var pfeile := ["↑", "↖", "←", "↙", "↓", "↘", "→", "↗"]
+	var ang := kamera.vorwaerts().signed_angle_to(Vector3(d.x, 0, d.y), Vector3.UP)
+	var pfeil: String = pfeile[posmod(roundi(ang / (PI / 4.0)), 8)]
+	if not auftraege.unterwegs:
+		return "Blaue Säule: Auftrag annehmen   %s %d m" % [pfeil, roundi(d.length())]
+	var rest := auftraege.restzeit()
+	var art_text := auftraege.art_name()
+	if auftraege.art == Auftraege.Art.RENNEN:
+		art_text += " %d/%d" % [auftraege.rennen_punkt + 1, auftraege.rennen_punkte()]
+	elif auftraege.art == Auftraege.Art.STREIFE:
+		art_text += " (noch %d)" % auftraege.streife_rest
+	return "%s → %s   %s %d m   %d:%02d   %d €" % [
+			art_text, auftraege.hole_zielname(), pfeil, roundi(d.length()),
+			floori(rest / 60.0), floori(rest) % 60, auftraege.lohn]
 
 
 # --- Rauchtest ----------------------------------------------------------------
@@ -289,6 +339,9 @@ func _rauchtest_ablauf() -> void:
 	ok = _pruefe_ampelplan() and ok
 	ok = await _pruefe_bremsen() and ok
 
+	# Auftraege, Laeden, Lackiererei und Reviere.
+	ok = await _pruefe_wirtschaft() and ok
+
 	await get_tree().create_timer(maxf(0.0, 22.0 - _rauch_zeit)).timeout
 	var ki := verkehr.bewegung()
 	ok = _pruefe("verkehr", ki > 1.0) and ok
@@ -296,6 +349,107 @@ func _rauchtest_ablauf() -> void:
 		spieler.global_position, auto.global_position, ki,
 		Engine.get_frames_per_second(), ok])
 	get_tree().quit(0 if ok else 1)
+
+
+## Setzt die Figur an einen Ort und wartet, bis sie auf dem Boden steht.
+func _gehe_zu(ort: Vector3) -> void:
+	spieler.setze_auf_boden(ort)
+	var frist := 15.0
+	while frist > 0.0:
+		await get_tree().create_timer(0.25).timeout
+		frist -= 0.25
+		if absf(spieler.global_position.y - 60.0) > 0.5 and spieler.is_on_floor():
+			break
+	await get_tree().create_timer(0.3).timeout
+
+
+func _pruefe_wirtschaft() -> bool:
+	var ok := true
+	# --- Lieferung zu Fuss: annehmen, hinlaufen, kassieren, naechste Saeule
+	var ziele := auftraege.ziele_zahl()
+	ok = _pruefe("auftrag_ziele ziele=%d" % ziele, ziele >= 20) and ok
+	var geld_vor := Konto.geld()
+	auftraege.test_erzwinge(Auftraege.Art.LIEFERUNG)
+	auftraege.setze_start_ort(spieler.global_position)
+	await get_tree().create_timer(0.6).timeout
+	ok = _pruefe("auftrag_angenommen", auftraege.unterwegs) and ok
+	var lohn := auftraege.lohn
+	var ziel_vor := auftraege.ziel_ort()
+	# Direkt an den Zielpunkt: geprueft wird die Ankunft, nicht das Laden der Stadt.
+	spieler.global_position = ziel_vor + Vector3(0, 0.5, 0)
+	spieler.velocity = Vector3.ZERO
+	var frist := 6.0
+	while auftraege.erledigt == 0 and frist > 0.0:
+		await get_tree().create_timer(0.25).timeout
+		frist -= 0.25
+	var abstand := Vector2(spieler.global_position.x - ziel_vor.x,
+			spieler.global_position.z - ziel_vor.z).length()
+	ok = _pruefe("auftrag_erledigt lohn=%d abstand=%.1f dy=%.1f" % [
+			lohn, abstand, spieler.global_position.y - ziel_vor.y],
+			auftraege.erledigt == 1 and Konto.geld() == geld_vor + lohn) and ok
+	ok = _pruefe("naechste_saeule", auftraege.angebot) and ok
+
+	# --- Paintball-Laden: zu Fuss hinein, MP kaufen und waehlen
+	await _gehe_zu(laeden.ort_von(Laeden.Ladenart.PAINTBALL))
+	ok = _pruefe("laden_offen", laeden.offen == Laeden.Ladenart.PAINTBALL) and ok
+	Konto.gutschrift(2000)
+	var vor := Konto.geld()
+	var gekauft := laeden.kaufe(0)
+	ok = _pruefe("laden_kauf", gekauft and Konto.hat_waffe(1) and Konto.geld() == vor - 300) and ok
+	spieler.waehle_waffe(1)
+	ok = _pruefe("waffe_gewaehlt", spieler.waffe.art == Waffe.Art.MASCHINE) and ok
+	ok = _pruefe("laden_nicht_doppelt", not laeden.kaufe(0)) and ok
+
+	# --- Lackiererei: mit dem Wagen hinein, umlackieren
+	# Die Figur steht ausserhalb des Rings (so ist der Boden geladen); der Wagen
+	# faehrt von aussen hinein, wie im Spiel: wer zu Fuss in die Lackiererei laeuft,
+	# muss erst wieder hinaus.
+	var lack_ort := laeden.ort_von(Laeden.Ladenart.LACKIEREREI)
+	await _gehe_zu(lack_ort + Vector3(25.0, 0, 0))
+	auto.linear_velocity = Vector3.ZERO
+	auto.angular_velocity = Vector3.ZERO
+	auto.global_position = lack_ort + Vector3(0, 1.5, 0)
+	auto.rotation = Vector3.ZERO
+	await get_tree().create_timer(1.0).timeout
+	_steige_ein(auto)
+	await get_tree().create_timer(1.0).timeout
+	ok = _pruefe("lackiererei_offen", laeden.offen == Laeden.Ladenart.LACKIEREREI) and ok
+	polizei.setze_sterne(1)
+	await get_tree().create_timer(0.5).timeout   # erst jetzt gilt man als ungesehen
+	var rot := Color(0.6, 0.03, 0.03)
+	ok = _pruefe("lackiererei_kauf", laeden.kaufe(2) and Konto.hat_lack() and auto.lack == rot) and ok
+	# Die Streife war nicht in Sicht: die Fahndung ist vorbei.
+	ok = _pruefe("lackiererei_fahndung_weg", polizei.hole_sterne() == 0) and ok
+
+	# --- Verfolgung: einen fahrenden Wagen stellen
+	var geld_v := Konto.geld()
+	auftraege.test_erzwinge(Auftraege.Art.VERFOLGUNG)
+	auftraege.setze_start_ort(auto.global_position)
+	await get_tree().create_timer(0.8).timeout
+	var beute := auftraege.beute()
+	ok = _pruefe("verfolgung_beute", auftraege.unterwegs and beute != null
+			and auftraege.art == Auftraege.Art.VERFOLGUNG) and ok
+	if beute != null:
+		beute.verletze(9999.0, Vector3.RIGHT, Schaden.Art.BESCHUSS)
+	await get_tree().create_timer(1.0).timeout
+	ok = _pruefe("verfolgung_gestellt", Konto.hole_art_zahl(3) == 1 and Konto.geld() > geld_v) and ok
+	_aussteigen()
+
+	# --- Revier: alle Wahrzeichen, Bewaehrung, Kopf, Uebernahme
+	ok = _pruefe("revier_marken", revier.reviere.size() == 4
+			and revier.reviere[0]["marken"].size() == 4) and ok
+	revier.test_markiere_alle()
+	ok = _pruefe("revier_markiert", revier.markiert(0) == 4 and not revier.kopf_laeuft()) and ok
+	for i in 3:
+		Konto.zaehle_art(1)   # drei Taxifahrten: die Bewaehrung des ersten Reviers
+	revier.test_markiere_alle()
+	ok = _pruefe("revier_kopf", revier.kopf_laeuft()) and ok
+	var geld_r := Konto.geld()
+	revier.test_stelle_kopf()
+	ok = _pruefe("revier_uebernommen", Konto.hat_revier(0) and Konto.kapitel() == 2
+			and Konto.hat_fund(Konto.Fund.WERKSTATT) and Konto.geld() == geld_r + 800) and ok
+	ok = _pruefe("revier_naechstes", revier.offenes() == 1) and ok
+	return ok
 
 
 ## Es gibt die 44 Ampeln und die 1726 Kreuzungen, und an keiner Kreuzung zeigen zwei
@@ -371,12 +525,14 @@ func _pruefe_fahndung() -> bool:
 			spieler.global_position.z - Polizei.INSPEKTION.z).length() < 25.0
 	ok = _pruefe("inspektion", zur_inspektion) and ok
 	# Ab drei Sternen steht voraus eine Sperre.
-	polizei.test_setze_sterne(3)
+	polizei.setze_sterne(3)
 	await get_tree().create_timer(1.0).timeout
 	ok = _pruefe("sperre", polizei.sperre_steht) and ok
-	polizei.test_setze_sterne(0)
+	polizei.setze_sterne(0)
 	await get_tree().create_timer(0.5).timeout
 	ok = _pruefe("sperre_weg", not polizei.sperre_steht) and ok
+	polizei.einsatz_min_m = 250.0
+	polizei.einsatz_max_m = 450.0
 	return ok
 
 
@@ -414,7 +570,7 @@ func _eingaben() -> void:
 		"vorwaerts": [KEY_W, KEY_UP], "rueckwaerts": [KEY_S, KEY_DOWN],
 		"links": [KEY_A, KEY_LEFT], "rechts": [KEY_D, KEY_RIGHT],
 		"rennen": [KEY_SHIFT], "springen": [KEY_SPACE], "handbremse": [KEY_SPACE],
-		"einsteigen": [KEY_F, KEY_ENTER], "menue": [KEY_ESCAPE],
+		"einsteigen": [KEY_F], "menue": [KEY_ESCAPE],
 		"waffe1": [KEY_1], "waffe2": [KEY_2], "waffe3": [KEY_3], "waffe4": [KEY_4],
 	}
 	for aktion: String in tasten:

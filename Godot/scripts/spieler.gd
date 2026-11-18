@@ -148,10 +148,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	for art in 4:
 		if event.is_action_pressed("waffe%d" % (art + 1)):
-			_waehle_waffe(art)
+			waehle_waffe(art)
 
 
-func _waehle_waffe(art: int) -> void:
+func waehle_waffe(art: int) -> void:
 	if not Konto.hat_waffe(art):
 		Schaden.rueckmeldung(get_tree(), "%s gehört dir noch nicht – gibt es im Laden" % Waffe.NAMEN[art])
 		return

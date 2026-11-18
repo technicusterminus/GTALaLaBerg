@@ -106,6 +106,13 @@ func hole_streifen() -> PackedVector3Array:
 	return orte
 
 
+## Naechster Punkt des Strassengraphen, mit Hoehe: fuer Marken und Laeden, die
+## auf einer Fahrbahn stehen sollen.
+func naechster_punkt(ort: Vector3) -> Vector3:
+	var k := _naechster_knoten(ort)
+	return _knoten[k] if k >= 0 else ort
+
+
 ## Zustand der Streifen als Text, fuer Diagnose im Rauchtest.
 func debug_streifen() -> String:
 	var teile: Array[String] = []
@@ -180,7 +187,7 @@ func verwische() -> void:
 		_einstellen("lackiert")
 
 
-func test_setze_sterne(anzahl: int) -> void:
+func setze_sterne(anzahl: int) -> void:
 	_punkte = float(anzahl * anzahl)
 	var vorher := sterne
 	sterne = clampi(anzahl, 0, 5)

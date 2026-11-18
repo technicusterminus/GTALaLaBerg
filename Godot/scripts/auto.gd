@@ -24,12 +24,15 @@ var fahrer: Node3D:
 		else:
 			remove_from_group("spielerauto")
 var tempo_ms := 0.0
+var leben := 100.0
+var _letzter_stoss := -10.0
 var _lenkung := 0.0
 var _karosserie: MeshInstance3D
 
 
 func _ready() -> void:
 	add_to_group("auto")
+	add_to_group("verletzbar")
 	if Konto.hat_lack() and not uebernommen:
 		lack = Konto.lack()
 	mass = 1300.0
@@ -70,8 +73,68 @@ func _ready() -> void:
 			add_child(rad)
 
 
+func ist_ausgeschaltet() -> bool:
+	return leben <= 0.0
+
+
+func lebensanteil() -> float:
+	return clampf(leben / 100.0, 0.0, 1.0)
+
+
+## Wer den Werkstattschluessel hat, faehrt einen verstaerkten Wagen: der Schaden
+## kommt nur zu zwei Dritteln an. Bei null Leben ist der Motor hin.
+func verletze(schaden: float, _richtung: Vector3, art: Schaden.Art) -> void:
+	if ist_ausgeschaltet():
+		return
+	if Konto.hat_fund(Konto.Fund.WERKSTATT):
+		schaden *= 0.66
+	leben -= schaden
+	if fahrer != null:
+		Schaden.rueckmeldung(get_tree(), "Wagen beschädigt – %d %%" % ceili(leben)
+				if leben > 0.0 else "Motor hin – aussteigen mit F")
+	if leben > 0.0:
+		return
+	leben = 0.0
+	engine_force = 0.0
+	setze_lack(Color(0.06, 0.055, 0.05))
+	print("LALABERG_WAGEN ausgeschaltet art=%d" % art)
+
+
+## Auffahren, Abdraengen, frontal ineinander: was zaehlt, ist die Annaeherungs-
+## geschwindigkeit, nicht das eigene Tempo. Beide nehmen denselben Schaden.
+## Gemessen ueber Abstand und Richtung statt ueber Kollisionsereignisse: die
+## KI-Autos bewegen sich kinematisch und melden keinen physikalischen Stoss.
+func _pruefe_zusammenstoss() -> void:
+	var jetzt := Time.get_ticks_msec() / 1000.0
+	if ist_ausgeschaltet() or jetzt - _letzter_stoss < 1.0:
+		return
+	var fahrt := linear_velocity
+	for gruppe in ["verkehrsauto", "auto"]:
+		for a: Node3D in get_tree().get_nodes_in_group(gruppe):
+			if a == self:
+				continue
+			var weg := a.global_position - global_position
+			# Zwei Wagen sind je rund 4,5 m lang: naeher als 4,2 m zwischen den
+			# Mittelpunkten stehen sie nur, wenn es gekracht hat.
+			if Vector2(weg.x, weg.z).length_squared() > 4.2 * 4.2 or absf(weg.y) > 3.0:
+				continue
+			var richtung := Vector3(weg.x, 0, weg.z).normalized()
+			var andere_fahrt: Vector3 = a.geschwindigkeit_ms()
+			var annaeherung: float = (fahrt - andere_fahrt).dot(richtung) * 3.6
+			if annaeherung < 15.0:
+				continue
+			_letzter_stoss = jetzt
+			# 15 km/h kosten ein paar Prozent, ab 90 km/h ist der Wagen hin.
+			var schaden := remap(clampf(annaeherung, 15.0, 90.0), 15.0, 90.0, 5.0, 100.0)
+			verletze(schaden, -richtung, Schaden.Art.ANPRALL)
+			a.verletze(schaden, richtung, Schaden.Art.ANPRALL)
+			print("LALABERG_STOSS tempo=%.0f schaden=%.0f gegen=%s" % [annaeherung, schaden, a.name])
+			return
+
+
 func _physics_process(delta: float) -> void:
 	tempo_ms = linear_velocity.length()
+	_pruefe_zusammenstoss()
 	var vorwaerts_ms := -global_basis.z.dot(linear_velocity)
 	if fahrer == null:
 		engine_force = 0.0
@@ -93,6 +156,8 @@ func _physics_process(delta: float) -> void:
 		kraft = 0.0
 	if Input.is_action_pressed("handbremse"):
 		bremse = BREMSE * 1.5
+	if ist_ausgeschaltet():
+		kraft = 0.0
 	engine_force = kraft
 	brake = bremse
 	var maximal := lerpf(0.5, 0.1, clampf(tempo_ms / 30.0, 0.0, 1.0))

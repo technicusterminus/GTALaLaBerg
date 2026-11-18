@@ -213,6 +213,10 @@ func lebensanteil() -> float:
 	return clampf(leben / 100.0, 0.0, 1.0)
 
 
+func setze_leben(neu: float) -> void:
+	leben = neu
+
+
 func setze_lack(farbe: Color) -> void:
 	lack = farbe
 	_netz.mesh = Wagenmesh.netz(lack)
