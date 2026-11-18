@@ -23,6 +23,9 @@ func _ready() -> void:
 	_arm.collision_mask = 1
 	_arm.add_child(_kamera)
 	add_child(_arm)
+	# Strassen liegen nur Zentimeter ueber dem Boden: eine enge Near-Plane
+	# macht den Tiefenpuffer dort zu grob (Ringe durch Z-Fighting).
+	_kamera.near = 0.5
 	_kamera.far = 3000.0
 	_kamera.fov = 70.0
 	_kamera.current = true

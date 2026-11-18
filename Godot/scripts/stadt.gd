@@ -198,6 +198,8 @@ func _material(art: String, farbe: Array) -> ShaderMaterial:
 	var m := ShaderMaterial.new()
 	m.shader = SHADER
 	m.set_shader_parameter("farbe", Vector3(farbe[0], farbe[1], farbe[2]))
+	if art in ["Ground", "Road", "Sidewalk", "Gehweg", "Plaza", "Rail", "Water"]:
+		m.set_shader_parameter("oben", true)
 	match art:
 		"Water":
 			m.set_shader_parameter("rauheit", 0.1)

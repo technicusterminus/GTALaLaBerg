@@ -16,6 +16,7 @@ var aktuelles_auto: Auto
 
 var _rauchtest := false
 var _boden_y := 0.0
+var _bildpfad := ""
 var _rauch_zeit := 0.0
 
 
@@ -23,6 +24,9 @@ func _ready() -> void:
 	_eingaben()
 	_umgebung()
 	_rauchtest = "--rauchtest" in OS.get_cmdline_user_args()
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--bild="):
+			_bildpfad = arg.substr(7)
 
 	add_child(stadt)
 	add_child(kamera)
@@ -138,6 +142,12 @@ func _process(delta: float) -> void:
 		hud.hinweis = ""
 	if _rauchtest:
 		_rauch_zeit += delta
+		if not _bildpfad.is_empty() and _rauch_zeit > 15.0:
+			var bild := get_viewport().get_texture().get_image()
+			if bild != null:
+				bild.save_png(_bildpfad)
+				print("LALABERG_BILD %s %s" % [_bildpfad, bild.get_size()])
+			_bildpfad = ""
 		if _rauch_zeit > 25.0:
 			var p := spieler.global_position
 			var ki := verkehr.bewegung()
@@ -174,7 +184,7 @@ func _umgebung() -> void:
 
 	var sonne := DirectionalLight3D.new()
 	sonne.rotation_degrees = Vector3(-50, 152, 0)
-	sonne.shadow_enabled = true
+	sonne.shadow_enabled = not "--ohneschatten" in OS.get_cmdline_user_args()
 	sonne.directional_shadow_max_distance = 250.0
 	sonne.light_energy = 1.2
 	add_child(sonne)
