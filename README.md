@@ -1,7 +1,7 @@
 # GTALaLaBerg – Godot 4.5
 
 > **Landsberg am Lech als begehbare und befahrbare Stadt im Maßstab 1:1.**
-> Godot-Umsetzung mit amtlichen LoD2-Gebäudedaten, Laserscan-Gelände, OpenStreetMap-Straßennetz, Sektor-Streaming, KI-Verkehr und fahrbaren Autos.
+> Godot-Umsetzung mit amtlichen LoD2-Gebäudedaten, Laserscan-Gelände, OpenStreetMap-Straßennetz, Sektor-Streaming, KI-Verkehr, Polizei und einer eigenen Geschichte.
 
 Das Projekt lag zuvor als Unreal-Engine-5.8-Projekt vor. Es wurde auf Godot umgestellt; die ausführliche
 Unreal-Dokumentation steht unverändert in [`Docs/README-Unreal-Archiv.md`](Docs/README-Unreal-Archiv.md),
@@ -12,6 +12,7 @@ der Unreal-Stand in der Git-Historie (Commit `dea4cec`).
 | Projekt | `Godot/project.godot` |
 | Engine | Godot 4.5 |
 | Stadt | 90 Sektoren à 500 × 500 m, 2,4 Mio. Dreiecke |
+| Geschichte | „Farbkrieg“: 22 Hauptmissionen, 3 Enden |
 | Quelldaten | `Content/SourceData` (Git LFS) |
 | Lizenz für Code/Tools | MIT |
 | Stadt- und Geodaten | ODbL / CC BY 4.0, siehe Lizenzabschnitt |
@@ -28,25 +29,34 @@ Steuerung, Stand und Rauchtest stehen in [`Godot/README.md`](Godot/README.md).
 
 ## Stand
 
-Umgesetzt: Sektor-Streaming mit Kollision, Spieler zu Fuß, fahrbares Auto, Ortsanzeige, 70 KI-Autos auf
-Rundkursen, 204 Passanten (Platzhalter), 1078 geparkte Autos.
+Umgesetzt (alles mit einem Rauchtest geprüft, siehe [`Godot/README.md`](Godot/README.md)):
 
-Aus der Unreal-Version noch nicht portiert: Ampeln und Kreuzungsbremsen, Polizei und Fahndung,
-Drehbuch und Missionen, Läden, Konto und Lackiererei, Paintball-Waffen, Wasser, Radio, Menü, Figuren
-(statt Kapseln), Karte.
+- **Stadt und Verkehr:** Sektor-Streaming mit Kollision, Spieler und Auto, 70 KI-Autos,
+  204 Passanten, 1078 geparkte Autos, 44 Ampeln, bremsendes Verkehrsverhalten
+- **Kampf und Polizei:** vier Paintball-Waffen, Schaden und Krankenhaus, Fahndung mit
+  bis zu fünf Sternen, Streifen, Straßensperre, Festnahme
+- **Wirtschaft und Reviere:** sechs Auftragsarten, Paintball-Laden, Lackiererei,
+  Konto und Spielstand, vier Reviere mit Wahrzeichen, Bewährung und Kopf der Mannschaft
+- **Geschichte:** das Drehbuch **Farbkrieg** – Prolog, vier Akte und ein Finale mit drei
+  Enden, 22 Hauptmissionen, 54 Szenen, 244 Zeilen Dialog, gespielt mit Kamerafahrten,
+  Untertiteln und Entscheidungen. Lesbar in [`Docs/Drehbuch.md`](Docs/Drehbuch.md)
+
+Aus der Unreal-Version noch nicht portiert: Panzer und Hubschrauber, Menü, Karte,
+Radio, Wasser, Ton, Schießbude, Farbdosen, Figuren statt Kapseln.
 
 ## Werkzeuge
 
 | Pfad | Zweck |
 |---|---|
-| `Tools/konvertiere_sektoren.py` | Sektor-JSON → Godot-Binärdaten |
+| `Tools/konvertiere_sektoren.py` | Sektor-JSON und Daten → Godot-Binärdaten und Kopien |
+| `Tools/drehbuch/` | schreibt und prüft das Drehbuch (`schreibe.py`), erzeugt `drehbuch.json` und `Docs/Drehbuch.md` |
 | `Tools/SectorPipeline/` | Sektorbildung der Stadt (Node.js) |
 | `Tools/Export/` | Aufbereitung von OSM-, LoD2-, Verkehrs- und Ortsdaten (Node.js) |
 | `Tools/erzeuge_*.py`, `Tools/baue_*.py` (ohne Unreal) | Texturen, Sounds, Musik, Modelle |
 
 ## Lizenzen und Datenquellen
 
-Der Quellcode, die Konfiguration, Werkzeuge und selbst erzeugten Materialien stehen unter der [MIT-Lizenz](LICENSE).
+Der Quellcode, die Konfiguration, Werkzeuge und selbst erzeugten Materialien stehen unter der [MIT-Lizenz](LICENSE). Das gilt auch für die Geschichte „Farbkrieg“ (Figuren, Handlung, Dialoge in `Tools/drehbuch/`): Sie ist frei erfunden, ähnliche Namen sind Zufall; nur die Orte sind echt.
 
 ### OpenStreetMap
 

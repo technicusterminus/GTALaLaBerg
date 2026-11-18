@@ -2,6 +2,7 @@ extends Node3D
 ## Wurzel des Spiels: baut Licht, Stadt, Spieler, Auto, Kamera und HUD zusammen
 ## und kuemmert sich um Ein- und Aussteigen.
 ##
+## Film ansehen (Bilder):   ... -- --filmtest --bild=/pfad/film.png
 ## Rauchtest ohne Fenster:  godot --path Godot --headless -- --rauchtest
 ## Mit Screenshot:          ... -- --rauchtest --bild=/pfad/bild.png
 ## Ohne Schatten:           ... -- --rauchtest --ohneschatten
@@ -24,6 +25,8 @@ var aktuelles_auto: Auto
 var farbtreffer := 0
 
 var _rauchtest := false
+var _filmtest := false
+var _film_bilder := 0
 var _boden_y := 0.0
 var _bildpfad := ""
 var _rauch_zeit := 0.0
@@ -34,6 +37,7 @@ func _ready() -> void:
 	_eingaben()
 	_umgebung()
 	_rauchtest = "--rauchtest" in OS.get_cmdline_user_args()
+	_filmtest = "--filmtest" in OS.get_cmdline_user_args()
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--bild="):
 			_bildpfad = arg.substr(7)
@@ -269,6 +273,17 @@ func _process(delta: float) -> void:
 	hud.status = "Leben %d    %d €    %s    Ruf %d" % [
 		ceili(spieler.leben), Konto.geld(), spieler.waffe.art_name(),
 		Konto.stufe(Konto.Wert.RUF)]
+	if _filmtest and not _bildpfad.is_empty():
+		_rauch_zeit += delta
+		# Zwei Bilder aus dem Film: der Prolog beginnt von selbst.
+		if _film_bilder < 4 and _rauch_zeit > 12.0 + 9.0 * _film_bilder:
+			var film := get_viewport().get_texture().get_image()
+			var pfad := _bildpfad.replace(".png", "_%d.png" % _film_bilder)
+			film.save_png(pfad)
+			print("LALABERG_BILD %s mission=%s" % [pfad, drehbuch.laeuft()])
+			_film_bilder += 1
+			if _film_bilder >= 4:
+				get_tree().quit(0)
 	if _rauchtest:
 		_rauch_zeit += delta
 		if not _bildpfad.is_empty() and _rauch_zeit > 15.0:

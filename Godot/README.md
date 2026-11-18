@@ -1,58 +1,123 @@
 # GTA LaLaBerg in Godot 4.5
 
-Landsberg am Lech als begeh- und befahrbare Stadt. Dies ist die Godot-Umsetzung;
-die Quelldaten liegen weiterhin in `Content/SourceData` (Git LFS).
+Landsberg am Lech als begeh- und befahrbare Stadt mit einer Geschichte: dem
+**Farbkrieg**. Dies ist die Godot-Umsetzung; die Quelldaten liegen in
+`Content/SourceData` (Git LFS), die Geschichte in `Tools/drehbuch`.
 
 ## Starten
 
 ```bash
 git lfs pull --include="Content/SourceData/**"
 python3 Tools/konvertiere_sektoren.py      # braucht numpy, erzeugt Godot/daten (~106 MB)
-godot --path Godot                         # oder den Ordner Godot/ im Editor oeffnen
+godot --path Godot                         # oder den Ordner Godot/ im Editor öffnen
 ```
 
-Rauchtest ohne Fenster (endet nach 25 s mit `LALABERG_RAUCHTEST` in der Ausgabe,
-Exit-Code 0 nur, wenn das Auto gespawnt ist und sich ein KI-Auto bewegt hat):
-
-```bash
-godot --path Godot --headless -- --rauchtest
-```
+Die Hauptgeschichte beginnt von selbst: Du wachst im Klinikum auf.
 
 ## Steuerung
 
 | Taste | Aktion |
 |---|---|
 | WASD / Pfeile | gehen bzw. fahren |
-| Maus | Kamera |
+| Maus | Kamera; linke Maustaste schießt |
 | Shift, Leertaste | rennen, springen (im Auto: Handbremse) |
-| F | ein-/aussteigen |
+| 1 bis 4 | Waffe wählen (Pistole, MP, Schrotflinte, Werfer; Letztere zu kaufen) |
+| F | ein- und aussteigen; ein KI-Auto zu nehmen ist Diebstahl |
+| ↑ ↓ Enter | im Laden wählen und kaufen |
+| Enter, Leertaste, Klick | im Film zur nächsten Zeile |
+| 1 bis 3 | im Film eine Entscheidung treffen |
 | Esc | Maus freigeben |
 
-## Stand
+## Was drin ist
 
-Umgesetzt: Sektor-Streaming der Stadt (90 Sektoren, 2,4 Mio. Dreiecke) mit
-Kollision, Spieler zu Fuss, ein fahrbares Auto (Karosserie aus `wagen.json`),
-Ortsanzeige, Tempo und Bildrate.
+**Stadt.** 90 Sektoren mit 2,4 Mio. Dreiecken, nach Entfernung nachgeladen, mit
+Kollision (`stadt.gd`). Spieler zu Fuß, fahrbares Auto, Kamera, HUD mit Ortsanzeige.
 
-Verkehr (`verkehr.gd`): 70 KI-Autos auf Rundkursen (schieben Spieler und Wagen
-beiseite), 204 Passanten als Platzhalter-Kapseln, 1078 geparkte Autos als
-MultiMesh je Sektor.
+**Verkehr.** 70 KI-Autos auf Rundkursen, 204 Passanten (Kapseln), 1078 geparkte Autos
+je Sektor als MultiMesh, 44 Ampeln mit Phasenplan. KI-Autos bremsen vor Autos,
+Rot, Kurven, dem Spieler und wartepflichtigen Kreuzungen (`verkehrsbremse.gd`).
 
-Noch offen gegenueber der Unreal-Version (Stand in der Git-Historie, Commit
-`dea4cec`; die Dokumentation in `Docs/README-Unreal-Archiv.md`): Ampeln (44) und
-Kreuzungsbremsen (1726) beim Verkehr, Polizei, Drehbuch und Missionen, Laeden und
-Konto, Waffen, Wasser, Radio, Menue, Karte, Figuren statt Kapseln.
+**Kampf und Folgen.** Vier Paintball-Waffen, Farbkugeln mit Klecks und Wirkung im
+Umkreis, Leben für Spieler, Passanten und Autos, Sturz- und Anprallschaden,
+Krankenhaus mit Behandlungskosten. Die Polizei (`polizei.gd`) fahndet mit bis zu fünf
+Sternen, schickt Streifen über den Straßengraphen, sucht, sperrt ab drei Sternen die
+Straße und nimmt fest.
+
+**Wirtschaft.** Aufträge in sechs Arten (Lieferung, Taxi, Rennen, Verfolgung,
+Krankenwagen, Streife), Paintball-Laden, Lackiererei, ein Konto mit Spielstand, Werten
+(Ausdauer, Zielsicherheit, Fahren, Ruf), Fundstücken und Merkern.
+
+**Reviere.** Vier Reviere mit je vier Wahrzeichen-Säulen, Bewährung, Ruf und einem Kopf
+der Mannschaft, den man stellen muss (`revier.gd`).
+
+**Drehbuch.** `drehbuch.gd` führt Missionen aus Stufen aus; `kino.gd` spielt Szenen mit
+Kamerafahrten, Letterbox, Untertiteln, Figuren, Titelkarten, Funk und Entscheidungen.
+Die Hauptgeschichte hat 22 Missionen, 54 Szenen, 244 Zeilen Dialog und drei Enden; dazu
+kommen 22 Nebenaufträge der Mannschaften. Das lesbare Skript steht in
+[`Docs/Drehbuch.md`](../Docs/Drehbuch.md).
+
+## Die Geschichte ändern
+
+Das Drehbuch entsteht aus Python-Modulen in `Tools/drehbuch/` (nicht die JSON von Hand
+bearbeiten):
+
+```bash
+python3 Tools/drehbuch/schreibe.py         # prüft die Daten, schreibt drehbuch.json und Docs/Drehbuch.md
+python3 Tools/konvertiere_sektoren.py      # kopiert alles nach Godot/daten
+```
+
+Beim Schreiben wird geprüft: jede Kennung ist eindeutig, jede Voraussetzung existiert,
+es gibt keine Zyklen, jeder Ortsname steht in `orte.json`, jede Figur ist bekannt.
+Stufenarten: `hin`, `bring`, `markiere`, `stelle`, `halte`, `im_wagen`, `warte_revier`
+(Spiel) und `szene`, `titel`, `funk`, `wahl`, `wenn`, `setze`, `gib` (Film und Zustand).
+
+## Prüfen
+
+Rauchtest ohne Fenster (endet nach rund zwei Minuten, Exit-Code 0 nur, wenn alles stimmt):
+
+```bash
+godot --path Godot --headless -- --rauchtest
+```
+
+Er prüft unter anderem: Boden und Kollision, Konto, Treffer auf Passanten und Autos,
+Krankenhaus, Fahndung bis zur Festnahme, Straßensperre, Ampelplan und Bremsen, Aufträge,
+Laden und Lackiererei, Verfolgung, Reviernahme und die ganze Hauptgeschichte im
+Zeitraffer mit allen drei Enden (über 40 Prüfungen, `LALABERG_PRUEFUNG ... ok=`).
+
+Bilder (nicht headless; ohne GPU mit Software-OpenGL unter Xvfb):
+
+```bash
+xvfb-run godot --rendering-method gl_compatibility --rendering-driver opengl3 \
+  --path Godot -- --rauchtest --bild=bild.png         # Spielbild nach 15 s
+xvfb-run godot --rendering-method gl_compatibility --rendering-driver opengl3 \
+  --path Godot -- --filmtest --bild=film.png          # vier Bilder aus dem Prolog
+```
+
+`--ohneschatten` schaltet die Sonnenschatten ab (zum Eingrenzen von Bildfehlern).
+Rauch- und Filmtest schreiben nur in eine eigene Spielstanddatei.
+
+## Noch offen gegenüber der Unreal-Version
+
+Stand der Unreal-Version: Git-Historie, Commit `dea4cec`; ihre Dokumentation steht
+in `Docs/README-Unreal-Archiv.md`.
+
+- Panzer und Hubschrauber (Rotor- und Zündschlüssel sind schon Fundstücke)
+- Menü, Karte und Minikarte, Radio mit drei Sendern, Wasser, Ton
+- Schießbude und die fünfzig versteckten Farbdosen
+- Figuren statt Kapseln, Waffenmodelle, Insassen in den Autos
+- Überholen und der Kontakt-Einsatz der Polizei bei drei Sternen
+- Keine Bildraten- oder Größenmessung gegenüber Unreal
 
 ## Hinweise
 
-- Geprueft unter Godot 4.5.1: Import ohne Fehler, Rauchtest bestanden (Headless
-  und mit Software-OpenGL unter Xvfb). Nicht geprueft: echte GPU-Leistung,
-  Vulkan-Renderer, Ton.
-- Screenshot im Rauchtest: `-- --rauchtest --bild=/pfad/bild.png` (nicht headless;
-  ohne GPU z. B. `xvfb-run godot --rendering-method gl_compatibility
-  --rendering-driver opengl3 --path Godot -- --rauchtest --bild=bild.png`).
-- Die Dreiecks-Wicklung wird im Konverter gedreht (siehe dessen Kopf); ohne das
-  traegt der Boden von oben nicht.
+- Geprüft unter Godot 4.5.1: Import ohne Fehler, Rauchtest bestanden (headless und
+  mit Software-OpenGL). Nicht geprüft: echte GPU-Leistung, Vulkan-Renderer, Ton.
+- Die Dreiecks-Wicklung wird im Konverter gedreht (siehe dessen Kopf); ohne das trägt
+  der Boden von oben nicht.
+- `AnimatableBody3D` mit `sync_to_physics` liest `global_position` nach dem Setzen noch
+  bis zum nächsten Physikbild mit dem alten Wert; `Verkehrsauto.position_jetzt()` ist
+  deshalb die verlässliche Position.
 - Fahrzeuge brauchen die eingebaute Physik (`VehicleBody3D`), nicht Jolt.
-- Fuer einen Export muessen `*.msh,*.col,*.json` im Export-Filter fuer
-  Nicht-Ressourcen stehen, sonst fehlen die Stadtdaten im Build.
+- Für einen Export müssen `*.msh,*.col,*.json` im Export-Filter für Nicht-Ressourcen
+  stehen, sonst fehlen die Stadtdaten im Build.
+- `drehbuch.json` ist bewusst nicht in Git LFS (siehe `.gitattributes`).

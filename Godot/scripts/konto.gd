@@ -17,7 +17,8 @@ var _pruefung := false
 
 
 func _ready() -> void:
-	_pruefung = "--rauchtest" in OS.get_cmdline_user_args()
+	var args := OS.get_cmdline_user_args()
+	_pruefung = "--rauchtest" in args or "--filmtest" in args
 	if _pruefung:
 		_pfad = "user://spielstand_test.json"
 	_stand = _leer()
