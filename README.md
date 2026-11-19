@@ -44,7 +44,9 @@ Umgesetzt (alles mit einem Rauchtest geprüft, siehe [`Godot/README.md`](Godot/R
 - **Sonderfahrzeuge:** ein Panzer (Kanone mit Großkaliber-Farbkugel) und ein Hubschrauber
   zum Einsteigen
 
-Aus der Unreal-Version noch nicht portiert: Menü, Karte, Radio, Wasser, Ton,
+- **Karte und Menü:** Minikarte, Vollkarte (M) und Pausenmenü (Esc)
+
+Aus der Unreal-Version noch nicht portiert: Radio, Wasser, Ton,
 Schießbude, Farbdosen, Figuren statt Kapseln.
 
 ## Werkzeuge

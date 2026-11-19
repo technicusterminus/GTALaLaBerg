@@ -106,7 +106,7 @@ Rauch- und Filmtest schreiben nur in eine eigene Spielstanddatei.
 Stand der Unreal-Version: Git-Historie, Commit `dea4cec`; ihre Dokumentation steht
 in `Docs/Unreal-Archiv/README-Unreal-Archiv.md`.
 
-- Menü, Karte und Minikarte, Radio mit drei Sendern, Wasser, Ton
+- Radio mit drei Sendern, Wasser, Ton
 - Schießbude und die fünfzig versteckten Farbdosen
 - Figuren statt Kapseln, Waffenmodelle, Insassen in den Autos
 - Überholen und der Kontakt-Einsatz der Polizei bei drei Sternen

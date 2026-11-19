@@ -95,6 +95,14 @@ def main() -> int:
                   "Story/drehbuch.json", "Story/missionen.json"):
         shutil.copy(QUELLE / datei, ZIEL / Path(datei).name)
 
+    # Karte: die kleine Vorlage (3 m je Pixel) reicht fuer Mini- und Vollkarte.
+    karte = QUELLE / "Karte" / "karte-klein.png"
+    if karte.stat().st_size > 1000:
+        shutil.copy(karte, ZIEL / "karte.png")
+        shutil.copy(QUELLE / "Karte" / "karte.json", ZIEL / "karte.json")
+    else:
+        print("Karte fehlt (git lfs pull --include='Content/SourceData/Karte/**')")
+
     # Modelle (Panzer, Hubschrauber, Insasse): Godot importiert FBX selbst. Liegt nur
     # der LFS-Platzhalter da (git lfs pull fehlt), wird die Datei uebersprungen.
     (ZIEL / "modelle").mkdir(parents=True, exist_ok=True)

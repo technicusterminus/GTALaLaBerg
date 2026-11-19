@@ -15,6 +15,7 @@ var stadt := Stadt.new()
 var spieler := Spieler.new()
 var kamera := Kamera.new()
 var hud := Hud.new()
+var karte := Karte.new()
 var verkehr := Verkehr.new()
 var polizei := Polizei.new()
 var auftraege := Auftraege.new()
@@ -51,6 +52,9 @@ func _ready() -> void:
 	add_child(kamera)
 	add_child(spieler)
 	add_child(hud)
+	add_child(karte)
+	karte.kamera = kamera
+	karte.auftraege = auftraege
 	add_child(verkehr)
 	add_child(polizei)
 	# Aufträge und Reviere brauchen das Strassennetz der Polizei (Hoehe der Ziele).
@@ -97,6 +101,7 @@ func _fokus_auf(wer: Node3D) -> void:
 	revier.fokus = wer
 	drehbuch.fokus = wer
 	hud.ziel = wer
+	karte.fokus = wer
 
 
 ## Vom Drehbuch bei Szenen: Film an, die Spielfigur und der Wagen stehen still, das
@@ -196,10 +201,7 @@ func _boden(pos: Vector3) -> Vector3:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("menue"):
-		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE \
-				if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED else Input.MOUSE_MODE_CAPTURED
-	elif event.is_action_pressed("einsteigen") and auto != null:
+	if event.is_action_pressed("einsteigen") and auto != null:
 		if aktuelles_auto == null and aktuelles_sonder == null:
 			_einsteigen()
 		elif aktuelles_sonder != null:
@@ -210,7 +212,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				Schaden.rueckmeldung(get_tree(), hinweis)
 		else:
 			_aussteigen()
-	elif event is InputEventMouseButton and event.pressed:
+	elif event is InputEventMouseButton and event.pressed and not karte.menue_offen \
+			and not karte.voll:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
@@ -478,6 +481,9 @@ func _rauchtest_ablauf() -> void:
 	# Panzer und Hubschrauber.
 	ok = await _pruefe_sonder() and ok
 
+	# Karte und Menue.
+	ok = await _pruefe_karte() and ok
+
 	# Drehbuch: die ganze Hauptgeschichte im Zeitraffer, alle drei Enden.
 	ok = await _pruefe_drehbuch() and ok
 
@@ -490,6 +496,25 @@ func _rauchtest_ablauf() -> void:
 		spieler.global_position, auto.global_position, ki,
 		Engine.get_frames_per_second(), ok])
 	get_tree().quit(0 if ok else 1)
+
+
+func _pruefe_karte() -> bool:
+	var ok := _pruefe("karte_geladen", karte.hat_karte())
+	var p := karte.bild_punkt(spieler.global_position)
+	ok = _pruefe("karte_spieler_im_bild=%s" % p, p.x > 0.0 and p.y > 0.0 and p.x < 1043.0
+			and p.y < 1113.0) and ok
+	karte.oeffne_menue()
+	await get_tree().process_frame
+	var pausiert := get_tree().paused and karte.menue_offen
+	karte.schliesse_menue()
+	await get_tree().process_frame
+	ok = _pruefe("menue_pausiert", pausiert and not get_tree().paused) and ok
+	karte.schalte_vollkarte(true)
+	await get_tree().process_frame
+	var voll := karte.voll and get_tree().paused
+	karte.schalte_vollkarte(false)
+	await get_tree().process_frame
+	return _pruefe("vollkarte", voll and not get_tree().paused) and ok
 
 
 func _pruefe_sonder() -> bool:
@@ -795,7 +820,7 @@ func _eingaben() -> void:
 		"vorwaerts": [KEY_W, KEY_UP], "rueckwaerts": [KEY_S, KEY_DOWN],
 		"links": [KEY_A, KEY_LEFT], "rechts": [KEY_D, KEY_RIGHT],
 		"rennen": [KEY_SHIFT], "springen": [KEY_SPACE], "handbremse": [KEY_SPACE],
-		"einsteigen": [KEY_F], "menue": [KEY_ESCAPE],
+		"einsteigen": [KEY_F], "menue": [KEY_ESCAPE], "karte": [KEY_M],
 		"waffe1": [KEY_1], "waffe2": [KEY_2], "waffe3": [KEY_3], "waffe4": [KEY_4],
 	}
 	for aktion: String in tasten:
