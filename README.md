@@ -44,10 +44,12 @@ Umgesetzt (alles mit einem Rauchtest geprüft, siehe [`Godot/README.md`](Godot/R
 - **Sonderfahrzeuge:** ein Panzer (Kanone mit Großkaliber-Farbkugel) und ein Hubschrauber
   zum Einsteigen
 
+- **Aussehen:** animierte Menschenfiguren (Quaternius, CC0), Autos in vier Karosserieformen
+  und zwölf Lacken, Wiesenflecken und Erde am Hang im Gelände, bewegtes Wasser
 - **Karte und Menü:** Minikarte, Vollkarte (M) und Pausenmenü (Esc)
 
-Aus der Unreal-Version noch nicht portiert: Radio, Wasser, Ton,
-Schießbude, Farbdosen, Figuren statt Kapseln.
+Aus der Unreal-Version noch nicht portiert: Radio, Ton,
+Schießbude, Farbdosen.
 
 ## Werkzeuge
 

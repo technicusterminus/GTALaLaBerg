@@ -8,6 +8,8 @@ extends Node3D
 
 const ARTEN := ["Casual", "Worker"]
 const HOEHE := 1.78
+## Clips, die einmal laufen und dann stehen bleiben.
+const EINMAL := ["Death", "Roll", "Gun_Shoot", "HitRecieve", "HitRecieve_2"]
 
 static var _szenen := {}
 
@@ -40,8 +42,7 @@ static func neu(art: int) -> Figur:
 		for n in f._anim.get_animation_list():
 			var a := f._anim.get_animation(n)
 			var k := String(n).get_slice("|", 1)
-			a.loop_mode = Animation.LOOP_NONE if k in ["Death", "Roll", "Gun_Shoot", "HitRecieve", "HitRecieve_2"] \
-					else Animation.LOOP_LINEAR
+			a.loop_mode = Animation.LOOP_NONE if k in EINMAL else Animation.LOOP_LINEAR
 	f.spiele("Idle")
 	return f
 

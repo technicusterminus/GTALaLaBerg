@@ -9,15 +9,15 @@ const KLEIDER := [
 	Color(0.62, 0.15, 0.12), Color(0.15, 0.30, 0.55), Color(0.20, 0.45, 0.25),
 	Color(0.75, 0.62, 0.20), Color(0.30, 0.30, 0.34), Color(0.55, 0.35, 0.60),
 ]
-
-static var _mesh: CapsuleMesh
-static var _materialien: Array[StandardMaterial3D] = []
 ## Wie viele Passanten gleichzeitig eine ausmodellierte, animierte Figur tragen (nahe
 ## am Betrachter); alle anderen bleiben Kapseln. Haelt die Zeichenaufrufe klein.
 const FIGUR_NAH := 55.0
 const FIGUR_FERN := 80.0
 const FIGUR_MAX := 30
+
 static var _figuren_zahl := 0
+static var _mesh: CapsuleMesh
+static var _materialien: Array[StandardMaterial3D] = []
 
 var weg := Wegfolger.new()
 var tempo_ms := 1.3

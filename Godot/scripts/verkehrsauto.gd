@@ -29,6 +29,7 @@ var klasse := 3                      ## Strassenklasse, niedriger heisst wichtig
 var klassen := PackedInt32Array()    ## Klasse je Wegpunkt (die Route verkettet Strassen)
 var kreuzungen := PackedInt32Array() ## Kreuzungen auf der Route
 var lack := Color(0.5, 0.5, 0.5)
+var karosserie := Vector3.ONE   ## Laenge, Breite, Hoehe gegenueber dem Grundmodell
 
 var geparkt := false   ## abgestellt: weit unter der Stadt, unsichtbar, ohne Route
 var gesperrt := false  ## Sperrwagen: steht quer auf der Strasse, Blaulicht an
@@ -60,6 +61,7 @@ func _ready() -> void:
 	form.position = Vector3(0, 0.55, 0)
 	add_child(form)
 	_netz.mesh = Wagenmesh.netz(lack)
+	_netz.scale = karosserie
 	_netz.visibility_range_end = 500.0
 	add_child(_netz)
 	if weg.gueltig():

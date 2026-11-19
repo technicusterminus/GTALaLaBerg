@@ -9,6 +9,14 @@ const PARKSICHT := 700.0
 const LACKE := [
 	Color(0.55, 0.06, 0.05), Color(0.08, 0.12, 0.30), Color(0.75, 0.75, 0.77),
 	Color(0.10, 0.10, 0.11), Color(0.80, 0.78, 0.70), Color(0.12, 0.30, 0.18),
+	Color(0.92, 0.92, 0.90), Color(0.45, 0.47, 0.50), Color(0.62, 0.34, 0.10),
+	Color(0.20, 0.38, 0.55), Color(0.70, 0.55, 0.12), Color(0.35, 0.06, 0.20),
+]
+## Karosserieformen: Laenge, Breite, Hoehe gegenueber dem Grundmodell (Kleinwagen,
+## Limousine, Kombi, Gelaendewagen).
+const FORMEN := [
+	Vector3(0.88, 0.94, 0.96), Vector3(1.0, 1.0, 1.0), Vector3(1.07, 1.0, 1.04),
+	Vector3(1.03, 1.08, 1.22),
 ]
 
 var autos: Array[Verkehrsauto] = []
