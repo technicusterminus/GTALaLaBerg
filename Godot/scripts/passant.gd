@@ -12,6 +12,12 @@ const KLEIDER := [
 
 static var _mesh: CapsuleMesh
 static var _materialien: Array[StandardMaterial3D] = []
+## Wie viele Passanten gleichzeitig eine ausmodellierte, animierte Figur tragen (nahe
+## am Betrachter); alle anderen bleiben Kapseln. Haelt die Zeichenaufrufe klein.
+const FIGUR_NAH := 55.0
+const FIGUR_FERN := 80.0
+const FIGUR_MAX := 30
+static var _figuren_zahl := 0
 
 var weg := Wegfolger.new()
 var tempo_ms := 1.3
@@ -22,6 +28,8 @@ var _gier := 0.0
 var _stolpert_bis := 0.0
 var _liegt_bis := 0.0
 var _instanz := MeshInstance3D.new()
+var _figur: Figur
+var _lod_takt := randf() * 0.6
 
 
 func _ready() -> void:
@@ -49,6 +57,50 @@ func _ready() -> void:
 	add_child(_instanz)
 	if weg.gueltig():
 		_setze_lage(weg.ort)
+
+
+func hat_figur() -> bool:
+	return _figur != null
+
+
+## Nahe an der Kamera tritt die Kapsel zugunsten der animierten Figur zurueck.
+func _pruefe_figur(delta: float) -> void:
+	_lod_takt -= delta
+	if _lod_takt > 0.0 or not Figur.verfuegbar():
+		return
+	_lod_takt = 0.6
+	var kam := get_viewport().get_camera_3d()
+	if kam == null:
+		return
+	var abstand := global_position.distance_to(kam.global_position)
+	if _figur == null and abstand < FIGUR_NAH and _figuren_zahl < FIGUR_MAX:
+		_figur = Figur.neu(farbe)
+		add_child(_figur)
+		_figur.passe_an()
+		_figuren_zahl += 1
+		_instanz.visible = false
+	elif _figur != null and abstand > FIGUR_FERN:
+		_figur.queue_free()
+		_figur = null
+		_figuren_zahl -= 1
+		_instanz.visible = true
+
+
+func _exit_tree() -> void:
+	if _figur != null:
+		_figuren_zahl -= 1
+		_figur = null
+
+
+func _animiere(jetzt: float) -> void:
+	if _figur == null:
+		return
+	if ist_ausgeschaltet():
+		_figur.spiele("Death")
+	elif jetzt < _stolpert_bis:
+		_figur.spiele("HitRecieve")
+	else:
+		_figur.spiele("Walk", clampf(tempo_ms / 1.3, 0.6, 1.3))
 
 
 func ist_ausgeschaltet() -> bool:
@@ -101,6 +153,8 @@ func _jetzt() -> float:
 
 func _physics_process(delta: float) -> void:
 	var jetzt := _jetzt()
+	_pruefe_figur(delta)
+	_animiere(jetzt)
 	_pruefe_anprall(jetzt)
 	if ist_ausgeschaltet():
 		if jetzt < _liegt_bis:

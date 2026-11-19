@@ -278,6 +278,13 @@ func _baue_figuren(sch: Dictionary, zeilen: Array, ziel: Dictionary, db: Drehbuc
 
 func _gestalt(f: Dictionary) -> Node3D:
 	var wurzel := Node3D.new()
+	var figur: Figur = Figur.neu(hash(String(f.get("name", "")))) if Figur.verfuegbar() else null
+	if figur != null:
+		wurzel.add_child(figur)
+		figur.passe_an()
+		figur.spiele("Idle_Neutral")
+		_name_schild(wurzel, f)
+		return wurzel
 	var mesh := MeshInstance3D.new()
 	var kapsel := CapsuleMesh.new()
 	kapsel.height = 1.75
@@ -296,6 +303,11 @@ func _gestalt(f: Dictionary) -> Node3D:
 	nase.position = Vector3(0, 1.5, -0.3)
 	nase.material_override = m
 	wurzel.add_child(nase)
+	_name_schild(wurzel, f)
+	return wurzel
+
+
+func _name_schild(wurzel: Node3D, f: Dictionary) -> void:
 	var name := Label3D.new()
 	name.text = f.get("name", "")
 	name.billboard = BaseMaterial3D.BILLBOARD_ENABLED
@@ -305,7 +317,6 @@ func _gestalt(f: Dictionary) -> Node3D:
 	name.position.y = 2.15
 	name.no_depth_test = true
 	wurzel.add_child(name)
-	return wurzel
 
 
 func _raeume_figuren() -> void:

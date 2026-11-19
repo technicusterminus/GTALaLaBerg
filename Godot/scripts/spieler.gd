@@ -20,6 +20,7 @@ var krankenhausbesuche := 0
 
 var _schwerkraft: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var _koerper := Node3D.new()
+var _figur: Figur
 var _aktiv := true
 var _letzter_anprall := -10.0
 var _lande_schonzeit := 0.0
@@ -58,6 +59,12 @@ func _ready() -> void:
 	waffe.position = Vector3(0.32, 1.2, -0.3)
 	_koerper.add_child(waffe)
 	add_child(_koerper)
+	if Figur.verfuegbar():
+		_figur = Figur.neu(0)
+		_koerper.add_child(_figur)
+		_figur.passe_an()
+		mesh.visible = false
+		nase.visible = false
 
 
 func aktiv(an: bool) -> void:
@@ -197,8 +204,20 @@ func _physics_process(delta: float) -> void:
 	var lauf := Vector2(velocity.x, velocity.z).length()
 	if is_on_floor() and lauf > 1.5:
 		Konto.uebe(Konto.Wert.AUSDAUER, lauf * delta / 9.0)
+	_animiere(lauf)
 	_ziele_und_feuere()
 	_pruefe_anprall()
+
+
+func _animiere(lauf: float) -> void:
+	if _figur == null or not is_on_floor():
+		return
+	if lauf < 0.4:
+		_figur.spiele("Idle_Gun")
+	elif lauf < 6.0:
+		_figur.spiele("Walk", clampf(lauf / GEHEN, 0.5, 1.4))
+	else:
+		_figur.spiele("Run", clampf(lauf / RENNEN, 0.7, 1.3))
 
 
 ## Aus der Hoehe gefallen. Gemessen wird die Geschwindigkeit beim Aufsetzen: bis

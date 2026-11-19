@@ -112,6 +112,13 @@ def main() -> int:
             fehlend.append(fbx.name)
             continue
         shutil.copy(fbx, ZIEL / "modelle" / fbx.name)
+    # Menschenfiguren (Quaternius, CC0) mit allen Animationen im Rig.
+    for rel in ("People/Casual/Casual.fbx", "People/Worker/Worker.fbx"):
+        quelle = QUELLE / rel
+        if quelle.stat().st_size > 1000:
+            shutil.copy(quelle, ZIEL / "modelle" / quelle.name)
+        else:
+            fehlend.append(quelle.name)
     if fehlend:
         print("Modelle fehlen (git lfs pull --include='Tools/Modelle/**'): " + ", ".join(fehlend))
 
