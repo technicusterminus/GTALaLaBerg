@@ -93,6 +93,14 @@ func bewegung() -> float:
 	return autos[0].weg.ort.distance_to(_start_auto)
 
 
+## Wie weit sich der Knoten des ersten KI-Autos bewegt hat: prueft, dass das Auto
+## wirklich fuer die Physik und das Auge faehrt und nicht nur auf seiner Route.
+func bewegung_knoten() -> float:
+	if autos.is_empty() or not is_instance_valid(autos[0]):
+		return 0.0
+	return autos[0].global_position.distance_to(_start_auto)
+
+
 ## Quelle: Zentimeter (x, y, z oben) in dreier-Gruppen -> Meter (x, z, y).
 func _route(zahlen: Array) -> PackedVector3Array:
 	var r := PackedVector3Array()

@@ -43,6 +43,11 @@ Krankenhaus mit Behandlungskosten. Die Polizei (`polizei.gd`) fahndet mit bis zu
 Sternen, schickt Streifen über den Straßengraphen, sucht, sperrt ab drei Sternen die
 Straße und nimmt fest.
 
+**Sonderfahrzeuge.** `sonderfahrzeug.gd`: ein Panzer (W/S fahren, A/D drehen, der Turm
+folgt dem Blick, Maus links feuert alle drei Sekunden eine Großkaliber-Farbkugel) und ein
+Hubschrauber (Leertaste steigen, W/S fliegen, A/D drehen). Beide stehen in der Stadt und
+werden mit F bestiegen; Aussteigen nur am Boden.
+
 **Wirtschaft.** Aufträge in sechs Arten (Lieferung, Taxi, Rennen, Verfolgung,
 Krankenwagen, Streife), Paintball-Laden, Lackiererei, ein Konto mit Spielstand, Werten
 (Ausdauer, Zielsicherheit, Fahren, Ruf), Fundstücken und Merkern.
@@ -82,7 +87,7 @@ godot --path Godot --headless -- --rauchtest
 Er prüft unter anderem: Boden und Kollision, Konto, Treffer auf Passanten und Autos,
 Krankenhaus, Fahndung bis zur Festnahme, Straßensperre, Ampelplan und Bremsen, Aufträge,
 Laden und Lackiererei, Verfolgung, Reviernahme und die ganze Hauptgeschichte im
-Zeitraffer mit allen drei Enden (über 40 Prüfungen, `LALABERG_PRUEFUNG ... ok=`).
+Zeitraffer mit allen drei Enden (knapp 60 Prüfungen, `LALABERG_PRUEFUNG ... ok=`).
 
 Bilder (nicht headless; ohne GPU mit Software-OpenGL unter Xvfb):
 
@@ -101,7 +106,6 @@ Rauch- und Filmtest schreiben nur in eine eigene Spielstanddatei.
 Stand der Unreal-Version: Git-Historie, Commit `dea4cec`; ihre Dokumentation steht
 in `Docs/Unreal-Archiv/README-Unreal-Archiv.md`.
 
-- Panzer und Hubschrauber (Rotor- und Zündschlüssel sind schon Fundstücke)
 - Menü, Karte und Minikarte, Radio mit drei Sendern, Wasser, Ton
 - Schießbude und die fünfzig versteckten Farbdosen
 - Figuren statt Kapseln, Waffenmodelle, Insassen in den Autos

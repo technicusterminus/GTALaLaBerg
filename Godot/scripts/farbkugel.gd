@@ -84,6 +84,7 @@ func _aufprall(treffer: Dictionary) -> void:
 	var ort: Vector3 = treffer["position"]
 	var normale: Vector3 = treffer["normal"]
 	var ziel: Object = treffer["collider"]
+	print("LALABERG_FARBKLECKS bei %s auf %s" % [ort, ziel.name if ziel is Node else "?"])
 	_setze_klecks(ort, normale, ziel)
 	var baum := get_tree()
 	# Wahrzeichen des Farbkriegs und Scheiben der Schiessbude.

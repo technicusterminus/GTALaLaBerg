@@ -41,8 +41,11 @@ Umgesetzt (alles mit einem Rauchtest geprüft, siehe [`Godot/README.md`](Godot/R
   Enden, 22 Hauptmissionen, 54 Szenen, 244 Zeilen Dialog, gespielt mit Kamerafahrten,
   Untertiteln und Entscheidungen. Lesbar in [`Docs/Drehbuch.md`](Docs/Drehbuch.md)
 
-Aus der Unreal-Version noch nicht portiert: Panzer und Hubschrauber, Menü, Karte,
-Radio, Wasser, Ton, Schießbude, Farbdosen, Figuren statt Kapseln.
+- **Sonderfahrzeuge:** ein Panzer (Kanone mit Großkaliber-Farbkugel) und ein Hubschrauber
+  zum Einsteigen
+
+Aus der Unreal-Version noch nicht portiert: Menü, Karte, Radio, Wasser, Ton,
+Schießbude, Farbdosen, Figuren statt Kapseln.
 
 ## Werkzeuge
 

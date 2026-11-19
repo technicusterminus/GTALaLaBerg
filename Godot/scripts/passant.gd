@@ -18,6 +18,7 @@ var tempo_ms := 1.3
 var farbe := 0
 var leben := 100.0
 
+var _gier := 0.0
 var _stolpert_bis := 0.0
 var _liegt_bis := 0.0
 var _instanz := MeshInstance3D.new()
@@ -47,7 +48,7 @@ func _ready() -> void:
 	_instanz.visibility_range_end = 250.0
 	add_child(_instanz)
 	if weg.gueltig():
-		global_position = weg.ort
+		_setze_lage(weg.ort)
 
 
 func ist_ausgeschaltet() -> bool:
@@ -80,12 +81,18 @@ func verletze(schaden: float, richtung: Vector3, art: Schaden.Art) -> void:
 	_liegt_bis = _jetzt() + 14.0
 	var stoss := Vector3(richtung.x, 0.0, richtung.z)
 	stoss = stoss.normalized() if stoss.length_squared() > 0.0001 else Vector3.FORWARD
-	rotation.y = atan2(-stoss.x, -stoss.z)
+	_gier = atan2(-stoss.x, -stoss.z)
 	_instanz.rotation = Vector3(0, 0, deg_to_rad(86.0))
 	_instanz.position.y = 0.3
 	weg.ort += stoss * 0.7
-	global_position = weg.ort
+	_setze_lage(weg.ort)
 	print("LALABERG_PASSANT umgefallen art=%d" % art)
+
+
+## Bei einem AnimatableBody3D mit sync_to_physics die ganze Transformation auf
+## einmal setzen (siehe Verkehrsauto._setze_transform).
+func _setze_lage(ort: Vector3) -> void:
+	global_transform = Transform3D(Basis(Vector3.UP, _gier), ort)
 
 
 func _jetzt() -> float:
@@ -105,7 +112,7 @@ func _physics_process(delta: float) -> void:
 		return
 	var faktor := 0.15 if jetzt < _stolpert_bis else 1.0
 	weg.bewege(tempo_ms * faktor * delta)
-	global_position = weg.ort
+	_setze_lage(weg.ort)
 
 
 ## Angefahren: der Spieler sitzt in einem Wagen und ist schneller als Schritttempo

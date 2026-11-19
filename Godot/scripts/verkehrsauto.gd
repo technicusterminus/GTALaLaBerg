@@ -36,6 +36,7 @@ var gesperrt := false  ## Sperrwagen: steht quer auf der Strasse, Blaulicht an
 var _blick := Vector3(1, 0, 0)
 var _rechts := Vector3(0, 0, 1)
 var _netz := MeshInstance3D.new()
+var _gier := 0.0
 var _lage := Vector3.ZERO   ## zuletzt gesetzte Position, sofort gueltig (siehe position_jetzt)
 var _geschwindigkeit := Vector3.ZERO
 var _stoerung_bis := 0.0
@@ -179,12 +180,11 @@ func _berechne_bremse() -> void:
 ## Stellt den Wagen an einen Ort und dreht ihn in eine Richtung.
 func setze_lage(ort: Vector3, blick: Vector3) -> void:
 	weg.ort = ort
-	_setze_position(ort)
 	var b := Vector3(blick.x, 0, blick.z)
 	if b.length_squared() > 0.0001:
 		_blick = b.normalized()
 	_rechts = Vector3(-_blick.z, 0.0, _blick.x)
-	rotation.y = -atan2(_blick.z, _blick.x)
+	_setze_transform(ort, -atan2(_blick.z, _blick.x))
 	geparkt = false
 	visible = true
 
@@ -196,9 +196,22 @@ func position_jetzt() -> Vector3:
 	return _lage
 
 
+## Bei einem AnimatableBody3D mit sync_to_physics gilt: die GANZE Transformation auf
+## einmal setzen. Wer erst die Position und danach rotation setzt (oder umgekehrt),
+## verliert das zuerst Gesetzte, der Koerper bewegt sich dann gar nicht.
 func _setze_position(ort: Vector3) -> void:
+	_setze_transform(ort, _gier)
+
+
+func _setze_transform(ort: Vector3, gier: float) -> void:
 	_lage = ort
-	global_position = ort
+	_gier = gier
+	global_transform = Transform3D(Basis(Vector3.UP, gier), ort)
+
+
+## Drehung um Y; das Netz schaut nach +X, die Drehung bringt +X auf die Blickrichtung.
+func gier() -> float:
+	return _gier
 
 
 func geschwindigkeit_ms() -> Vector3:
@@ -281,7 +294,6 @@ func _physics_process(delta: float) -> void:
 	var rand := maxf(0.0, breite * 0.5 - HALBE_WAGENBREITE)
 	var ziel := minf(spur + (MAX_SEITVERSATZ if _bremse_objekt < 0.9 else 0.0), rand)
 	_seitversatz = lerpf(_seitversatz, ziel, minf(0.7 * delta, 1.0))
-	_setze_position(weg.ort + _rechts * _seitversatz)
-	_geschwindigkeit = (_lage - vorher) / delta
 	# Das Netz schaut nach +X; Drehung um Y bringt +X auf die Blickrichtung.
-	rotation.y = -atan2(_blick.z, _blick.x)
+	_setze_transform(weg.ort + _rechts * _seitversatz, -atan2(_blick.z, _blick.x))
+	_geschwindigkeit = (_lage - vorher) / delta

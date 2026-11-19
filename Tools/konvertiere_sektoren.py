@@ -95,6 +95,18 @@ def main() -> int:
                   "Story/drehbuch.json", "Story/missionen.json"):
         shutil.copy(QUELLE / datei, ZIEL / Path(datei).name)
 
+    # Modelle (Panzer, Hubschrauber, Insasse): Godot importiert FBX selbst. Liegt nur
+    # der LFS-Platzhalter da (git lfs pull fehlt), wird die Datei uebersprungen.
+    (ZIEL / "modelle").mkdir(parents=True, exist_ok=True)
+    fehlend = []
+    for fbx in sorted((WURZEL / "Tools" / "Modelle").glob("*.fbx")):
+        if fbx.stat().st_size < 1000:
+            fehlend.append(fbx.name)
+            continue
+        shutil.copy(fbx, ZIEL / "modelle" / fbx.name)
+    if fehlend:
+        print("Modelle fehlen (git lfs pull --include='Tools/Modelle/**'): " + ", ".join(fehlend))
+
     print(f"{len(verzeichnis)} Sektoren, {dreiecke} Dreiecke, "
           f"Netze {summe_msh / 1e6:.1f} MB, Kollision {summe_col / 1e6:.1f} MB")
     return 0
