@@ -91,3 +91,20 @@ func _welt_box(m: MeshInstance3D) -> AABB:
 	# Relativ zu diesem Knoten messen, damit die Lage der Figur keine Rolle spielt.
 	var zu_mir := global_transform.affine_inverse() * m.global_transform
 	return zu_mir * m.get_aabb()
+
+
+## Polizeiuniform aus dem Arbeiter-Modell: Helm und Weste werden Marineblau, die Hose dunkel,
+## das Hemd hellblau. Greift ueber die Materialnamen des Modells.
+func uniformiere() -> void:
+	var farben := {
+		"Worker_Yellow": Color(0.05, 0.08, 0.20), "Worker_Vest": Color(0.06, 0.10, 0.28),
+		"Brown": Color(0.04, 0.06, 0.14), "Brown2": Color(0.04, 0.06, 0.14),
+		"LightBrown": Color(0.45, 0.58, 0.78), "Grey": Color(0.05, 0.05, 0.06),
+	}
+	for m: MeshInstance3D in _innen.find_children("*", "MeshInstance3D", true, false):
+		for i in m.mesh.get_surface_count():
+			var mat := m.mesh.surface_get_material(i)
+			if mat is BaseMaterial3D and farben.has(mat.resource_name):
+				var neu := (mat as BaseMaterial3D).duplicate() as BaseMaterial3D
+				neu.albedo_color = farben[mat.resource_name]
+				m.set_surface_override_material(i, neu)

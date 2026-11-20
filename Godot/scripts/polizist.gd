@@ -34,6 +34,7 @@ func _ready() -> void:
 		_figur = Figur.neu(1)
 		add_child(_figur)
 		_figur.passe_an()
+		_figur.uniformiere()
 	else:
 		var m := MeshInstance3D.new()
 		var k := CapsuleMesh.new()

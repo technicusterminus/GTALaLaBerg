@@ -42,7 +42,7 @@ Umkreis, Leben für Spieler, Passanten und Autos, Sturz- und Anprallschaden,
 Krankenhaus mit Behandlungskosten. Die Polizei (`polizei.gd`) fahndet mit bis zu fünf
 Sternen, schickt Streifen über den Straßengraphen, sucht, sperrt ab drei Sternen die
 Straße und nimmt fest. Ab drei Sternen steigen aus einer Streife in der Nähe zwei Beamte
-(`polizist.gd`) und laufen mit 5,5 m/s auf den Gesuchten zu; wer erreicht wird, ist
+(`polizist.gd`) und laufen mit 5,5 m/s auf den Gesuchten zu (in Uniform: das Arbeiter-Modell, umgefärbt); wer erreicht wird, ist
 festgenommen. Mit dem Wagen davonfahren geht, Paintball-Treffer werfen sie kurz aus dem Tritt.
 
 **Sonderfahrzeuge.** `sonderfahrzeug.gd`: ein Panzer (W/S fahren, A/D drehen, der Turm
@@ -127,7 +127,8 @@ Rauch- und Filmtest schreiben nur in eine eigene Spielstanddatei.
 Stand der Unreal-Version: Git-Historie, Commit `dea4cec`; ihre Dokumentation steht
 in `Docs/Unreal-Archiv/README-Unreal-Archiv.md`.
 
-- Insassen in den Autos, Figuren für die Polizei und die Kapseln in der Ferne
+- Insassen in den Autos (die Scheiben sind im Flachstil undurchsichtig, ein Fahrer wäre unsichtbar)
+- Kapseln statt Figuren bei fernen Passanten (Absicht: spart Zeichenaufrufe)
 - Keine Bildraten- oder Größenmessung gegenüber Unreal
 
 ## Hinweise
