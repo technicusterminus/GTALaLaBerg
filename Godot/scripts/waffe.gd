@@ -28,6 +28,21 @@ const KENNZAHLEN := [
 			"radius": 0.06, "kleck": [0.42, 0.58], "muendung": 0.5},
 ]
 
+## Die Modelle (Quaternius, CC0) liegen mit dem Lauf entlang X; laenge ist die Soll-Laenge in
+## Metern, drehung dreht den Lauf nach -Z (-90 Grad: Muendung bei +X, +90: bei -X).
+const MODELLE := {
+	Art.PISTOLE: {"datei": "Pistol", "laenge": 0.26, "drehung": -90.0},
+	Art.MASCHINE: {"datei": "Smg", "laenge": 0.50, "drehung": -90.0},
+	Art.SCHROTFLINTE: {"datei": "Shotgun", "laenge": 0.85, "drehung": -90.0},
+	Art.RAKETENWERFER: {"datei": "RocketLauncher", "laenge": 0.8, "drehung": -90.0},
+}
+
+
+const SCHUSSKLANG := {
+	Art.PISTOLE: "SFX_Schuss_Pistole", Art.MASCHINE: "SFX_Schuss_Maschine",
+	Art.SCHROTFLINTE: "SFX_Schuss_Schrot", Art.RAKETENWERFER: "SFX_Schuss_Rakete",
+}
+
 var art := Art.PISTOLE
 var schuesse := 0
 
@@ -59,6 +74,7 @@ func feuern(ort: Vector3, richtung: Vector3, halter: Node3D) -> bool:
 	if jetzt - _letzter_schuss < k["feuerrate"]:
 		return false
 	_letzter_schuss = jetzt
+	Ton.einmal(get_tree(), SCHUSSKLANG[art], ort, -3.0, randf_range(0.96, 1.04))
 	for i in int(k["kugeln"]):
 		# Zielsicherheit halbiert die Streuung, wenn sie ausgebaut ist.
 		var streuung: float = k["streuung"] * (1.0 - 0.5 * Konto.anteil(Konto.Wert.ZIELSICHERHEIT))
@@ -90,9 +106,48 @@ func _kegel(richtung: Vector3, halbwinkel: float) -> Vector3:
 
 
 ## Einfaches Ansichtsmodell aus Kasten und Zylinder; zeigt nach -Z.
+## Setzt das Modell aus der GLB-Datei ein; false, wenn sie fehlt (dann bleiben die Kasten).
+func _lade_glb() -> bool:
+	var k: Dictionary = MODELLE[art]
+	var pfad := "res://daten/modelle/%s.glb" % k["datei"]
+	if not ResourceLoader.exists(pfad) or not is_inside_tree():
+		return false
+	var szene := load(pfad) as PackedScene
+	if szene == null:
+		return false
+	var n := szene.instantiate() as Node3D
+	_modell.add_child(n)
+	var box := _huelle(n)
+	if box.size.x < 0.000001:
+		n.queue_free()
+		return false
+	n.scale = Vector3.ONE * (float(k["laenge"]) / box.size.x)
+	n.rotation.y = deg_to_rad(float(k["drehung"]))
+	# Hinten (Griff) knapp hinter dem Ursprung, mittig in X und auf Handhoehe.
+	var neu := _huelle(n)
+	n.position += Vector3(-(neu.position.x + neu.size.x / 2.0), -(neu.position.y + neu.size.y * 0.7),
+			0.1 - neu.end.z)
+	for m: MeshInstance3D in n.find_children("*", "MeshInstance3D", true, false):
+		m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	return true
+
+
+func _huelle(wurzel: Node3D) -> AABB:
+	var summe := AABB()
+	var erste := true
+	for m: MeshInstance3D in wurzel.find_children("*", "MeshInstance3D", true, false):
+		var b: AABB = _modell.global_transform.affine_inverse() * m.global_transform \
+				* m.get_aabb()
+		summe = b if erste else summe.merge(b)
+		erste = false
+	return summe
+
+
 func _baue_modell() -> void:
 	for c in _modell.get_children():
 		c.queue_free()
+	if _lade_glb():
+		return
 	var metall := StandardMaterial3D.new()
 	metall.albedo_color = Color(0.09, 0.09, 0.10)
 	metall.metallic = 0.6

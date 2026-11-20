@@ -1,28 +1,13 @@
-Binaries/
-DerivedDataCache/
-Intermediate/
-Saved/
-.vs/
-*.sln
-*.slnx
-.vsconfig
+# Godot: Editor-Cache und die aus Content/SourceData erzeugten Stadtdaten
+# (python3 Tools/konvertiere_sektoren.py erzeugt sie wieder)
+Godot/.godot/
+Godot/daten/
+Godot/export/
+*.translation
+
+# Werkzeuge
 Tools/Export/node_modules/
 __pycache__/
-Build/Windows/FileOpenOrder/
-
-# Fab-Content (Epic Games, "City Sample Vehicles") - eigene Lizenz (Nutzung
-# innerhalb von UE-Projekten, keine freie Weitergabe der Rohdateien), anders
-# als die CC-lizenzierten Assets sonst in diesem Repo. Lokal ueber den
-# Fab-Reiter im Editor holen (siehe README "Datenquellen und Lizenzen").
-Content/CitySampleVehicles/
 
 # Die heruntergeladene und gewandelte Radiomusik - siehe Content/SourceData/Audio/LIZENZ.md
 Tools/Musik/
-
-# Die importierten Radiotitel (rund 0,5 GB) - stellt Tools/importiere_radio.py
-# jederzeit wieder her, siehe Content/SourceData/Audio/LIZENZ.md
-Content/Audio/Radio/
-
-# Godot: Editor-Cache und die aus Content/SourceData erzeugten Stadtdaten
-Godot/.godot/
-Godot/daten/

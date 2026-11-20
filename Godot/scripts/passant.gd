@@ -9,7 +9,13 @@ const KLEIDER := [
 	Color(0.62, 0.15, 0.12), Color(0.15, 0.30, 0.55), Color(0.20, 0.45, 0.25),
 	Color(0.75, 0.62, 0.20), Color(0.30, 0.30, 0.34), Color(0.55, 0.35, 0.60),
 ]
+## Wie viele Passanten gleichzeitig eine ausmodellierte, animierte Figur tragen (nahe
+## am Betrachter); alle anderen bleiben Kapseln. Haelt die Zeichenaufrufe klein.
+const FIGUR_NAH := 55.0
+const FIGUR_FERN := 80.0
+const FIGUR_MAX := 30
 
+static var _figuren_zahl := 0
 static var _mesh: CapsuleMesh
 static var _materialien: Array[StandardMaterial3D] = []
 
@@ -18,9 +24,12 @@ var tempo_ms := 1.3
 var farbe := 0
 var leben := 100.0
 
+var _gier := 0.0
 var _stolpert_bis := 0.0
 var _liegt_bis := 0.0
 var _instanz := MeshInstance3D.new()
+var _figur: Figur
+var _lod_takt := randf() * 0.6
 
 
 func _ready() -> void:
@@ -47,7 +56,51 @@ func _ready() -> void:
 	_instanz.visibility_range_end = 250.0
 	add_child(_instanz)
 	if weg.gueltig():
-		global_position = weg.ort
+		_setze_lage(weg.ort)
+
+
+func hat_figur() -> bool:
+	return _figur != null
+
+
+## Nahe an der Kamera tritt die Kapsel zugunsten der animierten Figur zurueck.
+func _pruefe_figur(delta: float) -> void:
+	_lod_takt -= delta
+	if _lod_takt > 0.0 or not Figur.verfuegbar():
+		return
+	_lod_takt = 0.6
+	var kam := get_viewport().get_camera_3d()
+	if kam == null:
+		return
+	var abstand := global_position.distance_to(kam.global_position)
+	if _figur == null and abstand < FIGUR_NAH and _figuren_zahl < FIGUR_MAX:
+		_figur = Figur.neu(farbe)
+		add_child(_figur)
+		_figur.passe_an()
+		_figuren_zahl += 1
+		_instanz.visible = false
+	elif _figur != null and abstand > FIGUR_FERN:
+		_figur.queue_free()
+		_figur = null
+		_figuren_zahl -= 1
+		_instanz.visible = true
+
+
+func _exit_tree() -> void:
+	if _figur != null:
+		_figuren_zahl -= 1
+		_figur = null
+
+
+func _animiere(jetzt: float) -> void:
+	if _figur == null:
+		return
+	if ist_ausgeschaltet():
+		_figur.spiele("Death")
+	elif jetzt < _stolpert_bis:
+		_figur.spiele("HitRecieve")
+	else:
+		_figur.spiele("Walk", clampf(tempo_ms / 1.3, 0.6, 1.3))
 
 
 func ist_ausgeschaltet() -> bool:
@@ -80,12 +133,18 @@ func verletze(schaden: float, richtung: Vector3, art: Schaden.Art) -> void:
 	_liegt_bis = _jetzt() + 14.0
 	var stoss := Vector3(richtung.x, 0.0, richtung.z)
 	stoss = stoss.normalized() if stoss.length_squared() > 0.0001 else Vector3.FORWARD
-	rotation.y = atan2(-stoss.x, -stoss.z)
+	_gier = atan2(-stoss.x, -stoss.z)
 	_instanz.rotation = Vector3(0, 0, deg_to_rad(86.0))
 	_instanz.position.y = 0.3
 	weg.ort += stoss * 0.7
-	global_position = weg.ort
+	_setze_lage(weg.ort)
 	print("LALABERG_PASSANT umgefallen art=%d" % art)
+
+
+## Bei einem AnimatableBody3D mit sync_to_physics die ganze Transformation auf
+## einmal setzen (siehe Verkehrsauto._setze_transform).
+func _setze_lage(ort: Vector3) -> void:
+	global_transform = Transform3D(Basis(Vector3.UP, _gier), ort)
 
 
 func _jetzt() -> float:
@@ -94,6 +153,8 @@ func _jetzt() -> float:
 
 func _physics_process(delta: float) -> void:
 	var jetzt := _jetzt()
+	_pruefe_figur(delta)
+	_animiere(jetzt)
 	_pruefe_anprall(jetzt)
 	if ist_ausgeschaltet():
 		if jetzt < _liegt_bis:
@@ -105,7 +166,7 @@ func _physics_process(delta: float) -> void:
 		return
 	var faktor := 0.15 if jetzt < _stolpert_bis else 1.0
 	weg.bewege(tempo_ms * faktor * delta)
-	global_position = weg.ort
+	_setze_lage(weg.ort)
 
 
 ## Angefahren: der Spieler sitzt in einem Wagen und ist schneller als Schritttempo

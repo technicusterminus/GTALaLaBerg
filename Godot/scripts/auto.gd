@@ -28,6 +28,7 @@ var gesperrt := false   ## im Film: keine Eingabe, der Wagen bremst
 var leben := 100.0
 var _letzter_stoss := -10.0
 var _lenkung := 0.0
+var _motor: AudioStreamPlayer3D
 var _karosserie: MeshInstance3D
 
 
@@ -37,6 +38,7 @@ func _ready() -> void:
 	if Konto.hat_lack() and not uebernommen:
 		lack = Konto.lack()
 	mass = 1300.0
+	_motor = Ton.schleife(self, "SFX_Motor", -4.0)
 	center_of_mass_mode = RigidBody3D.CENTER_OF_MASS_MODE_CUSTOM
 	center_of_mass = Vector3(0, -0.15, 0)
 	linear_damp = 0.05
@@ -133,8 +135,23 @@ func _pruefe_zusammenstoss() -> void:
 			return
 
 
+## Der Motor laeuft mit Fahrer; Tonhoehe und Lautstaerke folgen dem Tempo.
+func _motorklang() -> void:
+	if _motor == null:
+		return
+	if fahrer == null:
+		if _motor.playing:
+			_motor.stop()
+		return
+	if not _motor.playing:
+		_motor.play()
+	_motor.pitch_scale = 0.75 + clampf(tempo_ms / 28.0, 0.0, 1.0) * 1.1
+	_motor.volume_db = -9.0 + clampf(tempo_ms / 28.0, 0.0, 1.0) * 7.0
+
+
 func _physics_process(delta: float) -> void:
 	tempo_ms = linear_velocity.length()
+	_motorklang()
 	_pruefe_zusammenstoss()
 	var vorwaerts_ms := -global_basis.z.dot(linear_velocity)
 	if fahrer == null:

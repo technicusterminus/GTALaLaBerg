@@ -4,7 +4,7 @@
 > Godot-Umsetzung mit amtlichen LoD2-Gebäudedaten, Laserscan-Gelände, OpenStreetMap-Straßennetz, Sektor-Streaming, KI-Verkehr, Polizei und einer eigenen Geschichte.
 
 Das Projekt lag zuvor als Unreal-Engine-5.8-Projekt vor. Es wurde auf Godot umgestellt; die ausführliche
-Unreal-Dokumentation steht unverändert in [`Docs/README-Unreal-Archiv.md`](Docs/README-Unreal-Archiv.md),
+Unreal-Dokumentation steht unverändert in [`Docs/Unreal-Archiv/README-Unreal-Archiv.md`](Docs/Unreal-Archiv/README-Unreal-Archiv.md),
 der Unreal-Stand in der Git-Historie (Commit `dea4cec`).
 
 | Bezeichnung | Wert |
@@ -41,8 +41,18 @@ Umgesetzt (alles mit einem Rauchtest geprüft, siehe [`Godot/README.md`](Godot/R
   Enden, 22 Hauptmissionen, 54 Szenen, 244 Zeilen Dialog, gespielt mit Kamerafahrten,
   Untertiteln und Entscheidungen. Lesbar in [`Docs/Drehbuch.md`](Docs/Drehbuch.md)
 
-Aus der Unreal-Version noch nicht portiert: Panzer und Hubschrauber, Menü, Karte,
-Radio, Wasser, Ton, Schießbude, Farbdosen, Figuren statt Kapseln.
+- **Sonderfahrzeuge:** ein Panzer (Kanone mit Großkaliber-Farbkugel) und ein Hubschrauber
+  zum Einsteigen
+
+- **Aussehen:** animierte Menschenfiguren und Waffenmodelle (Quaternius, CC0), Autos in vier Karosserieformen
+  und zwölf Lacken, Wiesenflecken und Erde am Hang im Gelände, bewegtes Wasser
+- **Schießbude:** Runde zu 30 Sekunden mit sechs Scheiben, Lohn je Treffer, Bestleistung
+- **Farbdosen:** 50 versteckte Dosen im Straßennetz, Staffelpreis alle zehn
+- **Ton und Radio:** Motor, Schüsse, Sirene, Rotor, Schritte; Autoradio mit drei Sendern
+  (R), Musik von Lyria über OpenRouter (`Tools/erzeuge_radio.py`)
+- **Karte und Menü:** Minikarte, Vollkarte (M) und Pausenmenü (Esc)
+
+Aus der Unreal-Version ist alles Geplante portiert; offen sind nur Feinheiten (siehe `Godot/README.md`).
 
 ## Werkzeuge
 

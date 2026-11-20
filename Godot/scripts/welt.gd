@@ -9,24 +9,33 @@ extends Node3D
 
 const EINSTEIGEN_M := 4.0
 const STEHLEN_M := 8.0
+const SONDER_M := 9.0
 
 var stadt := Stadt.new()
 var spieler := Spieler.new()
 var kamera := Kamera.new()
 var hud := Hud.new()
+var karte := Karte.new()
 var verkehr := Verkehr.new()
 var polizei := Polizei.new()
 var auftraege := Auftraege.new()
 var laeden := Laeden.new()
+var farbdosen := Farbdosen.new()
+var radio := Radio.new()
+var schiessbude := Schiessbude.new()
 var revier := Revier.new()
 var drehbuch := Drehbuch.new()
 var auto: Auto
 var aktuelles_auto: Auto
+var aktuelles_sonder: Sonderfahrzeug
+var panzer: Sonderfahrzeug
+var hubschrauber: Sonderfahrzeug
 var farbtreffer := 0
 
 var _rauchtest := false
 var _filmtest := false
 var _film_bilder := 0
+var _spielbild := false
 var _boden_y := 0.0
 var _bildpfad := ""
 var _rauch_zeit := 0.0
@@ -46,6 +55,10 @@ func _ready() -> void:
 	add_child(kamera)
 	add_child(spieler)
 	add_child(hud)
+	add_child(karte)
+	add_child(radio)
+	karte.kamera = kamera
+	karte.auftraege = auftraege
 	add_child(verkehr)
 	add_child(polizei)
 	# Aufträge und Reviere brauchen das Strassennetz der Polizei (Hoehe der Ziele).
@@ -53,6 +66,9 @@ func _ready() -> void:
 	revier.polizei = polizei
 	add_child(auftraege)
 	add_child(laeden)
+	farbdosen.polizei = polizei
+	add_child(farbdosen)
+	add_child(schiessbude)
 	add_child(revier)
 	drehbuch.spieler = spieler
 	drehbuch.polizei = polizei
@@ -89,9 +105,12 @@ func _fokus_auf(wer: Node3D) -> void:
 	Verkehrsauto.fokus = wer
 	auftraege.fokus = wer
 	laeden.fokus = wer
+	farbdosen.fokus = wer
+	schiessbude.fokus = wer
 	revier.fokus = wer
 	drehbuch.fokus = wer
 	hud.ziel = wer
+	karte.fokus = wer
 
 
 ## Vom Drehbuch bei Szenen: Film an, die Spielfigur und der Wagen stehen still, das
@@ -102,6 +121,8 @@ func kino_modus(an: bool) -> void:
 		auto.gesperrt = an
 	for a: Auto in get_tree().get_nodes_in_group("auto"):
 		a.gesperrt = an
+	for s: Sonderfahrzeug in get_tree().get_nodes_in_group("sonderfahrzeug"):
+		s.gesperrt = an
 	hud.visible = not an
 	polizei.pausiert = an
 	if not an:
@@ -114,7 +135,7 @@ func zaehle_farbtreffer() -> void:
 
 ## Von der Polizei bei einer Festnahme: aus dem Wagen aussteigen.
 func aussteigen_erzwingen() -> void:
-	if aktuelles_auto != null:
+	if aktuelles_auto != null or aktuelles_sonder != null:
 		_aussteigen()
 
 
@@ -152,7 +173,34 @@ func _stelle_marken(start: Vector3) -> void:
 	auftraege.setze_start_ort(polizei.naechster_punkt(mitte))
 	laeden.stelle(Laeden.Ladenart.LACKIEREREI, polizei.naechster_punkt(Vector3(-1500.0, 0, 120.0)))
 	laeden.stelle(Laeden.Ladenart.PAINTBALL, polizei.naechster_punkt(Vector3(-376.3, 0, 260.0)))
+	# Die Schiessbude steht an der Strasse hinter dem Paintball-Laden, die Scheiben stehen
+	# quer ueber der Strasse.
+	schiessbude.stelle(polizei.naechster_punkt(Vector3(-300.0, 0, 330.0)), Vector3.RIGHT)
 	drehbuch.bereit = true
+	_stelle_sonderfahrzeuge()
+
+
+## Nichts weist auf sie hin: keine Saeule, kein Eintrag auf der Karte. Der Panzer
+## steht im Waldstueck westlich der Stadt, der Hubschrauber auf dem Dach des Klinikums,
+## dort, wo ein Rettungshubschrauber auch landen wuerde. Beide liegen im Sektor des
+## Spawns, die Kollision steht also schon.
+func _stelle_sonderfahrzeuge() -> void:
+	panzer = _setze_sonder(Sonderfahrzeug.Art.PANZER, Vector2(-1870.7, 407.6), -deg_to_rad(35.0))
+	# Das Klinikum hat in der Mitte einen Innenhof; das Flachdach beginnt 14 m weiter
+	# noerdlich (y = 43,6), dort steht der Hubschrauber.
+	hubschrauber = _setze_sonder(Sonderfahrzeug.Art.HUBSCHRAUBER, Vector2(-1590.0, 156.0), PI)
+
+
+func _setze_sonder(art: Sonderfahrzeug.Art, xz: Vector2, gier: float) -> Sonderfahrzeug:
+	var boden := _boden(Vector3(xz.x, 0.0, xz.y))
+	if absf(boden.y) < 0.001:
+		push_warning("LALABERG_SONDER kein Boden bei %s" % xz)
+		return null
+	var s := Sonderfahrzeug.new()
+	s.art = art
+	add_child(s)
+	s.setze_lage(boden + Vector3(0, 0.05, 0), gier)
+	return s
 
 
 ## Hoehe des Bodens unter einer Stelle; faellt auf die Stelle selbst zurueck.
@@ -165,20 +213,41 @@ func _boden(pos: Vector3) -> Vector3:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("menue"):
-		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE \
-				if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED else Input.MOUSE_MODE_CAPTURED
-	elif event.is_action_pressed("einsteigen") and auto != null:
-		if aktuelles_auto == null:
+	if event.is_action_pressed("einsteigen") and auto != null:
+		if aktuelles_auto == null and aktuelles_sonder == null:
 			_einsteigen()
+		elif aktuelles_sonder != null:
+			var hinweis := aktuelles_sonder.aussteigen_hinweis()
+			if hinweis.is_empty():
+				_aussteigen()
+			elif hinweis != "…":
+				Schaden.rueckmeldung(get_tree(), hinweis)
 		else:
 			_aussteigen()
-	elif event is InputEventMouseButton and event.pressed:
+	elif event is InputEventMouseButton and event.pressed and not karte.menue_offen \
+			and not karte.voll:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
 func _einsteigen() -> void:
-	# Zuerst ein freier eigener Wagen in der Naehe ...
+	# Panzer und Hubschrauber zuerst: wer vor dem Panzer steht, will in den Panzer, auch
+	# wenn daneben ein Auto parkt.
+	var sonder: Sonderfahrzeug = null
+	var bestes_sonder := SONDER_M
+	for s: Sonderfahrzeug in get_tree().get_nodes_in_group("sonderfahrzeug"):
+		if s.hat_fahrer():
+			continue
+		var abstand := s.position_jetzt().distance_to(spieler.global_position)
+		if abstand < bestes_sonder:
+			bestes_sonder = abstand
+			sonder = s
+	if sonder != null:
+		if sonder.gesperrt_fuer_spieler():
+			Schaden.rueckmeldung(get_tree(), sonder.sperrtext())
+		else:
+			_steige_ein_sonder(sonder)
+		return
+	# Dann ein freier eigener Wagen in der Naehe ...
 	var nah: Auto = null
 	var bester := EINSTEIGEN_M
 	for a: Auto in get_tree().get_nodes_in_group("auto"):
@@ -213,9 +282,9 @@ func _uebernimm(ki: Verkehrsauto) -> Auto:
 	neu.lack = ki.lack
 	neu.uebernommen = true
 	add_child(neu)
-	neu.global_position = ki.global_position + Vector3(0, 0.4, 0)
+	neu.global_position = ki.position_jetzt() + Vector3(0, 0.4, 0)
 	# Das Netz der KI schaut nach +X, der fahrbare Wagen nach -Z.
-	neu.rotation.y = ki.rotation.y - PI / 2.0
+	neu.rotation.y = ki.gier() - PI / 2.0
 	ki.remove_from_group("verkehrsauto")
 	ki.remove_from_group("verletzbar")
 	Schaden.melde(get_tree(), Schaden.Tat.AUTO_GESTOHLEN)
@@ -228,6 +297,7 @@ func _uebernimm(ki: Verkehrsauto) -> Auto:
 func _steige_ein(wagen: Auto) -> void:
 	aktuelles_auto = wagen
 	wagen.fahrer = spieler
+	radio.fahrt(true)
 	spieler.aktiv(false)
 	kamera.ziel = wagen
 	kamera.hoehe = 1.2
@@ -237,7 +307,37 @@ func _steige_ein(wagen: Auto) -> void:
 	Schaden.rueckmeldung(get_tree(), "Eingestiegen – W/S fahren, Leertaste bremsen, F aussteigen")
 
 
+func _steige_ein_sonder(s: Sonderfahrzeug) -> void:
+	aktuelles_sonder = s
+	s.setze_fahrer(spieler)
+	s.kamera = kamera
+	spieler.aktiv(false)
+	kamera.ziel = s
+	kamera.hoehe = 4.2 if s.art == Sonderfahrzeug.Art.PANZER else 2.2
+	kamera.abstand_setzen(16.0 if s.art == Sonderfahrzeug.Art.PANZER else 11.0)
+	kamera.ausnehmen(s)
+	_fokus_auf(s)
+	Schaden.rueckmeldung(get_tree(), s.steuerungstext())
+	print("LALABERG_SONDER eingestiegen art=%d" % s.art)
+
+
 func _aussteigen() -> void:
+	radio.fahrt(false)
+	if aktuelles_sonder != null:
+		var s := aktuelles_sonder
+		aktuelles_sonder = null
+		s.fahrer = null
+		var seite := s.rechts() * 4.5
+		spieler.global_position = s.position_jetzt() + seite + Vector3(0, 0.8, 0)
+		spieler.aktiv(true)
+		kamera.ziel = spieler
+		kamera.hoehe = 1.5
+		kamera.abstand_setzen(4.5)
+		kamera.ausnehmen(spieler)
+		kamera.folge_yaw = NAN
+		_fokus_auf(spieler)
+		hud.tempo_ms = 0.0
+		return
 	var a := aktuelles_auto
 	aktuelles_auto = null
 	a.fahrer = null
@@ -253,7 +353,10 @@ func _aussteigen() -> void:
 
 
 func _process(delta: float) -> void:
-	if aktuelles_auto != null:
+	if aktuelles_sonder != null:
+		hud.tempo_ms = absf(aktuelles_sonder.tempo)
+		hud.hinweis = "F  aussteigen"
+	elif aktuelles_auto != null:
 		var vor := -aktuelles_auto.global_basis.z
 		kamera.folge_yaw = atan2(-vor.x, -vor.z) if aktuelles_auto.tempo_ms > 2.0 else NAN
 		hud.tempo_ms = aktuelles_auto.tempo_ms
@@ -270,6 +373,7 @@ func _process(delta: float) -> void:
 	hud.auftrag_text = _auftrag_text()
 	hud.revier_text = revier.hud_text()
 	hud.laden_text = laeden.menue_text()
+	hud.bude_text = schiessbude.hud_text()
 	hud.status = "Leben %d    %d €    %s    Ruf %d" % [
 		ceili(spieler.leben), Konto.geld(), spieler.waffe.art_name(),
 		Konto.stufe(Konto.Wert.RUF)]
@@ -286,12 +390,9 @@ func _process(delta: float) -> void:
 				get_tree().quit(0)
 	if _rauchtest:
 		_rauch_zeit += delta
-		if not _bildpfad.is_empty() and _rauch_zeit > 15.0:
-			var bild := get_viewport().get_texture().get_image()
-			if bild != null:
-				bild.save_png(_bildpfad)
-				print("LALABERG_BILD %s %s" % [_bildpfad, bild.get_size()])
-			_bildpfad = ""
+		if not _bildpfad.is_empty() and _rauch_zeit > 15.0 and not _spielbild:
+			_spielbild = true
+			_bild("spiel")
 
 
 ## Auftragszeile mit Richtungspfeil zur Kamera, Entfernung und Restzeit.
@@ -319,6 +420,15 @@ func _auftrag_text() -> String:
 
 
 # --- Rauchtest ----------------------------------------------------------------
+
+## Speichert ein Bild des Spielfensters neben --bild=..., mit dem Namen als Endung.
+func _bild(name: String) -> void:
+	if _bildpfad.is_empty() or DisplayServer.get_name() == "headless":
+		return
+	var pfad := _bildpfad.replace(".png", "_%s.png" % name)
+	get_viewport().get_texture().get_image().save_png(pfad)
+	print("LALABERG_BILD %s" % pfad)
+
 
 func _pruefe(name: String, bedingung: bool) -> bool:
 	print("LALABERG_PRUEFUNG %s ok=%s" % [name, bedingung])
@@ -383,16 +493,206 @@ func _rauchtest_ablauf() -> void:
 	# Auftraege, Laeden, Lackiererei und Reviere.
 	ok = await _pruefe_wirtschaft() and ok
 
+	# Panzer und Hubschrauber.
+	ok = await _pruefe_sonder() and ok
+
+	# Farbdosen: fuenfzig gestellt, zehn einsammeln bringt den Staffelpreis.
+	ok = _pruefe_dosen() and ok
+
+	# Ueberholen: ein Wagen faehrt auf ein stehendes Hindernis zu und schert aus.
+	ok = await _pruefe_ueberholen() and ok
+
+	# Kontakt-Einsatz: bei drei Sternen laufen Beamte los und nehmen fest.
+	ok = await _pruefe_kontakt() and ok
+
+	# Schiessbude: Runde starten, Scheiben treffen, auszahlen.
+	ok = await _pruefe_bude() and ok
+
+	# Radio: schaltet durch alle Sender und wieder aus.
+	ok = _pruefe_radio() and ok
+
+	# Karte und Menue.
+	ok = await _pruefe_karte() and ok
+
 	# Drehbuch: die ganze Hauptgeschichte im Zeitraffer, alle drei Enden.
 	ok = await _pruefe_drehbuch() and ok
 
 	await get_tree().create_timer(maxf(0.0, 22.0 - _rauch_zeit)).timeout
 	var ki := verkehr.bewegung()
 	ok = _pruefe("verkehr", ki > 1.0) and ok
+	var knoten := verkehr.bewegung_knoten()
+	ok = _pruefe("verkehr_knoten_bewegt=%.1f" % knoten, knoten > 1.0) and ok
 	print("LALABERG_RAUCHTEST ende pos=%s auto=%s ki_bewegt=%.1f fps=%d ok=%s" % [
 		spieler.global_position, auto.global_position, ki,
 		Engine.get_frames_per_second(), ok])
 	get_tree().quit(0 if ok else 1)
+
+
+func _pruefe_dosen() -> bool:
+	var vor_dosen := Konto.dosen()
+	var vor_geld := Konto.geld()
+	for i in 50:
+		if Konto.dosen() >= 10:
+			break
+		farbdosen.sammle(i)
+	var gesammelt := Konto.dosen() - vor_dosen
+	var ok := _pruefe("dosen_gestellt=%d" % farbdosen.gestellt, farbdosen.gestellt == 50)
+	return _pruefe("dosen_gesammelt=%d geld=%d" % [gesammelt, Konto.geld() - vor_geld],
+			gesammelt >= 1 and Konto.geld() - vor_geld >= gesammelt * Farbdosen.PREIS) and ok
+
+
+func _pruefe_ueberholen() -> bool:
+	var start := spieler.global_position + Vector3(0, 40.0, 0)   # ueber der Stadt, ohne Verkehr
+	var blocker := Verkehrsauto.new()
+	add_child(blocker)
+	blocker.setze_lage(start + Vector3(40, 0, 1.5), Vector3.RIGHT)
+	var fahrer := Verkehrsauto.new()
+	add_child(fahrer)
+	fahrer.setze_lage(start, Vector3.RIGHT)
+	fahrer.folge_weg(PackedVector3Array([start, start + Vector3(200, 0, 0)]), 40.0)
+	var frist := 25.0
+	while frist > 0.0 and fahrer.position_jetzt().x < start.x + 55.0:
+		await get_tree().create_timer(0.25).timeout
+		frist -= 0.25
+	var vorbei := fahrer.position_jetzt().x > start.x + 55.0
+	var ok := _pruefe("ueberholen_vorbei=%s_anzahl=%d" % [vorbei, fahrer.ueberholungen],
+			vorbei and fahrer.ueberholungen >= 1)
+	blocker.queue_free()
+	fahrer.queue_free()
+	return ok
+
+
+func _pruefe_kontakt() -> bool:
+	var vor := polizei.festnahmen
+	polizei.setze_sterne(3)
+	var p := Polizist.new()
+	p.polizei = polizei
+	add_child(p)
+	p.global_position = _boden(spieler.global_position + Vector3(5, 0, 0)) + Vector3(0, 0.3, 0)
+	var frist := 6.0
+	while polizei.festnahmen == vor and frist > 0.0:
+		await get_tree().create_timer(0.25).timeout
+		frist -= 0.25
+	var ok := _pruefe("kontakt_festnahme=%d" % (polizei.festnahmen - vor),
+			polizei.festnahmen == vor + 1 and polizei.hole_sterne() == 0)
+	await get_tree().create_timer(1.0).timeout
+	return ok
+
+
+func _pruefe_bude() -> bool:
+	var gestartet := schiessbude.starte()
+	await get_tree().create_timer(2.5).timeout
+	var oben := schiessbude.hochstehende()
+	for k in oben:
+		schiessbude.treffer(k)
+	var treffer := schiessbude.treffer_runde
+	# Geld unmittelbar vor und nach dem Abschluss: dazwischen kann nichts anderes buchen.
+	var geld0 := Konto.geld()
+	schiessbude.beende()
+	var lohn := Konto.geld() - geld0
+	return _pruefe("bude_start=%s_treffer=%d_lohn=%d" % [gestartet, treffer, lohn],
+			gestartet and treffer >= 1 and lohn == treffer * Schiessbude.PREIS
+			and Konto.beste_bude() >= treffer)
+
+
+func _pruefe_radio() -> bool:
+	radio.nummer = 0
+	radio.fahrt(true)
+	radio.weiter()
+	var an := radio.laeuft()
+	var erster := radio.sender_name()
+	radio.weiter()
+	radio.weiter()
+	radio.weiter()
+	var aus := not radio.laeuft() and radio.nummer == 0
+	radio.fahrt(false)
+	return _pruefe("radio_%s_laeuft=%s_aus=%s" % [erster, an, aus],
+			erster == "Blasmusik" and an and aus)
+
+
+func _pruefe_karte() -> bool:
+	var ok := _pruefe("karte_geladen", karte.hat_karte())
+	var p := karte.bild_punkt(spieler.global_position)
+	ok = _pruefe("karte_spieler_im_bild=%s" % p, p.x > 0.0 and p.y > 0.0 and p.x < 1043.0
+			and p.y < 1113.0) and ok
+	karte.oeffne_menue()
+	await get_tree().process_frame
+	var pausiert := get_tree().paused and karte.menue_offen
+	karte.schliesse_menue()
+	await get_tree().process_frame
+	ok = _pruefe("menue_pausiert", pausiert and not get_tree().paused) and ok
+	karte.schalte_vollkarte(true)
+	await get_tree().process_frame
+	var voll := karte.voll and get_tree().paused
+	karte.schalte_vollkarte(false)
+	await get_tree().process_frame
+	return _pruefe("vollkarte", voll and not get_tree().paused) and ok
+
+
+func _pruefe_sonder() -> bool:
+	var ok := _pruefe("sonder_da", panzer != null and hubschrauber != null)
+	if panzer == null or hubschrauber == null:
+		return false
+	# --- Panzer: ohne Zuendschluessel verschlossen, dann fahren und feuern
+	await _gehe_zu(panzer.position_jetzt() + Vector3(0, 0, 6))
+	if not Konto.hat_fund(Konto.Fund.ZUENDUNG):
+		_einsteigen()
+		ok = _pruefe("panzer_verschlossen", aktuelles_sonder == null) and ok
+	Konto.gib_fund(Konto.Fund.ZUENDUNG)
+	_einsteigen()
+	ok = _pruefe("panzer_eingestiegen", aktuelles_sonder == panzer) and ok
+	var start := panzer.position_jetzt()
+	panzer.test_steuerung(1.0, 0.0, 0.0)
+	await get_tree().create_timer(3.0).timeout
+	var weg := panzer.position_jetzt().distance_to(start)
+	ok = _pruefe("panzer_faehrt weg=%.1f kmh=%.0f" % [weg, panzer.tempo_kmh()],
+			weg > 5.0 and panzer.tempo_kmh() > 10.0) and ok
+	var vor := farbtreffer
+	ok = _pruefe("kanone_feuert", panzer.feuern()) and ok
+	await get_tree().create_timer(0.4).timeout
+	_bild("panzer")
+	ok = _pruefe("kanone_laedt", not panzer.feuern()) and ok
+	await get_tree().create_timer(6.0).timeout
+	ok = _pruefe("kanone_trifft", farbtreffer > vor) and ok
+	var leben := panzer.leben
+	panzer.verletze(100.0, Vector3.UP, Schaden.Art.ANPRALL)
+	ok = _pruefe("panzer_farbe_prallt_ab", is_equal_approx(panzer.leben, leben - 12.0)) and ok
+	panzer.test_steuerung(0.0, 0.0, 0.0)
+	panzer.verletze(700.0, Vector3.UP, Schaden.Art.SPRENGUNG)
+	ok = _pruefe("panzer_kaputt", panzer.ist_ausgeschaltet()) and ok
+	var frist := 8.0
+	while aktuelles_sonder != null and frist > 0.0:
+		await get_tree().create_timer(0.25).timeout
+		frist -= 0.25
+	ok = _pruefe("panzer_fahrer_steigt_aus", aktuelles_sonder == null) and ok
+
+	# --- Hubschrauber: steigen, fliegen, abstuerzen
+	await _gehe_zu(hubschrauber.position_jetzt() + Vector3(0, 0, 5))
+	var abstand := hubschrauber.position_jetzt().distance_to(spieler.global_position)
+	Konto.gib_fund(Konto.Fund.ROTOR)
+	_einsteigen()
+	ok = _pruefe("heli_eingestiegen abstand=%.1f heli=%s figur=%s" % [
+			abstand, hubschrauber.position_jetzt(), spieler.global_position],
+			aktuelles_sonder == hubschrauber) and ok
+	var hoehe := hubschrauber.position_jetzt().y
+	hubschrauber.test_steuerung(0.0, 0.0, 1.0)
+	await get_tree().create_timer(3.0).timeout
+	var gestiegen := hubschrauber.position_jetzt().y - hoehe
+	ok = _pruefe("heli_steigt hoehe=%.1f" % gestiegen, gestiegen > 8.0) and ok
+	hubschrauber.test_steuerung(0.6, 0.0, 1.0)
+	await get_tree().create_timer(2.0).timeout
+	var kmh := hubschrauber.tempo_kmh()
+	_bild("heli")
+	ok = _pruefe("heli_fliegt kmh=%.0f" % kmh, kmh > 20.0) and ok
+	hubschrauber.test_steuerung(0.0, 0.0, 0.0)
+	hubschrauber.verletze(300.0, Vector3.UP, Schaden.Art.BESCHUSS)
+	ok = _pruefe("heli_kaputt", hubschrauber.ist_ausgeschaltet()) and ok
+	frist = 20.0
+	while aktuelles_sonder != null and frist > 0.0:
+		await get_tree().create_timer(0.25).timeout
+		frist -= 0.25
+	ok = _pruefe("heli_stuerzt_fahrer_steigt_aus", aktuelles_sonder == null) and ok
+	return ok
 
 
 func _pruefe_drehbuch() -> bool:
@@ -632,7 +932,7 @@ func _eingaben() -> void:
 		"vorwaerts": [KEY_W, KEY_UP], "rueckwaerts": [KEY_S, KEY_DOWN],
 		"links": [KEY_A, KEY_LEFT], "rechts": [KEY_D, KEY_RIGHT],
 		"rennen": [KEY_SHIFT], "springen": [KEY_SPACE], "handbremse": [KEY_SPACE],
-		"einsteigen": [KEY_F], "menue": [KEY_ESCAPE],
+		"einsteigen": [KEY_F], "menue": [KEY_ESCAPE], "karte": [KEY_M], "radio": [KEY_R],
 		"waffe1": [KEY_1], "waffe2": [KEY_2], "waffe3": [KEY_3], "waffe4": [KEY_4],
 	}
 	for aktion: String in tasten:

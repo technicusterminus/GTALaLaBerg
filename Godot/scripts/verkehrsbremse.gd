@@ -11,12 +11,12 @@ const KURVEN_SICHT := 25.0    ## so weit voraus zaehlt die Richtungsaenderung
 
 ## Bremst, wenn ein anderer Verkehrswagen naeher als 9 m voraus steht; sonst
 ## faehrt jeder stur durch jeden hindurch.
-static func vor_auto(auto: Verkehrsauto) -> float:
+static func vor_auto(auto: Verkehrsauto, ausser: Node3D = null) -> float:
 	var vor := auto.vorwaerts()
 	var ort := auto.position_jetzt()
 	var beste := ABSTAND_AUTO
 	for a: Verkehrsauto in auto.get_tree().get_nodes_in_group("verkehrsauto"):
-		if a == auto or a.geparkt:
+		if a == auto or a.geparkt or a == ausser:
 			continue
 		var diff := a.position_jetzt() - ort
 		var dist := diff.length()
@@ -85,9 +85,9 @@ static func in_kurve(weg: Wegfolger) -> float:
 
 
 ## Bremst vor dem Spieler wie vor einem anderen Verkehrswagen, zu Fuss wie im Wagen.
-static func vor_spieler(auto: Verkehrsauto) -> float:
+static func vor_spieler(auto: Verkehrsauto, ausser: Node3D = null) -> float:
 	var fokus := Verkehrsauto.fokus
-	if fokus == null:
+	if fokus == null or fokus == ausser:
 		return 1.0
 	var diff := fokus.global_position - auto.position_jetzt()
 	var dist := diff.length()
@@ -138,3 +138,67 @@ static func vor_kreuzung(auto: Verkehrsauto) -> float:
 			if muss:
 				bremse = minf(bremse, clampf((eigener - puffer) / 11.0, 0.0, 1.0))
 	return bremse
+
+
+## Das Hindernis, das den Wagen auf seiner Spur aufhaelt: ein stehendes oder sehr langsames
+## Auto (oder der Spieler im Wagen) in der Fahrlinie bis 14 m voraus; sonst null.
+static func hindernis_voraus(auto: Verkehrsauto) -> Node3D:
+	var vor := auto.vorwaerts()
+	var rechts := Vector3(-vor.z, 0.0, vor.x)
+	var ort := auto.position_jetzt()
+	var bestes: Node3D = null
+	var beste := 14.0
+	var kandidaten: Array = []
+	for a: Verkehrsauto in auto.get_tree().get_nodes_in_group("verkehrsauto"):
+		if a != auto and not a.geparkt:
+			kandidaten.append(a)
+	if Verkehrsauto.fokus != null:
+		kandidaten.append(Verkehrsauto.fokus)
+	for k: Node3D in kandidaten:
+		var p: Vector3 = k.position_jetzt() if k is Verkehrsauto else k.global_position
+		var diff := p - ort
+		var voraus := diff.dot(vor)
+		if voraus < 1.0 or voraus > beste or absf(diff.dot(rechts)) > 2.0:
+			continue
+		var tempo := 0.0
+		if k.has_method("geschwindigkeit_ms"):
+			tempo = k.geschwindigkeit_ms().length()
+		if tempo > 2.5:
+			continue
+		beste = voraus
+		bestes = k
+	return bestes
+
+
+## Kommt auf der Gegenspur etwas entgegen? Fahrzeuge bis weite Meter voraus, deren Fahrt
+## der eigenen entgegengerichtet ist (auch der Spieler im Wagen).
+static func gegenverkehr(auto: Verkehrsauto, weite: float) -> bool:
+	var vor := auto.vorwaerts()
+	var ort := auto.position_jetzt()
+	for a: Verkehrsauto in auto.get_tree().get_nodes_in_group("verkehrsauto"):
+		if a == auto or a.geparkt:
+			continue
+		var diff := a.position_jetzt() - ort
+		if diff.dot(vor) > 0.0 and diff.length() < weite and a.vorwaerts().dot(vor) < -0.3:
+			return true
+	var fokus := Verkehrsauto.fokus
+	if fokus != null and fokus.has_method("geschwindigkeit_ms"):
+		var v: Vector3 = fokus.geschwindigkeit_ms()
+		var diff := fokus.global_position - ort
+		if diff.dot(vor) > 0.0 and diff.length() < weite and v.length() > 2.0 \
+				and v.normalized().dot(vor) < -0.3:
+			return true
+	return false
+
+
+## Haelt eine Ampel voraus an (bis weite Meter)? Vor einer roten Ampel wird nicht ueberholt.
+static func ampel_haelt_voraus(auto: Verkehrsauto, weite: float) -> bool:
+	var vor := auto.vorwaerts()
+	var ort := auto.position_jetzt()
+	for a: Ampel in auto.get_tree().get_nodes_in_group("ampel"):
+		if not a.haelt_an():
+			continue
+		var diff := a.global_position - ort
+		if diff.length() < weite and diff.dot(vor) > 0.0:
+			return true
+	return false

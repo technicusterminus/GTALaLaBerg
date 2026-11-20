@@ -202,6 +202,7 @@ func _material(art: String, farbe: Array) -> ShaderMaterial:
 		m.set_shader_parameter("oben", true)
 	match art:
 		"Water":
+			m.set_shader_parameter("stil", 2)
 			m.set_shader_parameter("rauheit", 0.1)
 			m.set_shader_parameter("glanz", 1.0)
 		"Road", "Rail":
@@ -209,6 +210,8 @@ func _material(art: String, farbe: Array) -> ShaderMaterial:
 		"Roof", "Wall", "Sockel", "Gesims":
 			m.set_shader_parameter("rauheit", 0.8)
 		"Tree", "Trunk", "Ground":
+			if art == "Ground":
+				m.set_shader_parameter("stil", 1)
 			m.set_shader_parameter("rauheit", 1.0)
 	_materialien[schluessel] = m
 	return m

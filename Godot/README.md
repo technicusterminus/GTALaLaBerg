@@ -41,11 +41,37 @@ Rot, Kurven, dem Spieler und wartepflichtigen Kreuzungen (`verkehrsbremse.gd`).
 Umkreis, Leben für Spieler, Passanten und Autos, Sturz- und Anprallschaden,
 Krankenhaus mit Behandlungskosten. Die Polizei (`polizei.gd`) fahndet mit bis zu fünf
 Sternen, schickt Streifen über den Straßengraphen, sucht, sperrt ab drei Sternen die
-Straße und nimmt fest.
+Straße und nimmt fest. Ab drei Sternen steigen aus einer Streife in der Nähe zwei Beamte
+(`polizist.gd`) und laufen mit 5,5 m/s auf den Gesuchten zu (in Uniform: das Arbeiter-Modell, umgefärbt); wer erreicht wird, ist
+festgenommen. Mit dem Wagen davonfahren geht, Paintball-Treffer werfen sie kurz aus dem Tritt.
+
+**Sonderfahrzeuge.** `sonderfahrzeug.gd`: ein Panzer (W/S fahren, A/D drehen, der Turm
+folgt dem Blick, Maus links feuert alle drei Sekunden eine Großkaliber-Farbkugel) und ein
+Hubschrauber (Leertaste steigen, W/S fliegen, A/D drehen). Beide stehen in der Stadt und
+werden mit F bestiegen; Aussteigen nur am Boden.
+
+**Überholen.** Steht ein Hindernis (stehendes Auto oder der Spieler im Wagen) länger als zwei
+Sekunden vor einem KI-Auto, die Gegenspur ist 45 m weit frei und keine rote Ampel in Sicht, schert
+das Auto aus, fährt 25 % schneller vorbei und ordnet sich wieder ein (`verkehrsauto.gd`,
+`verkehrsbremse.gd`).
 
 **Wirtschaft.** Aufträge in sechs Arten (Lieferung, Taxi, Rennen, Verfolgung,
 Krankenwagen, Streife), Paintball-Laden, Lackiererei, ein Konto mit Spielstand, Werten
 (Ausdauer, Zielsicherheit, Fahren, Ruf), Fundstücken und Merkern.
+
+**Ton und Radio.** `ton.gd` spielt die Klänge aus `Tools/Sounds` (Motor nach Tempo, Schuss je
+Waffe, Klecks, Sirene der Streifen, Rotor, Panzerdiesel, Schritte). `radio.gd` ist das
+Autoradio: R schaltet Aus, Blasmusik, Klassik, Lech. Die Musik erzeugt
+`Tools/erzeuge_radio.py` mit Googles Lyria 3 über OpenRouter (Schlüssel
+`OPENROUTER_API_KEY`, ein Song etwa 0,08 USD) nach `Godot/daten/radio`; ohne die Dateien
+laufen die gerechneten Schleifen.
+
+**Schießbude.** `schiessbude.gd`: wer zu Fuß in den orangen Ring tritt, startet eine Runde
+von 30 Sekunden. Sechs Scheiben klappen hoch (höchstens drei zugleich); jede Paintball-Kugel,
+die eine trifft, zählt 20 €. Die Bestleistung steht im Konto.
+
+**Farbdosen.** `farbdosen.gd` stellt fünfzig Dosen mit festem Zufall in das Straßennetz
+(mindestens 90 m auseinander); Einsammeln bringt 25 €, jede zehnte einen Staffelpreis.
 
 **Reviere.** Vier Reviere mit je vier Wahrzeichen-Säulen, Bewährung, Ruf und einem Kopf
 der Mannschaft, den man stellen muss (`revier.gd`).
@@ -82,7 +108,7 @@ godot --path Godot --headless -- --rauchtest
 Er prüft unter anderem: Boden und Kollision, Konto, Treffer auf Passanten und Autos,
 Krankenhaus, Fahndung bis zur Festnahme, Straßensperre, Ampelplan und Bremsen, Aufträge,
 Laden und Lackiererei, Verfolgung, Reviernahme und die ganze Hauptgeschichte im
-Zeitraffer mit allen drei Enden (über 40 Prüfungen, `LALABERG_PRUEFUNG ... ok=`).
+Zeitraffer mit allen drei Enden (knapp 60 Prüfungen, `LALABERG_PRUEFUNG ... ok=`).
 
 Bilder (nicht headless; ohne GPU mit Software-OpenGL unter Xvfb):
 
@@ -99,13 +125,10 @@ Rauch- und Filmtest schreiben nur in eine eigene Spielstanddatei.
 ## Noch offen gegenüber der Unreal-Version
 
 Stand der Unreal-Version: Git-Historie, Commit `dea4cec`; ihre Dokumentation steht
-in `Docs/README-Unreal-Archiv.md`.
+in `Docs/Unreal-Archiv/README-Unreal-Archiv.md`.
 
-- Panzer und Hubschrauber (Rotor- und Zündschlüssel sind schon Fundstücke)
-- Menü, Karte und Minikarte, Radio mit drei Sendern, Wasser, Ton
-- Schießbude und die fünfzig versteckten Farbdosen
-- Figuren statt Kapseln, Waffenmodelle, Insassen in den Autos
-- Überholen und der Kontakt-Einsatz der Polizei bei drei Sternen
+- Insassen in den Autos (die Scheiben sind im Flachstil undurchsichtig, ein Fahrer wäre unsichtbar)
+- Kapseln statt Figuren bei fernen Passanten (Absicht: spart Zeichenaufrufe)
 - Keine Bildraten- oder Größenmessung gegenüber Unreal
 
 ## Hinweise

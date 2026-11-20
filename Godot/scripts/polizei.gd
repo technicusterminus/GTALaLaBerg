@@ -46,6 +46,7 @@ var _streifen: Array = []   # je Streife ein Dictionary (siehe _neue_streife)
 var _sperrwagen: Array[Verkehrsauto] = []
 var _baken: Array[MeshInstance3D] = []
 var _sperre_seit := 0.0
+var _fuss_bis := 0.0
 var _letzte_tat := [-10.0, -10.0, -10.0, -10.0]
 var _takt := 0.0
 
@@ -75,6 +76,11 @@ func _lade_netz() -> void:
 
 
 # --- Auskunft ---------------------------------------------------------------
+
+## Die Knoten des Strassennetzes (Meter, Godot-Achsen), z. B. zum Verteilen von Sammelstuecken.
+func netz_knoten() -> PackedVector3Array:
+	return _knoten
+
 
 func hole_sterne() -> int:
 	return sterne
@@ -356,6 +362,7 @@ func _haltepunkt(von: Vector3, ziel: Vector3, auto: Verkehrsauto) -> Vector3:
 
 func _einstellen(grund: String) -> void:
 	print("LALABERG_FAHNDUNG sterne=0 grund=%s" % grund)
+	_raeume_fuss()
 	sterne = 0
 	_punkte = 0.0
 	_festnahme_uhr = 0.0
@@ -385,6 +392,7 @@ func _einstellen(grund: String) -> void:
 
 func _festnahme() -> void:
 	festnahmen += 1
+	_raeume_fuss()
 	# Laufender Auftrag ist hinfaellig, dazu eine Strafe.
 	get_tree().call_group("auftraege", "abbrechen")
 	var strafe := Konto.strafe(100 + Konto.geld() / 10)
@@ -520,6 +528,7 @@ func _physics_process(delta: float) -> void:
 			return
 	_pflege_sperre(wo, jetzt)
 	_pflege_streifen(wo, jetzt)
+	_pflege_fussstreife(wo, jetzt)
 	_pruefe_festnahme(wo, dt)
 
 
@@ -540,6 +549,43 @@ func _pflege_sperre(wo: Vector3, jetzt: float) -> void:
 			_abstand2(wo, sperr_ort) < 60.0 or jetzt - _sperre_seit > 60.0)
 	if not sperre_steht or verbraucht:
 		_stelle_sperre(wo, fahrt)
+
+
+## Ab drei Sternen steigen aus einer Streife nahe beim Gesuchten zwei Beamte und laufen
+## auf ihn zu. Eine neue Besatzung erst nach einer Weile.
+func _pflege_fussstreife(wo: Vector3, jetzt: float) -> void:
+	if sterne < 3:
+		_raeume_fuss()
+		return
+	if jetzt < _fuss_bis or get_tree().get_nodes_in_group("fusspolizei").size() >= 4:
+		return
+	for s in _streifen:
+		var a: Verkehrsauto = s["auto"]
+		if not s["im_einsatz"] or not is_instance_valid(a) or a.ist_geparkt():
+			continue
+		if _abstand2(a.position_jetzt(), wo) > 60.0 or a.geschwindigkeit_ms().length() > 4.0:
+			continue
+		_fuss_bis = jetzt + 25.0
+		var seite := a.vorwaerts().cross(Vector3.UP).normalized()
+		for i in 2:
+			var p := Polizist.new()
+			p.polizei = self
+			get_tree().current_scene.add_child(p)
+			p.global_position = a.position_jetzt() + seite * (2.2 if i == 0 else -2.2) + Vector3(0, 0.3, 0)
+		print("LALABERG_FUSSSTREIFE zwei Beamte steigen aus bei %s" % a.position_jetzt())
+		return
+
+
+## Ein Beamter hat den Gesuchten erreicht: ab drei Sternen ist das die Festnahme.
+func kontakt() -> void:
+	if sterne >= 3 and not pausiert:
+		print("LALABERG_KONTAKT festnahme")
+		_festnahme()
+
+
+func _raeume_fuss() -> void:
+	for p in get_tree().get_nodes_in_group("fusspolizei"):
+		p.queue_free()
 
 
 ## Je Stern eine Streife; neue kommen nicht alle auf einmal.

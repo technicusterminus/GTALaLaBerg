@@ -1,5 +1,11 @@
 # Der Farbkrieg um Landsberg
 
+> **Hinweis:** Dies ist der ursprüngliche Entwurf der Handlung (Reviere, Köpfe, Fundstücke).
+> Ausgearbeitet als Film mit Figuren, Szenen und drei Enden steht die Geschichte in
+> [`Drehbuch.md`](Drehbuch.md); sie entsteht aus `Tools/drehbuch/`. Wo unten von C++-Klassen
+> die Rede ist (`LaLaBerg…`), ist die Unreal-Version gemeint; die Godot-Entsprechungen sind
+> `Godot/scripts/revier.gd`, `konto.gd`, `auftraege.gd` und `drehbuch.gd`.
+
 Entwurf der Handlung. Mischung aus dem, was *Zelda* gut kann (eine Welt, die
 sich in Abschnitten oeffnet; jeder Abschnitt endet mit einem Gegner, der ein
 Werkzeug hinterlaesst, das den naechsten Abschnitt erst moeglich macht) und

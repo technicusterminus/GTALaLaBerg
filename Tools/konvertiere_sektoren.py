@@ -95,6 +95,39 @@ def main() -> int:
                   "Story/drehbuch.json", "Story/missionen.json"):
         shutil.copy(QUELLE / datei, ZIEL / Path(datei).name)
 
+    # Karte: die kleine Vorlage (3 m je Pixel) reicht fuer Mini- und Vollkarte.
+    karte = QUELLE / "Karte" / "karte-klein.png"
+    if karte.stat().st_size > 1000:
+        shutil.copy(karte, ZIEL / "karte.png")
+        shutil.copy(QUELLE / "Karte" / "karte.json", ZIEL / "karte.json")
+    else:
+        print("Karte fehlt (git lfs pull --include='Content/SourceData/Karte/**')")
+
+    # Klaenge (Schuesse, Motor, Sirene ...): gerechnet bzw. aus Tools/Sounds.
+    (ZIEL / "ton").mkdir(parents=True, exist_ok=True)
+    for wav in sorted((WURZEL / "Tools" / "Sounds").glob("*.wav")):
+        shutil.copy(wav, ZIEL / "ton" / wav.name)
+
+    # Modelle (Panzer, Hubschrauber, Insasse): Godot importiert FBX selbst. Liegt nur
+    # der LFS-Platzhalter da (git lfs pull fehlt), wird die Datei uebersprungen.
+    (ZIEL / "modelle").mkdir(parents=True, exist_ok=True)
+    fehlend = []
+    for fbx in sorted((WURZEL / "Tools" / "Modelle").glob("*.fbx")):
+        if fbx.stat().st_size < 1000:
+            fehlend.append(fbx.name)
+            continue
+        shutil.copy(fbx, ZIEL / "modelle" / fbx.name)
+    # Menschenfiguren (Quaternius, CC0) mit allen Animationen im Rig.
+    for rel in ("People/Casual/Casual.fbx", "People/Worker/Worker.fbx", "Waffen/Pistol.glb",
+                "Waffen/Smg.glb", "Waffen/Shotgun.glb", "Waffen/RocketLauncher.glb"):
+        quelle = QUELLE / rel
+        if quelle.stat().st_size > 1000:
+            shutil.copy(quelle, ZIEL / "modelle" / quelle.name)
+        else:
+            fehlend.append(quelle.name)
+    if fehlend:
+        print("Modelle fehlen (git lfs pull --include='Tools/Modelle/**'): " + ", ".join(fehlend))
+
     print(f"{len(verzeichnis)} Sektoren, {dreiecke} Dreiecke, "
           f"Netze {summe_msh / 1e6:.1f} MB, Kollision {summe_col / 1e6:.1f} MB")
     return 0
