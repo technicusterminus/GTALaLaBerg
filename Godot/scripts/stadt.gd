@@ -208,6 +208,8 @@ func _material(art: String, farbe: Array) -> ShaderMaterial:
 		"Road", "Rail":
 			m.set_shader_parameter("rauheit", 0.85)
 		"Roof", "Wall", "Sockel", "Gesims":
+			if art == "Wall":
+				m.set_shader_parameter("stil", 3)
 			m.set_shader_parameter("rauheit", 0.8)
 		"Tree", "Trunk", "Ground":
 			if art == "Ground":
