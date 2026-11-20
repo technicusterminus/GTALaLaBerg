@@ -579,7 +579,28 @@ func _pruefe_kontakt() -> bool:
 	return ok
 
 
+## Eine echte Kugel aus der Pistole, vom Stand aus auf eine hochstehende Scheibe.
+func _pruefe_bude_schuss() -> bool:
+	spieler.global_position = _boden(schiessbude.stand()) + Vector3(0, 0.3, 0)
+	schiessbude.starte()
+	var frist := 6.0
+	while schiessbude.hochstehende().is_empty() and frist > 0.0:
+		await get_tree().create_timer(0.1).timeout
+		frist -= 0.1
+	var versuche := 0
+	while schiessbude.treffer_runde == 0 and versuche < 8 and schiessbude.laeuft:
+		var oben := schiessbude.hochstehende()
+		if not oben.is_empty():
+			spieler.feuere_auf(oben[0].global_position)
+			versuche += 1
+		await get_tree().create_timer(0.5).timeout
+	var treffer := schiessbude.treffer_runde
+	schiessbude.beende()
+	return _pruefe("bude_echter_schuss_treffer=%d_versuche=%d" % [treffer, versuche], treffer >= 1)
+
+
 func _pruefe_bude() -> bool:
+	var echt := await _pruefe_bude_schuss()
 	var gestartet := schiessbude.starte()
 	await get_tree().create_timer(2.5).timeout
 	var oben := schiessbude.hochstehende()
@@ -592,7 +613,7 @@ func _pruefe_bude() -> bool:
 	var lohn := Konto.geld() - geld0
 	return _pruefe("bude_start=%s_treffer=%d_lohn=%d" % [gestartet, treffer, lohn],
 			gestartet and treffer >= 1 and lohn == treffer * Schiessbude.PREIS
-			and Konto.beste_bude() >= treffer)
+			and Konto.beste_bude() >= treffer) and echt
 
 
 func _pruefe_radio() -> bool:
