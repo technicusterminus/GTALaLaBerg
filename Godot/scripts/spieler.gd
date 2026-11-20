@@ -21,6 +21,7 @@ var krankenhausbesuche := 0
 var _schwerkraft: float = ProjectSettings.get_setting("physics/3d/default_gravity")
 var _koerper := Node3D.new()
 var _figur: Figur
+var _schritt_uhr := 0.0
 var _aktiv := true
 var _letzter_anprall := -10.0
 var _lande_schonzeit := 0.0
@@ -209,7 +210,21 @@ func _physics_process(delta: float) -> void:
 	_pruefe_anprall()
 
 
+## Alle halbe Sekunde (schneller beim Rennen) ein Schritt, solange man am Boden geht.
+func _schritte(lauf: float) -> void:
+	if lauf < 1.5 or not is_on_floor() or gesperrt:
+		_schritt_uhr = 0.0
+		return
+	_schritt_uhr -= get_physics_process_delta_time() * lauf / GEHEN
+	if _schritt_uhr > 0.0:
+		return
+	_schritt_uhr = 0.5
+	var name := "SFX_Schritt_Gras" if randf() < 0.3 else "SFX_Schritt"
+	Ton.einmal(get_tree(), name, global_position, -8.0, randf_range(0.92, 1.08))
+
+
 func _animiere(lauf: float) -> void:
+	_schritte(lauf)
 	if _figur == null or not is_on_floor():
 		return
 	if lauf < 0.4:

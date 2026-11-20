@@ -21,6 +21,7 @@ var polizei := Polizei.new()
 var auftraege := Auftraege.new()
 var laeden := Laeden.new()
 var farbdosen := Farbdosen.new()
+var radio := Radio.new()
 var revier := Revier.new()
 var drehbuch := Drehbuch.new()
 var auto: Auto
@@ -54,6 +55,7 @@ func _ready() -> void:
 	add_child(spieler)
 	add_child(hud)
 	add_child(karte)
+	add_child(radio)
 	karte.kamera = kamera
 	karte.auftraege = auftraege
 	add_child(verkehr)
@@ -289,6 +291,7 @@ func _uebernimm(ki: Verkehrsauto) -> Auto:
 func _steige_ein(wagen: Auto) -> void:
 	aktuelles_auto = wagen
 	wagen.fahrer = spieler
+	radio.fahrt(true)
 	spieler.aktiv(false)
 	kamera.ziel = wagen
 	kamera.hoehe = 1.2
@@ -313,6 +316,7 @@ func _steige_ein_sonder(s: Sonderfahrzeug) -> void:
 
 
 func _aussteigen() -> void:
+	radio.fahrt(false)
 	if aktuelles_sonder != null:
 		var s := aktuelles_sonder
 		aktuelles_sonder = null
@@ -488,6 +492,9 @@ func _rauchtest_ablauf() -> void:
 	# Farbdosen: fuenfzig gestellt, zehn einsammeln bringt den Staffelpreis.
 	ok = _pruefe_dosen() and ok
 
+	# Radio: schaltet durch alle Sender und wieder aus.
+	ok = _pruefe_radio() and ok
+
 	# Karte und Menue.
 	ok = await _pruefe_karte() and ok
 
@@ -516,6 +523,21 @@ func _pruefe_dosen() -> bool:
 	var ok := _pruefe("dosen_gestellt=%d" % farbdosen.gestellt, farbdosen.gestellt == 50)
 	return _pruefe("dosen_gesammelt=%d geld=%d" % [gesammelt, Konto.geld() - vor_geld],
 			gesammelt >= 1 and Konto.geld() - vor_geld >= gesammelt * Farbdosen.PREIS) and ok
+
+
+func _pruefe_radio() -> bool:
+	radio.nummer = 0
+	radio.fahrt(true)
+	radio.weiter()
+	var an := radio.laeuft()
+	var erster := radio.sender_name()
+	radio.weiter()
+	radio.weiter()
+	radio.weiter()
+	var aus := not radio.laeuft() and radio.nummer == 0
+	radio.fahrt(false)
+	return _pruefe("radio_%s_laeuft=%s_aus=%s" % [erster, an, aus],
+			erster == "Blasmusik" and an and aus)
 
 
 func _pruefe_karte() -> bool:
@@ -840,7 +862,7 @@ func _eingaben() -> void:
 		"vorwaerts": [KEY_W, KEY_UP], "rueckwaerts": [KEY_S, KEY_DOWN],
 		"links": [KEY_A, KEY_LEFT], "rechts": [KEY_D, KEY_RIGHT],
 		"rennen": [KEY_SHIFT], "springen": [KEY_SPACE], "handbremse": [KEY_SPACE],
-		"einsteigen": [KEY_F], "menue": [KEY_ESCAPE], "karte": [KEY_M],
+		"einsteigen": [KEY_F], "menue": [KEY_ESCAPE], "karte": [KEY_M], "radio": [KEY_R],
 		"waffe1": [KEY_1], "waffe2": [KEY_2], "waffe3": [KEY_3], "waffe4": [KEY_4],
 	}
 	for aktion: String in tasten:

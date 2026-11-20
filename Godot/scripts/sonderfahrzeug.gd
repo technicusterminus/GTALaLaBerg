@@ -52,6 +52,7 @@ var _drehen := 0.0
 var _steigen := 0.0
 var _sinkflug := 0.0
 var _drehphase := 0.0
+var _dauerton: AudioStreamPlayer3D
 var _letzter_schuss := -10.0
 var _rueckstoss := 0.0
 var _einstieg_zeit := -10.0
@@ -68,6 +69,7 @@ func _ready() -> void:
 	add_to_group("sonderfahrzeug")
 	add_to_group("verletzbar")
 	var panzer := art == Art.PANZER
+	_dauerton = Ton.schleife(self, "SFX_Panzer" if panzer else "SFX_Rotor", 3.0)
 	voll = 600.0 if panzer else 220.0
 	leben = voll
 	var form := CollisionShape3D.new()
@@ -259,6 +261,7 @@ func feuern() -> bool:
 	get_tree().current_scene.add_child(kugel)
 	kugel.global_position = muendung
 	kugel.abschiessen(richtung, KANONE_TEMPO)
+	Ton.einmal(get_tree(), "SFX_Panzer_Schuss", muendung, 3.0)
 	print("LALABERG_KANONE schuss=%d bei %s" % [schuesse, muendung])
 	return true
 
@@ -286,6 +289,7 @@ func _setze_position(ort: Vector3) -> void:
 
 func _physics_process(delta: float) -> void:
 	var faehrt := fahrer != null and not kaputt
+	_klang(faehrt)
 	if faehrt and not _test:
 		_schub = 0.0 if gesperrt else Input.get_axis("rueckwaerts", "vorwaerts")
 		_drehen = 0.0 if gesperrt else Input.get_axis("rechts", "links")
@@ -302,6 +306,19 @@ func _physics_process(delta: float) -> void:
 		var boden := _boden_y()
 		if not is_nan(boden) and global_position.y - boden < 4.0:
 			get_tree().call_group("welt", "aussteigen_erzwingen")
+
+
+## Dauerton: Panzerdiesel oder Rotor, solange jemand fahrt; Tonhoehe nach Tempo.
+func _klang(faehrt: bool) -> void:
+	if _dauerton == null:
+		return
+	if faehrt != _dauerton.playing:
+		if faehrt:
+			_dauerton.play()
+		else:
+			_dauerton.stop()
+	var anteil := absf(tempo) / (PANZER_TEMPO if art == Art.PANZER else HELI_TEMPO)
+	_dauerton.pitch_scale = 0.85 + 0.35 * clampf(anteil, 0.0, 1.0)
 
 
 func _panzer(delta: float, faehrt: bool) -> void:

@@ -52,6 +52,13 @@ werden mit F bestiegen; Aussteigen nur am Boden.
 Krankenwagen, Streife), Paintball-Laden, Lackiererei, ein Konto mit Spielstand, Werten
 (Ausdauer, Zielsicherheit, Fahren, Ruf), Fundstücken und Merkern.
 
+**Ton und Radio.** `ton.gd` spielt die Klänge aus `Tools/Sounds` (Motor nach Tempo, Schuss je
+Waffe, Klecks, Sirene der Streifen, Rotor, Panzerdiesel, Schritte). `radio.gd` ist das
+Autoradio: R schaltet Aus, Blasmusik, Klassik, Lech. Die Musik erzeugt
+`Tools/erzeuge_radio.py` mit Googles Lyria 3 über OpenRouter (Schlüssel
+`OPENROUTER_API_KEY`, ein Song etwa 0,08 USD) nach `Godot/daten/radio`; ohne die Dateien
+laufen die gerechneten Schleifen.
+
 **Farbdosen.** `farbdosen.gd` stellt fünfzig Dosen mit festem Zufall in das Straßennetz
 (mindestens 90 m auseinander); Einsammeln bringt 25 €, jede zehnte einen Staffelpreis.
 
@@ -109,7 +116,6 @@ Rauch- und Filmtest schreiben nur in eine eigene Spielstanddatei.
 Stand der Unreal-Version: Git-Historie, Commit `dea4cec`; ihre Dokumentation steht
 in `Docs/Unreal-Archiv/README-Unreal-Archiv.md`.
 
-- Radio mit drei Sendern, Ton
 - Schießbude
 - Waffenmodelle, Insassen in den Autos, Figuren für die Polizei und die Kapseln in der Ferne
 - Überholen und der Kontakt-Einsatz der Polizei bei drei Sternen

@@ -86,6 +86,7 @@ func _aufprall(treffer: Dictionary) -> void:
 	var ziel: Object = treffer["collider"]
 	print("LALABERG_FARBKLECKS bei %s auf %s" % [ort, ziel.name if ziel is Node else "?"])
 	_setze_klecks(ort, normale, ziel)
+	Ton.einmal(get_tree(), "SFX_Klecks", ort, -4.0, randf_range(0.9, 1.1))
 	var baum := get_tree()
 	# Wahrzeichen des Farbkriegs und Scheiben der Schiessbude.
 	baum.call_group("revier", "markiere", ziel, farbe)

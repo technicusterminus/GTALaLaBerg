@@ -48,6 +48,7 @@ var _bremse_in := randf() * 0.12   ## Sekunden bis zur naechsten Berechnung, ver
 var _seitversatz := 0.0
 var _leuchten: Array[MeshInstance3D] = []
 var _blaulicht := OmniLight3D.new()
+var _sirene: AudioStreamPlayer3D
 
 
 func _ready() -> void:
@@ -88,10 +89,16 @@ func _baue_blaulicht() -> void:
 	_blaulicht.light_energy = 0.0
 	_blaulicht.shadow_enabled = false
 	add_child(_blaulicht)
+	_sirene = Ton.schleife(self, "SFX_Sirene", 2.0)
 
 
 func _blinke() -> void:
 	var an := not geparkt and (weg.gueltig() or gesperrt) and not ist_ausgeschaltet()
+	if _sirene != null and an != _sirene.playing:
+		if an:
+			_sirene.play()
+		else:
+			_sirene.stop()
 	if not an:
 		_blaulicht.light_energy = 0.0
 		for m in _leuchten:

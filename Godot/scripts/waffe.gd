@@ -28,6 +28,11 @@ const KENNZAHLEN := [
 			"radius": 0.06, "kleck": [0.42, 0.58], "muendung": 0.5},
 ]
 
+const SCHUSSKLANG := {
+	Art.PISTOLE: "SFX_Schuss_Pistole", Art.MASCHINE: "SFX_Schuss_Maschine",
+	Art.SCHROTFLINTE: "SFX_Schuss_Schrot", Art.RAKETENWERFER: "SFX_Schuss_Rakete",
+}
+
 var art := Art.PISTOLE
 var schuesse := 0
 
@@ -59,6 +64,7 @@ func feuern(ort: Vector3, richtung: Vector3, halter: Node3D) -> bool:
 	if jetzt - _letzter_schuss < k["feuerrate"]:
 		return false
 	_letzter_schuss = jetzt
+	Ton.einmal(get_tree(), SCHUSSKLANG[art], ort, -3.0, randf_range(0.96, 1.04))
 	for i in int(k["kugeln"]):
 		# Zielsicherheit halbiert die Streuung, wenn sie ausgebaut ist.
 		var streuung: float = k["streuung"] * (1.0 - 0.5 * Konto.anteil(Konto.Wert.ZIELSICHERHEIT))

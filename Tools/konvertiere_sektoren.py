@@ -103,6 +103,11 @@ def main() -> int:
     else:
         print("Karte fehlt (git lfs pull --include='Content/SourceData/Karte/**')")
 
+    # Klaenge (Schuesse, Motor, Sirene ...): gerechnet bzw. aus Tools/Sounds.
+    (ZIEL / "ton").mkdir(parents=True, exist_ok=True)
+    for wav in sorted((WURZEL / "Tools" / "Sounds").glob("*.wav")):
+        shutil.copy(wav, ZIEL / "ton" / wav.name)
+
     # Modelle (Panzer, Hubschrauber, Insasse): Godot importiert FBX selbst. Liegt nur
     # der LFS-Platzhalter da (git lfs pull fehlt), wird die Datei uebersprungen.
     (ZIEL / "modelle").mkdir(parents=True, exist_ok=True)
