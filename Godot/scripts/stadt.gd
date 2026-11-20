@@ -15,6 +15,7 @@ var fokus: Node3D
 var sektorgroesse := 500.0
 var spawn := {}
 var baeume := 0   ## wie viele Baum-Instanzen bisher gestellt wurden
+var gauben := 0   ## ... und Dachgauben
 
 var _eintraege := {}    # Vector2i -> Verzeichniseintrag
 var _geladen := {}      # id -> Node3D
@@ -107,12 +108,17 @@ func _lese(e: Dictionary) -> void:
 	var c := FileAccess.open("res://daten/sektoren/%s.col" % e["id"], FileAccess.READ)
 	if c != null and int(e["kollision_ecken"]) > 0:
 		flaechen = _zu_vec3(c.get_buffer(int(e["kollision_ecken"]) * 12).to_float32_array())
+	var gauben := PackedFloat32Array()
+	var gf := FileAccess.open("res://daten/sektoren/%s.gauben" % e["id"], FileAccess.READ)
+	if gf != null and int(e.get("gauben", 0)) > 0:
+		gauben = gf.get_buffer(int(e["gauben"]) * Gauben.SPALTEN * 4).to_float32_array()
 	var baeume := PackedFloat32Array()
 	var bf := FileAccess.open("res://daten/sektoren/%s.baeume" % e["id"], FileAccess.READ)
 	if bf != null and int(e.get("baeume", 0)) > 0:
 		baeume = bf.get_buffer(int(e["baeume"]) * Baeume.SPALTEN * 4).to_float32_array()
 	_sperre.lock()
-	_fertig.append({"eintrag": e, "abschnitte": abschnitte, "flaechen": flaechen, "baeume": baeume})
+	_fertig.append({"eintrag": e, "abschnitte": abschnitte, "flaechen": flaechen, "baeume": baeume,
+			"gauben": gauben})
 	_sperre.unlock()
 
 
@@ -182,6 +188,7 @@ func _baue_sektor(d: Dictionary) -> void:
 	wurzel.add_child(instanz)
 
 	baeume += Baeume.stelle(wurzel, d["baeume"])
+	gauben += Gauben.stelle(wurzel, d["gauben"])
 
 	var flaechen: PackedVector3Array = d["flaechen"]
 	if flaechen.size() > 0:

@@ -93,6 +93,60 @@ def baeume_aus(abschnitte: list) -> np.ndarray:
     return np.asarray(zeilen, dtype=np.float32).reshape(-1, 9)
 
 
+def dach_details(pos: np.ndarray, idx: np.ndarray) -> list:
+    """Dachueberstand und Gauben. pos wird veraendert: die tiefsten Ecken jedes Dachteils
+    (die Traufe) ruecken 45 cm nach aussen und 6 cm nach unten, so steht das Dach ueber die
+    Wand. Zurueck kommen Gauben als Zeilen [x, y, z, richtung_x, richtung_z]: auf geneigten
+    Flaechen (33 bis 52 Grad) hoeher als 1 m ueber der Traufe, mindestens 5 m Abstand,
+    hoechstens zwei je Dachteil, nur bei Daechern mit mehr als 40 m2 geneigter Flaeche."""
+    gauben = []
+    for g in komponenten(pos, idx):
+        p = pos[g]
+        unten, oben = p[:, 1].min(), p[:, 1].max()
+        if oben - unten < 1.5:
+            continue
+        # Dreiecke dieses Teils: ueber die Ecken zuordnen.
+        menge = set(g.tolist())
+        tris = [t for t in idx if int(t[0]) in menge]
+        tri_pos = pos[np.asarray(tris)]
+        n = np.cross(tri_pos[:, 1] - tri_pos[:, 0], tri_pos[:, 2] - tri_pos[:, 0])
+        flaeche = np.linalg.norm(n, axis=1) / 2
+        n = n / np.maximum(np.linalg.norm(n, axis=1)[:, None], 1e-9)
+        n[n[:, 1] < 0] *= -1                       # nach oben zeigen lassen
+        neigung = np.degrees(np.arccos(np.clip(n[:, 1], 0, 1)))
+        geneigt = (neigung > 33) & (neigung < 52)
+        if flaeche[geneigt].sum() < 40.0:
+            continue
+        mitte = p[:, [0, 2]].mean(axis=0)
+        # Gauben vor dem Verschieben der Traufe waehlen.
+        gewaehlt = []
+        for k in np.argsort(-flaeche):
+            if not geneigt[k] or flaeche[k] < 1.5 or len(gewaehlt) >= 2:
+                continue
+            c = tri_pos[k].mean(axis=0)
+            if c[1] < unten + 1.0 or c[1] > oben - 0.8:
+                continue
+            if any((c[0] - o[0]) ** 2 + (c[2] - o[2]) ** 2 < 25.0 for o in gewaehlt):
+                continue
+            gewaehlt.append(c)
+            richtung = n[k][[0, 2]]
+            laenge = float(np.linalg.norm(richtung))
+            if laenge < 1e-6:
+                gewaehlt.pop()
+                continue
+            gauben.append([c[0], c[1], c[2], richtung[0] / laenge, richtung[1] / laenge])
+        # Traufe: die tiefsten Ecken nach aussen.
+        for v in g:
+            if pos[v, 1] < unten + 0.2:
+                aussen = pos[v, [0, 2]] - mitte
+                lg = float(np.linalg.norm(aussen))
+                if lg > 1e-6:
+                    pos[v, 0] += aussen[0] / lg * 0.45
+                    pos[v, 2] += aussen[1] / lg * 0.45
+                pos[v, 1] -= 0.06
+    return gauben
+
+
 def main() -> int:
     manifest_pfad = QUELLE / "Sectors" / "manifest.json"
     if not manifest_pfad.exists() or manifest_pfad.stat().st_size < 1000:
@@ -108,12 +162,15 @@ def main() -> int:
         abschnitte = []
         kollision = []
         baumquellen = []
+        gauben_zeilen = []
         with open(ZIEL / "sektoren" / f"{eintrag['id']}.msh", "wb") as msh:
             for a in daten["sections"]:
                 pos = nach_godot(np.asarray(a["positions"], dtype=np.float64))
                 idx = np.asarray(a["indices"], dtype=np.int32)
                 if len(idx) % 3 or idx.max(initial=-1) >= len(pos):
                     raise ValueError(f"{eintrag['id']}/{a['name']}: Indizes passen nicht zu den Ecken")
+                if art(a["name"]) == "Roof":
+                    gauben_zeilen.extend(dach_details(pos, idx.reshape(-1, 3)))
                 if art(a["name"]) in ("Tree", "Trunk"):
                     # Baeume werden als Instanzen gestellt (siehe baeume_aus), nicht als Netz.
                     baumquellen.append((a["name"], pos, idx.reshape(-1, 3), a["color"][:3]))
@@ -127,6 +184,8 @@ def main() -> int:
                 dreiecke += len(idx) // 3
                 if art(a["name"]) in KOLLISION:
                     kollision.append(pos[idx])
+        gauben = np.asarray(gauben_zeilen, dtype=np.float32).reshape(-1, 5)
+        (ZIEL / "sektoren" / f"{eintrag['id']}.gauben").write_bytes(gauben.tobytes())
         baeume = baeume_aus(baumquellen)
         (ZIEL / "sektoren" / f"{eintrag['id']}.baeume").write_bytes(baeume.tobytes())
         flaechen = np.concatenate(kollision) if kollision else np.zeros((0, 3), np.float32)
@@ -136,7 +195,7 @@ def main() -> int:
         b = eintrag["boundsCm"]
         verzeichnis.append({"id": eintrag["id"], "index": eintrag["index"],
                             "grenzen": [b[0] / 100, b[1] / 100, b[2] / 100, b[3] / 100],
-                            "kollision_ecken": int(len(flaechen)), "baeume": int(len(baeume)),
+                            "kollision_ecken": int(len(flaechen)), "baeume": int(len(baeume)), "gauben": int(len(gauben)),
                             "abschnitte": abschnitte})
 
     spawn = manifest["spawn"]

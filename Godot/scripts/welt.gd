@@ -522,7 +522,8 @@ func _rauchtest_ablauf() -> void:
 	ok = await _pruefe_drehbuch() and ok
 
 	await get_tree().create_timer(maxf(0.0, 22.0 - _rauch_zeit)).timeout
-	ok = _pruefe("baeume=%d" % stadt.baeume, stadt.baeume > 20) and ok
+	ok = _pruefe("baeume=%d_gauben=%d" % [stadt.baeume, stadt.gauben],
+			stadt.baeume > 20 and stadt.gauben > 5) and ok
 	ok = _pruefe("moebel=%s" % [moebel.gestellt], moebel.gestellt["lampen"] > 5
 			and moebel.gestellt["baeume"] > 5 and moebel.gestellt["buesche"] > 5) and ok
 	var ki := verkehr.bewegung()
