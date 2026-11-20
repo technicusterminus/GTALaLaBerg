@@ -228,6 +228,11 @@ func _material(art: String, farbe: Array) -> ShaderMaterial:
 		"Roof", "Wall", "Sockel", "Gesims":
 			if art == "Wall":
 				m.set_shader_parameter("stil", 3)
+				var da := ResourceLoader.exists("res://texturen/fenster_a.jpg")
+				if da:
+					for f in ["a", "b", "c"]:
+						m.set_shader_parameter("fenster_" + f, load("res://texturen/fenster_%s.jpg" % f))
+					m.set_shader_parameter("fassade_foto", true)
 			elif art == "Roof":
 				m.set_shader_parameter("stil", 4)
 			m.set_shader_parameter("rauheit", 0.8)

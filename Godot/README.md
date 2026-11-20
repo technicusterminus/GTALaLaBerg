@@ -74,7 +74,10 @@ die eine trifft, zählt 20 €. Die Bestleistung steht im Konto.
 über OpenRouter (`Tools/ueberarbeite_bild.py`, Ergebnisse in `Docs/Konzept/`):
 - *Texturen* für Dachziegel, Putz, Pflaster, Wiese und Laub (`Godot/texturen/*.jpg`), nahtlos
   gemacht und im Shader `flach.gdshader` (Stile Fassade, Dach, Pflaster, Gelände) benutzt.
-- *Fassaden*: eingelassene Fenster mit Laibung, Rahmen, Bank und Läden per Shader.
+- *Fassaden*: drei vom Bildmodell erzeugte Fensterfelder (Sprossenfenster mit Läden, Rundbogen,
+  Blumenkasten; `texturen/fenster_*.jpg`) wiederholen sich je Zelle von 2,15 × 3,2 m auf allen
+  Wänden; der neutrale Putz nimmt eine Hausfarbe an (Creme, Ocker, Gelb, Lachs, Graugrün). Ohne
+  die Texturen zeichnet der Shader die Fenster selbst.
 - *Bäume* (`baeume.gd`): Der Konverter ersetzt die Kegelnetze durch Instanzen; Laubbäume haben
   runde Kronen aus mehreren Kugeln, Nadelbäume gestapelte Kegel.
 - *Straßenmöbel* (`strassenmoebel.gd`): Laternen, Straßenbäume und Sträucher entlang des

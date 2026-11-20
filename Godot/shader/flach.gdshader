@@ -24,6 +24,12 @@ uniform sampler2D detail_putz : source_color, filter_linear_mipmap, repeat_enabl
 uniform sampler2D detail_pflaster : source_color, filter_linear_mipmap, repeat_enable;
 uniform sampler2D detail_wiese : source_color, filter_linear_mipmap, repeat_enable;
 
+// Fensterfelder (vom Bildmodell erzeugt): je Zelle ein Fenster auf neutralem Putz.
+uniform bool fassade_foto = false;
+uniform sampler2D fenster_a : source_color, filter_linear_mipmap, repeat_enable;
+uniform sampler2D fenster_b : source_color, filter_linear_mipmap, repeat_enable;
+uniform sampler2D fenster_c : source_color, filter_linear_mipmap, repeat_enable;
+
 varying vec3 welt;
 
 // Mip-Stufe nach der Pixelgroesse in Metern; selbst bestimmt, weil Textur-Zugriffe in
@@ -121,7 +127,52 @@ vec3 fassade_detail(vec3 wand, vec3 n, vec3 vw, float px) {
 
 // Mit der Entfernung verschwimmen die Einzelheiten zu einem mittleren Farbton, sonst
 // flimmern die Fenster (ein Pixel deckt dann mehrere Zentimeter bis Meter ab).
+// Fassade aus den Fotofeldern: Zellen von 2,15 x 3,2 m, je Zelle eines der drei Felder (jede
+// zwoelfte bleibt glatter Putz). Neutraler Putz nimmt die Wandfarbe an, Rahmen (hell) und alles
+// Bunte (Laeden, Blumen, Glas, Stein) bleibt, wie gezeichnet.
+// Putzfarben je Haus (linear): Creme, Ocker, Hellgelb, Lachs, Graugruen, Weiss, Sand.
+vec3 hausfarbe(float z) {
+	if (z < 0.16) return vec3(0.52, 0.42, 0.24);
+	if (z < 0.32) return vec3(0.44, 0.26, 0.07);
+	if (z < 0.48) return vec3(0.58, 0.48, 0.12);
+	if (z < 0.62) return vec3(0.48, 0.22, 0.14);
+	if (z < 0.76) return vec3(0.26, 0.36, 0.26);
+	if (z < 0.88) return vec3(0.52, 0.52, 0.47);
+	return vec3(0.40, 0.30, 0.18);
+}
+
+vec3 fassade_fotos(vec3 wand, vec3 n, float px) {
+	// Ein Haus ist rund 10 m gross: die Farbe haengt an der Gegend, nicht an der einzelnen Wand.
+	wand = mix(wand, hausfarbe(hash21(floor(welt.xz / 10.0))), 0.9);
+	vec3 t = normalize(cross(vec3(0.0, 1.0, 0.0), n));
+	float u = dot(welt, t) / 2.15;
+	float v = welt.y / 3.2;
+	vec2 zelle = vec2(floor(u), floor(v));
+	vec2 uv = vec2(fract(u), fract(v));
+	float zufall = hash21(zelle + floor(n.xz * 5.0 + 0.5) * 13.7);
+	float stufe_ = stufe(px, 3.2);
+	vec3 tc;
+	if (zufall < 0.30) {
+		tc = textureLod(fenster_a, uv, stufe_).rgb;
+	} else if (zufall < 0.60) {
+		tc = textureLod(fenster_b, uv, stufe_).rgb;
+	} else if (zufall < 0.92) {
+		tc = textureLod(fenster_c, uv, stufe_).rgb;
+	} else {
+		tc = textureLod(fenster_b, vec2(uv.x, 0.02), stufe_).rgb;   // nur Putz
+	}
+	float lum = dot(tc, vec3(0.333));
+	float saett = max(max(tc.r, tc.g), tc.b) - min(min(tc.r, tc.g), tc.b);
+	float ist_putz = (1.0 - smoothstep(0.07, 0.20, saett)) * (1.0 - smoothstep(0.62, 0.80, lum))
+			* smoothstep(0.20, 0.34, lum);
+	vec3 putz = wand * clamp(lum / 0.50, 0.0, 1.35);
+	return mix(tc, putz, ist_putz);
+}
+
 vec3 fassade(vec3 wand, vec3 n, vec3 vw, float px) {
+	if (fassade_foto) {
+		return fassade_fotos(wand, n, px);
+	}
 	float pixel = px * 1.6;
 	float weich = smoothstep(0.035, 0.12, pixel);
 	vec3 mittel = mix(wand * 0.97, vec3(0.05, 0.08, 0.12), 0.30);
