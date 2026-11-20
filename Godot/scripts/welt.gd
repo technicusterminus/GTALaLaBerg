@@ -536,17 +536,18 @@ func _pruefe_dosen() -> bool:
 
 
 func _pruefe_bude() -> bool:
-	var geld0 := Konto.geld()
 	var gestartet := schiessbude.starte()
 	await get_tree().create_timer(2.5).timeout
 	var oben := schiessbude.hochstehende()
 	for k in oben:
 		schiessbude.treffer(k)
 	var treffer := schiessbude.treffer_runde
+	# Geld unmittelbar vor und nach dem Abschluss: dazwischen kann nichts anderes buchen.
+	var geld0 := Konto.geld()
 	schiessbude.beende()
-	return _pruefe("bude_start=%s_treffer=%d_geld=%d" % [gestartet, treffer,
-			Konto.geld() - geld0], gestartet and treffer >= 1
-			and Konto.geld() - geld0 == treffer * Schiessbude.PREIS
+	var lohn := Konto.geld() - geld0
+	return _pruefe("bude_start=%s_treffer=%d_lohn=%d" % [gestartet, treffer, lohn],
+			gestartet and treffer >= 1 and lohn == treffer * Schiessbude.PREIS
 			and Konto.beste_bude() >= treffer)
 
 

@@ -28,6 +28,16 @@ const KENNZAHLEN := [
 			"radius": 0.06, "kleck": [0.42, 0.58], "muendung": 0.5},
 ]
 
+## Die Modelle (Quaternius, CC0) liegen mit dem Lauf entlang X; laenge ist die Soll-Laenge in
+## Metern, drehung dreht den Lauf nach -Z (-90 Grad: Muendung bei +X, +90: bei -X).
+const MODELLE := {
+	Art.PISTOLE: {"datei": "Pistol", "laenge": 0.26, "drehung": -90.0},
+	Art.MASCHINE: {"datei": "Smg", "laenge": 0.50, "drehung": -90.0},
+	Art.SCHROTFLINTE: {"datei": "Shotgun", "laenge": 0.85, "drehung": -90.0},
+	Art.RAKETENWERFER: {"datei": "RocketLauncher", "laenge": 0.8, "drehung": -90.0},
+}
+
+
 const SCHUSSKLANG := {
 	Art.PISTOLE: "SFX_Schuss_Pistole", Art.MASCHINE: "SFX_Schuss_Maschine",
 	Art.SCHROTFLINTE: "SFX_Schuss_Schrot", Art.RAKETENWERFER: "SFX_Schuss_Rakete",
@@ -96,16 +106,6 @@ func _kegel(richtung: Vector3, halbwinkel: float) -> Vector3:
 
 
 ## Einfaches Ansichtsmodell aus Kasten und Zylinder; zeigt nach -Z.
-## Die Modelle (Quaternius, CC0) liegen mit dem Lauf entlang X; laenge ist die Soll-Laenge in
-## Metern, drehung dreht den Lauf nach -Z (-90 Grad: Muendung bei +X, +90: bei -X).
-const MODELLE := {
-	Art.PISTOLE: {"datei": "Pistol", "laenge": 0.26, "drehung": -90.0},
-	Art.MASCHINE: {"datei": "Smg", "laenge": 0.50, "drehung": -90.0},
-	Art.SCHROTFLINTE: {"datei": "Shotgun", "laenge": 0.85, "drehung": -90.0},
-	Art.RAKETENWERFER: {"datei": "RocketLauncher", "laenge": 0.8, "drehung": -90.0},
-}
-
-
 ## Setzt das Modell aus der GLB-Datei ein; false, wenn sie fehlt (dann bleiben die Kasten).
 func _lade_glb() -> bool:
 	var k: Dictionary = MODELLE[art]
