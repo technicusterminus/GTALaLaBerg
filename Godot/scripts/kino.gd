@@ -271,6 +271,9 @@ func _baue_figuren(sch: Dictionary, zeilen: Array, ziel: Dictionary, db: Drehbuc
 		pos.y = db.boden_y(pos, _ziel.y)
 		var gestalt := _gestalt(f)
 		get_tree().current_scene.add_child(gestalt)
+		for kind in gestalt.get_children():
+			if kind is Figur:
+				(kind as Figur).passe_an()   # erst jetzt im Baum, jetzt laesst es sich messen
 		gestalt.global_position = pos
 		gestalt.look_at(Vector3(_ziel.x, pos.y, _ziel.z))
 		_figuren.append(gestalt)
@@ -281,7 +284,6 @@ func _gestalt(f: Dictionary) -> Node3D:
 	var figur: Figur = Figur.neu(hash(String(f.get("name", "")))) if Figur.verfuegbar() else null
 	if figur != null:
 		wurzel.add_child(figur)
-		figur.passe_an()
 		figur.spiele("Idle_Neutral")
 		_name_schild(wurzel, f)
 		return wurzel
