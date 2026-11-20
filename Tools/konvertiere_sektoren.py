@@ -45,6 +45,54 @@ def nach_godot(p: np.ndarray) -> np.ndarray:
     return v[:, [0, 2, 1]].astype(np.float32)
 
 
+def komponenten(pos: np.ndarray, idx: np.ndarray) -> list:
+    """Zusammenhaengende Teile eines Netzes: Liste von Eckenindex-Arrays."""
+    eltern = np.arange(len(pos))
+
+    def wurzel(a: int) -> int:
+        while eltern[a] != a:
+            eltern[a] = eltern[eltern[a]]
+            a = eltern[a]
+        return a
+
+    for a, b, c in idx.reshape(-1, 3):
+        ra, rb = wurzel(a), wurzel(b)
+        eltern[ra] = rb
+        eltern[wurzel(c)] = rb
+    gruppen: dict = {}
+    for v in range(len(pos)):
+        gruppen.setdefault(wurzel(v), []).append(v)
+    return [np.asarray(g) for g in gruppen.values()]
+
+
+def baeume_aus(abschnitte: list) -> np.ndarray:
+    """Jeder Baum der Quelldaten (ein Kronen-Netz plus ein Stamm-Netz) wird zu einer Zeile
+    [x, y_fuss, z, krone_mitte_ueber_fuss, krone_radius, krone_halbe_hoehe, r, g, b]
+    in Godot-Achsen. Godot setzt daraus Instanzen (Kugelkrone, Stamm) statt der Kegelnetze."""
+    staemme = []
+    kronen = []
+    for name, pos, idx, farbe in abschnitte:
+        if art(name) not in ("Tree", "Trunk"):
+            continue
+        for g in komponenten(pos, idx):
+            p = pos[g]
+            lo, hi = p.min(axis=0), p.max(axis=0)
+            eintrag = ((lo[0] + hi[0]) / 2, (lo[2] + hi[2]) / 2, lo[1], hi[1],
+                       max(hi[0] - lo[0], hi[2] - lo[2]) / 2, farbe)
+            (kronen if art(name) == "Tree" else staemme).append(eintrag)
+    zeilen = []
+    for kx, kz, ky0, ky1, radius, farbe in kronen:
+        boden = ky0 - 2.2
+        beste = 16.0
+        for sx, sz, sy0, _sy1, _r, _f in staemme:
+            d = (sx - kx) ** 2 + (sz - kz) ** 2
+            if d < beste:
+                beste, boden = d, sy0
+        zeilen.append([kx, boden, kz, (ky0 + ky1) / 2 - boden, max(radius, 0.6),
+                       max((ky1 - ky0) / 2, 0.6), *farbe[:3]])
+    return np.asarray(zeilen, dtype=np.float32).reshape(-1, 9)
+
+
 def main() -> int:
     manifest_pfad = QUELLE / "Sectors" / "manifest.json"
     if not manifest_pfad.exists() or manifest_pfad.stat().st_size < 1000:
@@ -59,12 +107,17 @@ def main() -> int:
         daten = json.loads((QUELLE / "Sectors" / eintrag["file"]).read_text())
         abschnitte = []
         kollision = []
+        baumquellen = []
         with open(ZIEL / "sektoren" / f"{eintrag['id']}.msh", "wb") as msh:
             for a in daten["sections"]:
                 pos = nach_godot(np.asarray(a["positions"], dtype=np.float64))
                 idx = np.asarray(a["indices"], dtype=np.int32)
                 if len(idx) % 3 or idx.max(initial=-1) >= len(pos):
                     raise ValueError(f"{eintrag['id']}/{a['name']}: Indizes passen nicht zu den Ecken")
+                if art(a["name"]) in ("Tree", "Trunk"):
+                    # Baeume werden als Instanzen gestellt (siehe baeume_aus), nicht als Netz.
+                    baumquellen.append((a["name"], pos, idx.reshape(-1, 3), a["color"][:3]))
+                    continue
                 idx = np.ascontiguousarray(idx.reshape(-1, 3)[:, [0, 2, 1]]).reshape(-1)
                 msh.write(pos.tobytes())
                 msh.write(idx.tobytes())
@@ -74,6 +127,8 @@ def main() -> int:
                 dreiecke += len(idx) // 3
                 if art(a["name"]) in KOLLISION:
                     kollision.append(pos[idx])
+        baeume = baeume_aus(baumquellen)
+        (ZIEL / "sektoren" / f"{eintrag['id']}.baeume").write_bytes(baeume.tobytes())
         flaechen = np.concatenate(kollision) if kollision else np.zeros((0, 3), np.float32)
         (ZIEL / "sektoren" / f"{eintrag['id']}.col").write_bytes(flaechen.tobytes())
         summe_msh += (ZIEL / "sektoren" / f"{eintrag['id']}.msh").stat().st_size
@@ -81,7 +136,8 @@ def main() -> int:
         b = eintrag["boundsCm"]
         verzeichnis.append({"id": eintrag["id"], "index": eintrag["index"],
                             "grenzen": [b[0] / 100, b[1] / 100, b[2] / 100, b[3] / 100],
-                            "kollision_ecken": int(len(flaechen)), "abschnitte": abschnitte})
+                            "kollision_ecken": int(len(flaechen)), "baeume": int(len(baeume)),
+                            "abschnitte": abschnitte})
 
     spawn = manifest["spawn"]
     (ZIEL / "sektoren.json").write_text(json.dumps({

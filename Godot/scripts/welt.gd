@@ -518,6 +518,7 @@ func _rauchtest_ablauf() -> void:
 	ok = await _pruefe_drehbuch() and ok
 
 	await get_tree().create_timer(maxf(0.0, 22.0 - _rauch_zeit)).timeout
+	ok = _pruefe("baeume=%d" % stadt.baeume, stadt.baeume > 20) and ok
 	var ki := verkehr.bewegung()
 	ok = _pruefe("verkehr", ki > 1.0) and ok
 	var knoten := verkehr.bewegung_knoten()
@@ -582,6 +583,7 @@ func _pruefe_kontakt() -> bool:
 ## Eine echte Kugel aus der Pistole, vom Stand aus auf eine hochstehende Scheibe.
 func _pruefe_bude_schuss() -> bool:
 	spieler.global_position = _boden(schiessbude.stand()) + Vector3(0, 0.3, 0)
+	schiessbude.test_oben = true
 	schiessbude.starte()
 	var frist := 6.0
 	while schiessbude.hochstehende().is_empty() and frist > 0.0:
@@ -593,8 +595,12 @@ func _pruefe_bude_schuss() -> bool:
 		if not oben.is_empty():
 			spieler.feuere_auf(oben[0].global_position)
 			versuche += 1
-		await get_tree().create_timer(0.5).timeout
+		# Physikschritte statt Zeit: im Render-Lauf mit Schatten laeuft das Spiel mit 1 bis 2
+		# Bildern je Sekunde, die Kugel braucht aber ihre Schritte, um anzukommen.
+		for i in 40:
+			await get_tree().physics_frame
 	var treffer := schiessbude.treffer_runde
+	schiessbude.test_oben = false
 	schiessbude.beende()
 	return _pruefe("bude_echter_schuss_treffer=%d_versuche=%d" % [treffer, versuche], treffer >= 1)
 
@@ -602,7 +608,10 @@ func _pruefe_bude_schuss() -> bool:
 func _pruefe_bude() -> bool:
 	var echt := await _pruefe_bude_schuss()
 	var gestartet := schiessbude.starte()
-	await get_tree().create_timer(2.5).timeout
+	var frist := 6.0
+	while schiessbude.hochstehende().is_empty() and frist > 0.0:
+		await get_tree().create_timer(0.1).timeout
+		frist -= 0.1
 	var oben := schiessbude.hochstehende()
 	for k in oben:
 		schiessbude.treffer(k)

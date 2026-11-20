@@ -14,6 +14,7 @@ const SHADER := preload("res://shader/flach.gdshader")
 var fokus: Node3D
 var sektorgroesse := 500.0
 var spawn := {}
+var baeume := 0   ## wie viele Baum-Instanzen bisher gestellt wurden
 
 var _eintraege := {}    # Vector2i -> Verzeichniseintrag
 var _geladen := {}      # id -> Node3D
@@ -106,8 +107,12 @@ func _lese(e: Dictionary) -> void:
 	var c := FileAccess.open("res://daten/sektoren/%s.col" % e["id"], FileAccess.READ)
 	if c != null and int(e["kollision_ecken"]) > 0:
 		flaechen = _zu_vec3(c.get_buffer(int(e["kollision_ecken"]) * 12).to_float32_array())
+	var baeume := PackedFloat32Array()
+	var bf := FileAccess.open("res://daten/sektoren/%s.baeume" % e["id"], FileAccess.READ)
+	if bf != null and int(e.get("baeume", 0)) > 0:
+		baeume = bf.get_buffer(int(e["baeume"]) * Baeume.SPALTEN * 4).to_float32_array()
 	_sperre.lock()
-	_fertig.append({"eintrag": e, "abschnitte": abschnitte, "flaechen": flaechen})
+	_fertig.append({"eintrag": e, "abschnitte": abschnitte, "flaechen": flaechen, "baeume": baeume})
 	_sperre.unlock()
 
 
@@ -175,6 +180,8 @@ func _baue_sektor(d: Dictionary) -> void:
 	instanz.mesh = netz
 	instanz.visibility_range_end = SICHTWEITE
 	wurzel.add_child(instanz)
+
+	baeume += Baeume.stelle(wurzel, d["baeume"])
 
 	var flaechen: PackedVector3Array = d["flaechen"]
 	if flaechen.size() > 0:
