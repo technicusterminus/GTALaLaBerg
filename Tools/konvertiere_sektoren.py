@@ -118,7 +118,8 @@ def main() -> int:
             continue
         shutil.copy(fbx, ZIEL / "modelle" / fbx.name)
     # Menschenfiguren (Quaternius, CC0) mit allen Animationen im Rig.
-    for rel in ("People/Casual/Casual.fbx", "People/Worker/Worker.fbx"):
+    for rel in ("People/Casual/Casual.fbx", "People/Worker/Worker.fbx", "Waffen/Pistol.glb",
+                "Waffen/Smg.glb", "Waffen/Shotgun.glb", "Waffen/RocketLauncher.glb"):
         quelle = QUELLE / rel
         if quelle.stat().st_size > 1000:
             shutil.copy(quelle, ZIEL / "modelle" / quelle.name)

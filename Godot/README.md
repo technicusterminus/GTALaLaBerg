@@ -120,7 +120,7 @@ Rauch- und Filmtest schreiben nur in eine eigene Spielstanddatei.
 Stand der Unreal-Version: Git-Historie, Commit `dea4cec`; ihre Dokumentation steht
 in `Docs/Unreal-Archiv/README-Unreal-Archiv.md`.
 
-- Waffenmodelle, Insassen in den Autos, Figuren für die Polizei und die Kapseln in der Ferne
+- Insassen in den Autos, Figuren für die Polizei und die Kapseln in der Ferne
 - Überholen und der Kontakt-Einsatz der Polizei bei drei Sternen
 - Keine Bildraten- oder Größenmessung gegenüber Unreal
 
