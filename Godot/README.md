@@ -50,6 +50,11 @@ folgt dem Blick, Maus links feuert alle drei Sekunden eine Großkaliber-Farbkuge
 Hubschrauber (Leertaste steigen, W/S fliegen, A/D drehen). Beide stehen in der Stadt und
 werden mit F bestiegen; Aussteigen nur am Boden.
 
+**Überholen.** Steht ein Hindernis (stehendes Auto oder der Spieler im Wagen) länger als zwei
+Sekunden vor einem KI-Auto, die Gegenspur ist 45 m weit frei und keine rote Ampel in Sicht, schert
+das Auto aus, fährt 25 % schneller vorbei und ordnet sich wieder ein (`verkehrsauto.gd`,
+`verkehrsbremse.gd`).
+
 **Wirtschaft.** Aufträge in sechs Arten (Lieferung, Taxi, Rennen, Verfolgung,
 Krankenwagen, Streife), Paintball-Laden, Lackiererei, ein Konto mit Spielstand, Werten
 (Ausdauer, Zielsicherheit, Fahren, Ruf), Fundstücken und Merkern.
@@ -123,7 +128,6 @@ Stand der Unreal-Version: Git-Historie, Commit `dea4cec`; ihre Dokumentation ste
 in `Docs/Unreal-Archiv/README-Unreal-Archiv.md`.
 
 - Insassen in den Autos, Figuren für die Polizei und die Kapseln in der Ferne
-- Überholen
 - Keine Bildraten- oder Größenmessung gegenüber Unreal
 
 ## Hinweise

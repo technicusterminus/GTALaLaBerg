@@ -30,6 +30,7 @@ var klassen := PackedInt32Array()    ## Klasse je Wegpunkt (die Route verkettet 
 var kreuzungen := PackedInt32Array() ## Kreuzungen auf der Route
 var lack := Color(0.5, 0.5, 0.5)
 var karosserie := Vector3.ONE   ## Laenge, Breite, Hoehe gegenueber dem Grundmodell
+var ueberholungen := 0   ## wie oft dieser Wagen schon ein Hindernis ueberholt hat
 
 var geparkt := false   ## abgestellt: weit unter der Stadt, unsichtbar, ohne Route
 var gesperrt := false  ## Sperrwagen: steht quer auf der Strasse, Blaulicht an
@@ -46,6 +47,9 @@ var _bremse := 1.0
 var _bremse_objekt := 1.0
 var _bremse_in := randf() * 0.12   ## Sekunden bis zur naechsten Berechnung, versetzt
 var _seitversatz := 0.0
+var _ueberholt: Node3D
+var _ueberhol_bis := 0.0
+var _blockiert := 0.0
 var _leuchten: Array[MeshInstance3D] = []
 var _blaulicht := OmniLight3D.new()
 var _sirene: AudioStreamPlayer3D
@@ -178,8 +182,42 @@ func rechts2() -> Vector2:
 	return Vector2(_rechts.x, _rechts.z)
 
 
+func ueberholt_gerade() -> bool:
+	return _ueberholt != null
+
+
+## Steht ein Hindernis laenger als zwei Sekunden vor dem Wagen, die Gegenspur ist frei und
+## keine rote Ampel in Sicht, schert er aus, faehrt vorbei und ordnet sich wieder ein.
+func _pruefe_ueberholen() -> void:
+	var jetzt := Time.get_ticks_msec() / 1000.0
+	if _ueberholt != null:
+		if not is_instance_valid(_ueberholt):
+			_ueberholt = null
+			return
+		var p: Vector3 = _ueberholt.position_jetzt() if _ueberholt is Verkehrsauto \
+				else _ueberholt.global_position
+		if (p - _lage).dot(_blick) < -6.0 or jetzt > _ueberhol_bis \
+				or Verkehrsbremse.gegenverkehr(self, 30.0):
+			_ueberholt = null
+		return
+	var hindernis := Verkehrsbremse.hindernis_voraus(self)
+	if hindernis == null:
+		_blockiert = 0.0
+		return
+	_blockiert += 0.12
+	var breite := breiten[weg.index] if weg.index < breiten.size() else 6.0
+	if _blockiert > 2.0 and breite >= 5.5 and not Verkehrsbremse.gegenverkehr(self, 45.0) \
+			and (polizei or not Verkehrsbremse.ampel_haelt_voraus(self, 45.0)):
+		_ueberholt = hindernis
+		_ueberhol_bis = jetzt + 9.0
+		_blockiert = 0.0
+		ueberholungen += 1
+
+
 func _berechne_bremse() -> void:
-	_bremse_objekt = minf(Verkehrsbremse.vor_auto(self), Verkehrsbremse.vor_spieler(self))
+	_pruefe_ueberholen()
+	_bremse_objekt = minf(Verkehrsbremse.vor_auto(self, _ueberholt),
+			Verkehrsbremse.vor_spieler(self, _ueberholt))
 	# Mit Blaulicht gelten weder Rot noch Vorfahrt.
 	var ampel := 1.0 if polizei else Verkehrsbremse.vor_ampel(self)
 	var kreuzung := 1.0 if polizei else Verkehrsbremse.vor_kreuzung(self)
@@ -288,7 +326,7 @@ func _physics_process(delta: float) -> void:
 		_bremse_in = 0.12
 		_berechne_bremse()
 	var vorher := _lage
-	weg.bewege(tempo_ms * _faktor * _bremse * delta)
+	weg.bewege(tempo_ms * _faktor * _bremse * (1.25 if _ueberholt != null else 1.0) * delta)
 	if weg.blick != Vector3.ZERO:
 		_blick = _blick.lerp(weg.blick, minf(8.0 * delta, 1.0)).normalized()
 	var rechts_soll := Vector3(-_blick.z, 0.0, _blick.x)
@@ -302,7 +340,9 @@ func _physics_process(delta: float) -> void:
 	var spur := breite * 0.25
 	var rand := maxf(0.0, breite * 0.5 - HALBE_WAGENBREITE)
 	var ziel := minf(spur + (MAX_SEITVERSATZ if _bremse_objekt < 0.9 else 0.0), rand)
-	_seitversatz = lerpf(_seitversatz, ziel, minf(0.7 * delta, 1.0))
+	if _ueberholt != null:
+		ziel = -minf(spur, rand)   # auf die Gegenspur
+	_seitversatz = lerpf(_seitversatz, ziel, minf((1.6 if _ueberholt != null else 0.7) * delta, 1.0))
 	# Das Netz schaut nach +X; Drehung um Y bringt +X auf die Blickrichtung.
 	_setze_transform(weg.ort + _rechts * _seitversatz, -atan2(_blick.z, _blick.x))
 	_geschwindigkeit = (_lage - vorher) / delta

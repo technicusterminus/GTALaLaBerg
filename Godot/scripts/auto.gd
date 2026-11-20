@@ -24,11 +24,11 @@ var fahrer: Node3D:
 		else:
 			remove_from_group("spielerauto")
 var tempo_ms := 0.0
-var _motor: AudioStreamPlayer3D
 var gesperrt := false   ## im Film: keine Eingabe, der Wagen bremst
 var leben := 100.0
 var _letzter_stoss := -10.0
 var _lenkung := 0.0
+var _motor: AudioStreamPlayer3D
 var _karosserie: MeshInstance3D
 
 

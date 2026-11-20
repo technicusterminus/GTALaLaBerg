@@ -499,6 +499,9 @@ func _rauchtest_ablauf() -> void:
 	# Farbdosen: fuenfzig gestellt, zehn einsammeln bringt den Staffelpreis.
 	ok = _pruefe_dosen() and ok
 
+	# Ueberholen: ein Wagen faehrt auf ein stehendes Hindernis zu und schert aus.
+	ok = await _pruefe_ueberholen() and ok
+
 	# Kontakt-Einsatz: bei drei Sternen laufen Beamte los und nehmen fest.
 	ok = await _pruefe_kontakt() and ok
 
@@ -536,6 +539,27 @@ func _pruefe_dosen() -> bool:
 	var ok := _pruefe("dosen_gestellt=%d" % farbdosen.gestellt, farbdosen.gestellt == 50)
 	return _pruefe("dosen_gesammelt=%d geld=%d" % [gesammelt, Konto.geld() - vor_geld],
 			gesammelt >= 1 and Konto.geld() - vor_geld >= gesammelt * Farbdosen.PREIS) and ok
+
+
+func _pruefe_ueberholen() -> bool:
+	var start := spieler.global_position + Vector3(0, 40.0, 0)   # ueber der Stadt, ohne Verkehr
+	var blocker := Verkehrsauto.new()
+	add_child(blocker)
+	blocker.setze_lage(start + Vector3(40, 0, 1.5), Vector3.RIGHT)
+	var fahrer := Verkehrsauto.new()
+	add_child(fahrer)
+	fahrer.setze_lage(start, Vector3.RIGHT)
+	fahrer.folge_weg(PackedVector3Array([start, start + Vector3(200, 0, 0)]), 40.0)
+	var frist := 25.0
+	while frist > 0.0 and fahrer.position_jetzt().x < start.x + 55.0:
+		await get_tree().create_timer(0.25).timeout
+		frist -= 0.25
+	var vorbei := fahrer.position_jetzt().x > start.x + 55.0
+	var ok := _pruefe("ueberholen_vorbei=%s_anzahl=%d" % [vorbei, fahrer.ueberholungen],
+			vorbei and fahrer.ueberholungen >= 1)
+	blocker.queue_free()
+	fahrer.queue_free()
+	return ok
 
 
 func _pruefe_kontakt() -> bool:
