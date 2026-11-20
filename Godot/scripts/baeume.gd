@@ -21,7 +21,7 @@ static var _mat_stamm: StandardMaterial3D
 
 
 ## Baut die Instanzen eines Sektors; fuegt sie an wurzel an und liefert die Zahl der Baeume.
-static func stelle(wurzel: Node3D, zeilen: PackedFloat32Array) -> int:
+static func stelle(wurzel: Node3D, zeilen: PackedFloat32Array, mit_stamm := true) -> int:
 	var n := zeilen.size() / SPALTEN
 	if n == 0:
 		return 0
@@ -34,7 +34,8 @@ static func stelle(wurzel: Node3D, zeilen: PackedFloat32Array) -> int:
 		(nadel if hoehe > radius * NADEL_VERHAELTNIS else laub).append(i)
 	_krone(wurzel, zeilen, laub, _laub, _mat_laub)
 	_krone(wurzel, zeilen, nadel, _nadel, _mat_nadel)
-	_staemme(wurzel, zeilen, range(n))
+	if mit_stamm:
+		_staemme(wurzel, zeilen, range(n))
 	return n
 
 

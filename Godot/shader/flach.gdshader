@@ -215,11 +215,11 @@ void fragment() {
 		}
 		// Grosse Felder: Gruenland mit Flecken aus reifem Weizen und gemaehten Streifen.
 		float feld = wert(welt.xz / 230.0 + 3.1);
-		float reif = smoothstep(0.54, 0.64, feld);
+		float reif = smoothstep(0.58, 0.68, feld);
 		float streifen = 0.5 + 0.5 * sin(dot(welt.xz, vec2(0.83, 0.56)) * 3.9);
 		vec3 gruen = vec3(0.13, 0.27, 0.05) * (0.85 + 0.35 * g) * (0.93 + 0.07 * streifen);
-		vec3 weizen = vec3(0.40, 0.31, 0.10) * (0.85 + 0.3 * g) * (0.9 + 0.1 * streifen);
-		c = mix(c, mix(gruen, weizen, reif), 0.65);
+		vec3 weizen = vec3(0.34, 0.29, 0.12) * (0.85 + 0.3 * g) * (0.9 + 0.1 * streifen);
+		c = mix(c, mix(gruen, weizen, reif), 0.8);
 		float steil = smoothstep(0.93, 0.72, abs(wn.y));
 		c = mix(c, vec3(0.20, 0.13, 0.07) * (0.8 + 0.4 * g), steil);
 	} else if (stil == 4) {

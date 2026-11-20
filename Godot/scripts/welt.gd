@@ -23,6 +23,7 @@ var laeden := Laeden.new()
 var farbdosen := Farbdosen.new()
 var radio := Radio.new()
 var schiessbude := Schiessbude.new()
+var moebel := Strassenmoebel.new()
 var revier := Revier.new()
 var drehbuch := Drehbuch.new()
 var auto: Auto
@@ -69,6 +70,9 @@ func _ready() -> void:
 	farbdosen.polizei = polizei
 	add_child(farbdosen)
 	add_child(schiessbude)
+	moebel.stadt = stadt
+	moebel.polizei = polizei
+	add_child(moebel)
 	add_child(revier)
 	drehbuch.spieler = spieler
 	drehbuch.polizei = polizei
@@ -519,6 +523,8 @@ func _rauchtest_ablauf() -> void:
 
 	await get_tree().create_timer(maxf(0.0, 22.0 - _rauch_zeit)).timeout
 	ok = _pruefe("baeume=%d" % stadt.baeume, stadt.baeume > 20) and ok
+	ok = _pruefe("moebel=%s" % [moebel.gestellt], moebel.gestellt["lampen"] > 5
+			and moebel.gestellt["baeume"] > 5 and moebel.gestellt["buesche"] > 5) and ok
 	var ki := verkehr.bewegung()
 	ok = _pruefe("verkehr", ki > 1.0) and ok
 	var knoten := verkehr.bewegung_knoten()
@@ -953,7 +959,7 @@ func _umgebung() -> void:
 	# Waermer, satter und mit leichtem Leuchten wie im Konzeptbild.
 	env.adjustment_enabled = true
 	env.adjustment_contrast = 1.08
-	env.adjustment_saturation = 1.2
+	env.adjustment_saturation = 1.08
 	env.glow_enabled = true
 	env.glow_intensity = 0.3
 	env.glow_bloom = 0.04

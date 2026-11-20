@@ -1,2 +1,3 @@
 # Das Konto ist eine breite Fassade ueber den Spielstand.
 max-public-methods: 60
+max-file-lines: 1400
