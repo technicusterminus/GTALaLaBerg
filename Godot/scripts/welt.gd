@@ -22,6 +22,7 @@ var auftraege := Auftraege.new()
 var laeden := Laeden.new()
 var farbdosen := Farbdosen.new()
 var radio := Radio.new()
+var schiessbude := Schiessbude.new()
 var revier := Revier.new()
 var drehbuch := Drehbuch.new()
 var auto: Auto
@@ -67,6 +68,7 @@ func _ready() -> void:
 	add_child(laeden)
 	farbdosen.polizei = polizei
 	add_child(farbdosen)
+	add_child(schiessbude)
 	add_child(revier)
 	drehbuch.spieler = spieler
 	drehbuch.polizei = polizei
@@ -104,6 +106,7 @@ func _fokus_auf(wer: Node3D) -> void:
 	auftraege.fokus = wer
 	laeden.fokus = wer
 	farbdosen.fokus = wer
+	schiessbude.fokus = wer
 	revier.fokus = wer
 	drehbuch.fokus = wer
 	hud.ziel = wer
@@ -170,6 +173,9 @@ func _stelle_marken(start: Vector3) -> void:
 	auftraege.setze_start_ort(polizei.naechster_punkt(mitte))
 	laeden.stelle(Laeden.Ladenart.LACKIEREREI, polizei.naechster_punkt(Vector3(-1500.0, 0, 120.0)))
 	laeden.stelle(Laeden.Ladenart.PAINTBALL, polizei.naechster_punkt(Vector3(-376.3, 0, 260.0)))
+	# Die Schiessbude steht an der Strasse hinter dem Paintball-Laden, die Scheiben stehen
+	# quer ueber der Strasse.
+	schiessbude.stelle(polizei.naechster_punkt(Vector3(-300.0, 0, 330.0)), Vector3.RIGHT)
 	drehbuch.bereit = true
 	_stelle_sonderfahrzeuge()
 
@@ -367,6 +373,7 @@ func _process(delta: float) -> void:
 	hud.auftrag_text = _auftrag_text()
 	hud.revier_text = revier.hud_text()
 	hud.laden_text = laeden.menue_text()
+	hud.bude_text = schiessbude.hud_text()
 	hud.status = "Leben %d    %d €    %s    Ruf %d" % [
 		ceili(spieler.leben), Konto.geld(), spieler.waffe.art_name(),
 		Konto.stufe(Konto.Wert.RUF)]
@@ -492,6 +499,9 @@ func _rauchtest_ablauf() -> void:
 	# Farbdosen: fuenfzig gestellt, zehn einsammeln bringt den Staffelpreis.
 	ok = _pruefe_dosen() and ok
 
+	# Schiessbude: Runde starten, Scheiben treffen, auszahlen.
+	ok = await _pruefe_bude() and ok
+
 	# Radio: schaltet durch alle Sender und wieder aus.
 	ok = _pruefe_radio() and ok
 
@@ -523,6 +533,21 @@ func _pruefe_dosen() -> bool:
 	var ok := _pruefe("dosen_gestellt=%d" % farbdosen.gestellt, farbdosen.gestellt == 50)
 	return _pruefe("dosen_gesammelt=%d geld=%d" % [gesammelt, Konto.geld() - vor_geld],
 			gesammelt >= 1 and Konto.geld() - vor_geld >= gesammelt * Farbdosen.PREIS) and ok
+
+
+func _pruefe_bude() -> bool:
+	var geld0 := Konto.geld()
+	var gestartet := schiessbude.starte()
+	await get_tree().create_timer(2.5).timeout
+	var oben := schiessbude.hochstehende()
+	for k in oben:
+		schiessbude.treffer(k)
+	var treffer := schiessbude.treffer_runde
+	schiessbude.beende()
+	return _pruefe("bude_start=%s_treffer=%d_geld=%d" % [gestartet, treffer,
+			Konto.geld() - geld0], gestartet and treffer >= 1
+			and Konto.geld() - geld0 == treffer * Schiessbude.PREIS
+			and Konto.beste_bude() >= treffer)
 
 
 func _pruefe_radio() -> bool:

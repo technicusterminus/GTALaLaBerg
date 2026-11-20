@@ -46,12 +46,13 @@ Umgesetzt (alles mit einem Rauchtest geprüft, siehe [`Godot/README.md`](Godot/R
 
 - **Aussehen:** animierte Menschenfiguren (Quaternius, CC0), Autos in vier Karosserieformen
   und zwölf Lacken, Wiesenflecken und Erde am Hang im Gelände, bewegtes Wasser
+- **Schießbude:** Runde zu 30 Sekunden mit sechs Scheiben, Lohn je Treffer, Bestleistung
 - **Farbdosen:** 50 versteckte Dosen im Straßennetz, Staffelpreis alle zehn
 - **Ton und Radio:** Motor, Schüsse, Sirene, Rotor, Schritte; Autoradio mit drei Sendern
   (R), Musik von Lyria über OpenRouter (`Tools/erzeuge_radio.py`)
 - **Karte und Menü:** Minikarte, Vollkarte (M) und Pausenmenü (Esc)
 
-Aus der Unreal-Version noch nicht portiert: die Schießbude.
+Aus der Unreal-Version noch nicht portiert: Waffenmodelle, Überholen, Kontakt-Einsatz der Polizei.
 
 ## Werkzeuge
 

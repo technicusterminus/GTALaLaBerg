@@ -59,6 +59,10 @@ Autoradio: R schaltet Aus, Blasmusik, Klassik, Lech. Die Musik erzeugt
 `OPENROUTER_API_KEY`, ein Song etwa 0,08 USD) nach `Godot/daten/radio`; ohne die Dateien
 laufen die gerechneten Schleifen.
 
+**Schießbude.** `schiessbude.gd`: wer zu Fuß in den orangen Ring tritt, startet eine Runde
+von 30 Sekunden. Sechs Scheiben klappen hoch (höchstens drei zugleich); jede Paintball-Kugel,
+die eine trifft, zählt 20 €. Die Bestleistung steht im Konto.
+
 **Farbdosen.** `farbdosen.gd` stellt fünfzig Dosen mit festem Zufall in das Straßennetz
 (mindestens 90 m auseinander); Einsammeln bringt 25 €, jede zehnte einen Staffelpreis.
 
@@ -116,7 +120,6 @@ Rauch- und Filmtest schreiben nur in eine eigene Spielstanddatei.
 Stand der Unreal-Version: Git-Historie, Commit `dea4cec`; ihre Dokumentation steht
 in `Docs/Unreal-Archiv/README-Unreal-Archiv.md`.
 
-- Schießbude
 - Waffenmodelle, Insassen in den Autos, Figuren für die Polizei und die Kapseln in der Ferne
 - Überholen und der Kontakt-Einsatz der Polizei bei drei Sternen
 - Keine Bildraten- oder Größenmessung gegenüber Unreal
