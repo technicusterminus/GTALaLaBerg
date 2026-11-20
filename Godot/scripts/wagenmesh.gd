@@ -180,11 +180,28 @@ static func _karosserie(lack: Color, instanziert: bool, p: Dictionary) -> ArrayM
 			for v: Vector3 in tri:
 				lackflaeche.add_vertex(v)
 	var netz := ArrayMesh.new()
-	_anfuegen(netz, lackflaeche, _material(lack, true, instanziert, false, 0.3))
+	var lackmaterial := _material(lack, true, instanziert, false, 0.3)
+	_zeichnung_zuweisen(lackmaterial, p)
+	_anfuegen(netz, lackflaeche, lackmaterial)
 	_anfuegen(netz, glasflaeche, _material(Color(0.02, 0.03, 0.04), false, false, true))
 	_anfuegen(netz, unterbau, _material(Color(0.02, 0.02, 0.022), false, false, false, 0.9))
 	_raeder_und_licht(netz, p, halbringe)
 	return netz
+
+
+## Hat die Linienzeichnung (Texturen aus Tools/baue_auto_profil.py), liegt sie auf dem Lack.
+static func _zeichnung_zuweisen(m: ShaderMaterial, p: Dictionary) -> void:
+	for ansicht in ["seite", "oben", "front", "heck"]:
+		if not ResourceLoader.exists("res://texturen/auto_%s.png" % ansicht):
+			return
+	for ansicht in ["seite", "oben", "front", "heck"]:
+		m.set_shader_parameter("tex_" + ansicht, load("res://texturen/auto_%s.png" % ansicht))
+	m.set_shader_parameter("front_breite", p.get("front_breite", 2.08))
+	m.set_shader_parameter("heck_breite", p.get("heck_breite", 2.08))
+	m.set_shader_parameter("laenge", p["laenge"])
+	m.set_shader_parameter("seite_hoehe", p.get("seite_hoehe", 1.59))
+	m.set_shader_parameter("oben_breite", p.get("oben_breite", 1.94))
+	m.set_shader_parameter("detail_an", true)
 
 
 static func _anfuegen(netz: ArrayMesh, st: SurfaceTool, material: Material) -> void:
@@ -193,16 +210,13 @@ static func _anfuegen(netz: ArrayMesh, st: SurfaceTool, material: Material) -> v
 	netz.surface_set_material(netz.get_surface_count() - 1, material)
 
 
-## Reifen, Felgen, Scheinwerfer, Rueckleuchten, Kuehlergrill und Spiegel.
+## Reifen, Felgen und Spiegel; Lichter, Grill und Kennzeichen kommen aus der Textur.
 static func _raeder_und_licht(netz: ArrayMesh, p: Dictionary, halbringe: Array) -> void:
 	var laenge: float = p["laenge"]
 	var reifen := SurfaceTool.new()
 	var felgen := SurfaceTool.new()
-	var licht_vorn := SurfaceTool.new()
-	var licht_hinten := SurfaceTool.new()
-	var schwarz := SurfaceTool.new()
 	var spiegel := SurfaceTool.new()
-	for st in [reifen, felgen, licht_vorn, licht_hinten, schwarz, spiegel]:
+	for st in [reifen, felgen, spiegel]:
 		(st as SurfaceTool).begin(Mesh.PRIMITIVE_TRIANGLES)
 	var n: int = halbringe.size()
 	for rad: Dictionary in p["raeder"]:
@@ -224,30 +238,15 @@ static func _raeder_und_licht(netz: ArrayMesh, p: Dictionary, halbringe: Array) 
 			felge.height = 0.23
 			felge.radial_segments = 12
 			felgen.append_from(felge, 0, t)
-	var vorn := _kasten(Vector3(0.05, 0.10, 0.30))
-	var hinten := _kasten(Vector3(0.05, 0.14, 0.30))
-	var breite0: float = (halbringe[0][2] as Vector2).x
-	var breite1: float = (halbringe[n - 1][2] as Vector2).x
 	var schwelle: float = p["schwelle"]
 	for s in [1.0, -1.0]:
-		licht_vorn.append_from(vorn, 0, Transform3D(Basis(), Vector3(
-				laenge / 2.0 - 0.03, schwelle + 0.52, s * breite0 * 0.62)))
-		licht_hinten.append_from(hinten, 0, Transform3D(Basis(), Vector3(
-				-laenge / 2.0 + 0.03, schwelle + 0.62, s * breite1 * 0.66)))
 		var w: float = halbringe[roundi(0.34 * (n - 1))][2].x
 		spiegel.append_from(_kasten(Vector3(0.10, 0.09, 0.16)), 0, Transform3D(Basis(),
 				Vector3(laenge * 0.16, p["gurt"] + 0.02, s * (w + 0.06))))
-	schwarz.append_from(_kasten(Vector3(0.04, 0.13, 0.78)), 0, Transform3D(Basis(),
-			Vector3(laenge / 2.0 - 0.02, schwelle + 0.38, 0.0)))
-	for st in [reifen, felgen, licht_vorn, licht_hinten, schwarz, spiegel]:
+	for st in [reifen, felgen, spiegel]:
 		(st as SurfaceTool).generate_normals()
 	_anfuegen(netz, reifen, _material(Color(0.015, 0.015, 0.016), false, false, false, 0.95))
 	_anfuegen(netz, felgen, _material(Color(0.55, 0.56, 0.58), false, false, false, 0.35, 0.8))
-	_anfuegen(netz, licht_vorn, _material(Color(1.0, 0.97, 0.88), false, false, false, 0.2,
-			0.0, Vector3(0.9, 0.85, 0.6)))
-	_anfuegen(netz, licht_hinten, _material(Color(0.5, 0.02, 0.02), false, false, false, 0.3,
-			0.0, Vector3(0.5, 0.02, 0.02)))
-	_anfuegen(netz, schwarz, _material(Color(0.02, 0.02, 0.02), false, false, false, 0.8))
 	_anfuegen(netz, spiegel, _material(Color(0.02, 0.02, 0.02), false, false, false, 0.5))
 
 

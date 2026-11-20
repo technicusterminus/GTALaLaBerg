@@ -22,7 +22,7 @@ const INSPEKTION := Vector3(-425.9, 0.0, 461.5)
 const GEWICHT := [1.0, 2.0, 2.0, 4.0]
 const TAT_NAMEN := ["passant_beschossen", "passant_angefahren", "auto_gestohlen",
 		"polizei_beschossen"]
-const STREIFE_LACK := Color(0.85, 0.86, 0.9)
+const STREIFE_LACK := Color(0.66, 0.68, 0.74)
 
 var fokus: Node3D           ## wer gerade gesteuert wird: Figur oder Wagen
 var sterne := 0

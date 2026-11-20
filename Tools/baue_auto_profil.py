@@ -134,6 +134,33 @@ def main() -> None:
         "windschutz": [round(vorn[0] / len(halb), 4), round(vorn[1] / len(halb), 4)],
         "heckscheibe": [round(hinten[0] / len(halb), 4), round(hinten[1] / len(halb), 4)],
     }
+    # Detailtextur: die vom Bildmodell farbig ausgearbeitete Fassung der Zeichnung
+    # (Docs/Konzept/auto-farbtextur.png, gleiches Layout), sonst die Zeichnung selbst.
+    # Zugeschnitten auf die Umrisse jeder Ansicht; u laeuft ueber die Laenge (vorn = 0).
+    farbe_pfad = os.path.join(HIER, "..", "Docs", "Konzept", "auto-farbtextur.png")
+    bild_rgb = Image.open(farbe_pfad if os.path.exists(farbe_pfad) else QUELLE).convert("RGB")
+    texturen = os.path.join(HIER, "..", "Godot", "texturen")
+    os.makedirs(texturen, exist_ok=True)
+    bild_rgb.crop((int(sx0), int(sy0), int(sx1) + 1, int(sy1) + 1)).save(
+        os.path.join(texturen, "auto_seite.png"))
+    bild_rgb.crop((int(ox0), int(trenn + oy.min()), int(ox1) + 1, int(trenn + oy.max()) + 1)).save(
+        os.path.join(texturen, "auto_oben.png"))
+    profil["seite_hoehe"] = round(float((sy1 - sy0 + 1) * masst), 3)
+    profil["oben_breite"] = round(float((oy.max() - oy.min() + 1) * LAENGE_M / (ox1 - ox0 + 1)), 3)
+    # Front (unten rechts) und Heck (oben rechts) stehen rechts neben den beiden Ansichten.
+    farbig_f = np.asarray(bild_rgb).min(axis=2) < 225
+    rechts = farbig_f[:, int(breite * 0.65):]
+    for name, zeilen_von, zeilen_bis in (("heck", 0, trenn), ("front", trenn, hoehe)):
+        ys2, xs2 = np.where(rechts[zeilen_von:zeilen_bis])
+        if len(ys2) < 100:
+            continue
+        x0, x1 = xs2.min() + int(breite * 0.65), xs2.max() + int(breite * 0.65)
+        y0, y1 = ys2.min() + zeilen_von, ys2.max() + zeilen_von
+        bild_rgb.crop((int(x0), int(y0), int(x1) + 1, int(y1) + 1)).save(
+            os.path.join(texturen, f"auto_{name}.png"))
+        # Masstab: dieselbe Hoehe wie die Seitenansicht (Boden bis Dach).
+        hoehe_m = profil["seite_hoehe"]
+        profil[f"{name}_breite"] = round(float((x1 - x0 + 1) * hoehe_m / (y1 - y0 + 1)), 3)
     with open(ZIEL, "w") as f:
         json.dump(profil, f, separators=(",", ":"))
     print("LALABERG_AUTOPROFIL", {k: v for k, v in profil.items() if k not in ("dach", "halbe_breite")})
