@@ -70,6 +70,19 @@ laufen die gerechneten Schleifen.
 von 30 Sekunden. Sechs Scheiben klappen hoch (höchstens drei zugleich); jede Paintball-Kugel,
 die eine trifft, zählt 20 €. Die Bestleistung steht im Konto.
 
+**Aussehen (mit OpenRouter).** Die Konzeptbilder und mehrere Assets entstanden mit Bildmodellen
+über OpenRouter (`Tools/ueberarbeite_bild.py`, Ergebnisse in `Docs/Konzept/`):
+- *Texturen* für Dachziegel, Putz, Pflaster, Wiese und Laub (`Godot/texturen/*.jpg`), nahtlos
+  gemacht und im Shader `flach.gdshader` (Stile Fassade, Dach, Pflaster, Gelände) benutzt.
+- *Fassaden*: eingelassene Fenster mit Laibung, Rahmen, Bank und Läden per Shader.
+- *Bäume* (`baeume.gd`): Der Konverter ersetzt die Kegelnetze durch Instanzen; Laubbäume haben
+  runde Kronen aus mehreren Kugeln, Nadelbäume gestapelte Kegel.
+- *Straßenmöbel* (`strassenmoebel.gd`): Laternen, Straßenbäume und Sträucher entlang des
+  Straßennetzes, per Bodenstrahl nur dort, wo wirklich Boden ist.
+- *Autos* (`wagenmesh.gd`): Karosserie mit glatten Normalen aus den Umrissen einer vom Bildmodell
+  gezeichneten Konstruktionszeichnung (`Tools/baue_auto_profil.py`, Daten in
+  `Tools/Modelle/auto_profil.json`), mit Glas, Rädern, Leuchten und Spiegeln.
+
 **Farbdosen.** `farbdosen.gd` stellt fünfzig Dosen mit festem Zufall in das Straßennetz
 (mindestens 90 m auseinander); Einsammeln bringt 25 €, jede zehnte einen Staffelpreis.
 

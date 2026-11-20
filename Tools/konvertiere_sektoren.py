@@ -173,6 +173,11 @@ def main() -> int:
             fehlend.append(fbx.name)
             continue
         shutil.copy(fbx, ZIEL / "modelle" / fbx.name)
+    # Umrisse des neuen Autos (aus der Konstruktionszeichnung, Tools/baue_auto_profil.py).
+    profil = WURZEL / "Tools" / "Modelle" / "auto_profil.json"
+    if profil.exists():
+        shutil.copy(profil, ZIEL / "auto_profil.json")
+
     # Menschenfiguren (Quaternius, CC0) mit allen Animationen im Rig.
     for rel in ("People/Casual/Casual.fbx", "People/Worker/Worker.fbx", "Waffen/Pistol.glb",
                 "Waffen/Smg.glb", "Waffen/Shotgun.glb", "Waffen/RocketLauncher.glb"):
