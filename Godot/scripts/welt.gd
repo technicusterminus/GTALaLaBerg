@@ -925,7 +925,10 @@ func _umgebung() -> void:
 	var himmel := ProceduralSkyMaterial.new()
 	himmel.sky_top_color = Color(0.25, 0.45, 0.78)
 	himmel.sky_horizon_color = Color(0.65, 0.76, 0.88)
-	himmel.ground_horizon_color = Color(0.6, 0.64, 0.68)
+	himmel.ground_horizon_color = Color(0.62, 0.72, 0.84)
+	himmel.ground_bottom_color = Color(0.45, 0.52, 0.45)
+	himmel.sky_curve = 0.12
+	himmel.ground_curve = 0.05
 	var sky := Sky.new()
 	sky.sky_material = himmel
 	var env := Environment.new()
@@ -934,17 +937,31 @@ func _umgebung() -> void:
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.fog_enabled = true
-	env.fog_light_color = Color(0.7, 0.78, 0.88)
-	env.fog_density = 0.0004
+	env.fog_light_color = Color(0.70, 0.74, 0.80)
+	env.fog_density = 0.00028
+	env.fog_sky_affect = 0.3
+	env.fog_sun_scatter = 0.25
+	# Waermer, satter und mit leichtem Leuchten wie im Konzeptbild.
+	env.adjustment_enabled = true
+	env.adjustment_contrast = 1.08
+	env.adjustment_saturation = 1.2
+	env.glow_enabled = true
+	env.glow_intensity = 0.3
+	env.glow_bloom = 0.04
 	var we := WorldEnvironment.new()
 	we.environment = env
 	add_child(we)
 
 	var sonne := DirectionalLight3D.new()
-	sonne.rotation_degrees = Vector3(-50, 152, 0)
+	sonne.rotation_degrees = Vector3(-34, 150, 0)
+	sonne.light_color = Color(1.0, 0.89, 0.72)
 	sonne.shadow_enabled = not "--ohneschatten" in OS.get_cmdline_user_args()
-	sonne.directional_shadow_max_distance = 250.0
-	sonne.light_energy = 1.2
+	sonne.directional_shadow_max_distance = 450.0
+	sonne.light_energy = 1.25
+	# Gegen Schattenakne auf den senkrechten Waenden (streifige Flaechen im Streiflicht).
+	sonne.shadow_bias = 0.12
+	sonne.shadow_normal_bias = 3.2
+	sonne.shadow_blur = 1.6
 	add_child(sonne)
 
 

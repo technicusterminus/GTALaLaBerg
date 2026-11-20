@@ -198,6 +198,10 @@ func _material(art: String, farbe: Array) -> ShaderMaterial:
 	var m := ShaderMaterial.new()
 	m.shader = SHADER
 	m.set_shader_parameter("farbe", Vector3(farbe[0], farbe[1], farbe[2]))
+	for t in ["dach", "putz", "pflaster", "wiese"]:
+		var pfad := "res://texturen/%s.jpg" % t
+		if ResourceLoader.exists(pfad):
+			m.set_shader_parameter("detail_" + t, load(pfad))
 	if art in ["Ground", "Road", "Sidewalk", "Gehweg", "Plaza", "Rail", "Water", "Roof"]:
 		m.set_shader_parameter("oben", true)
 	match art:
@@ -210,10 +214,17 @@ func _material(art: String, farbe: Array) -> ShaderMaterial:
 		"Roof", "Wall", "Sockel", "Gesims":
 			if art == "Wall":
 				m.set_shader_parameter("stil", 3)
+			elif art == "Roof":
+				m.set_shader_parameter("stil", 4)
 			m.set_shader_parameter("rauheit", 0.8)
+		"Gehweg", "Sidewalk", "Plaza":
+			m.set_shader_parameter("stil", 5)
+			m.set_shader_parameter("rauheit", 0.9)
 		"Tree", "Trunk", "Ground":
 			if art == "Ground":
 				m.set_shader_parameter("stil", 1)
+			elif art == "Tree":
+				m.set_shader_parameter("stil", 6)
 			m.set_shader_parameter("rauheit", 1.0)
 	_materialien[schluessel] = m
 	return m
