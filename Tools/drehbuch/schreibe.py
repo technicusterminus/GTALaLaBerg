@@ -143,8 +143,32 @@ def _stufen_text(stufen, einzug) -> list:
     return z
 
 
+def uebernimm_texte(missionen) -> int:
+    """Legt die ueberarbeiteten Texte (texte.json, siehe ueberarbeite.py) ueber die Module.
+    Zaehlt, wie viele Missionen neue Texte bekommen haben."""
+    pfad = Path(__file__).parent / "texte.json"
+    if not pfad.exists():
+        return 0
+    from ueberarbeite import felder  # noqa: E402
+    neu = json.loads(pfad.read_text(encoding="utf-8"))
+    n = 0
+    for m in missionen:
+        if m["id"] not in neu:
+            continue
+        fl = list(felder(m["stufen"]))
+        if len(fl) != len(neu[m["id"]]):
+            print(f"{m['id']}: texte.json passt nicht zur Struktur, Mission bleibt alt",
+                  file=sys.stderr)
+            continue
+        for i, (obj, schluessel, _a, _w, _p) in enumerate(fl):
+            obj[schluessel] = neu[m["id"]][str(i)]
+        n += 1
+    return n
+
+
 def main() -> int:
     missionen = PROLOG + AKT1 + AKT2 + AKT3 + AKT4 + FINALE
+    neu = uebernimm_texte(missionen)
     fehler = pruefe(missionen)
     if fehler:
         print("\n".join(fehler), file=sys.stderr)
@@ -156,7 +180,8 @@ def main() -> int:
     zeilen = sum(len(sch["zeilen"]) for m in missionen for s in alle_stufen(m["stufen"])
                  for sch in s.get("schnitte", []))
     szenen = sum(1 for m in missionen for s in alle_stufen(m["stufen"]) if s["art"] == "szene")
-    print(f"{len(missionen)} Missionen, {szenen} Szenen, {zeilen} Zeilen Dialog")
+    print(f"{len(missionen)} Missionen, {szenen} Szenen, {zeilen} Zeilen Dialog, "
+          f"{neu} Missionen mit ueberarbeiteten Texten")
     return 0
 
 
