@@ -41,7 +41,9 @@ Rot, Kurven, dem Spieler und wartepflichtigen Kreuzungen (`verkehrsbremse.gd`).
 Umkreis, Leben für Spieler, Passanten und Autos, Sturz- und Anprallschaden,
 Krankenhaus mit Behandlungskosten. Die Polizei (`polizei.gd`) fahndet mit bis zu fünf
 Sternen, schickt Streifen über den Straßengraphen, sucht, sperrt ab drei Sternen die
-Straße und nimmt fest.
+Straße und nimmt fest. Ab drei Sternen steigen aus einer Streife in der Nähe zwei Beamte
+(`polizist.gd`) und laufen mit 5,5 m/s auf den Gesuchten zu; wer erreicht wird, ist
+festgenommen. Mit dem Wagen davonfahren geht, Paintball-Treffer werfen sie kurz aus dem Tritt.
 
 **Sonderfahrzeuge.** `sonderfahrzeug.gd`: ein Panzer (W/S fahren, A/D drehen, der Turm
 folgt dem Blick, Maus links feuert alle drei Sekunden eine Großkaliber-Farbkugel) und ein
@@ -121,7 +123,7 @@ Stand der Unreal-Version: Git-Historie, Commit `dea4cec`; ihre Dokumentation ste
 in `Docs/Unreal-Archiv/README-Unreal-Archiv.md`.
 
 - Insassen in den Autos, Figuren für die Polizei und die Kapseln in der Ferne
-- Überholen und der Kontakt-Einsatz der Polizei bei drei Sternen
+- Überholen
 - Keine Bildraten- oder Größenmessung gegenüber Unreal
 
 ## Hinweise

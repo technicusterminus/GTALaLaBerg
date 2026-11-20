@@ -52,7 +52,7 @@ Umgesetzt (alles mit einem Rauchtest geprüft, siehe [`Godot/README.md`](Godot/R
   (R), Musik von Lyria über OpenRouter (`Tools/erzeuge_radio.py`)
 - **Karte und Menü:** Minikarte, Vollkarte (M) und Pausenmenü (Esc)
 
-Aus der Unreal-Version noch nicht portiert: Überholen, Kontakt-Einsatz der Polizei.
+Aus der Unreal-Version noch nicht portiert: das Überholen im Verkehr.
 
 ## Werkzeuge
 

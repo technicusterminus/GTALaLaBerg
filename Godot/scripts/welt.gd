@@ -499,6 +499,9 @@ func _rauchtest_ablauf() -> void:
 	# Farbdosen: fuenfzig gestellt, zehn einsammeln bringt den Staffelpreis.
 	ok = _pruefe_dosen() and ok
 
+	# Kontakt-Einsatz: bei drei Sternen laufen Beamte los und nehmen fest.
+	ok = await _pruefe_kontakt() and ok
+
 	# Schiessbude: Runde starten, Scheiben treffen, auszahlen.
 	ok = await _pruefe_bude() and ok
 
@@ -533,6 +536,23 @@ func _pruefe_dosen() -> bool:
 	var ok := _pruefe("dosen_gestellt=%d" % farbdosen.gestellt, farbdosen.gestellt == 50)
 	return _pruefe("dosen_gesammelt=%d geld=%d" % [gesammelt, Konto.geld() - vor_geld],
 			gesammelt >= 1 and Konto.geld() - vor_geld >= gesammelt * Farbdosen.PREIS) and ok
+
+
+func _pruefe_kontakt() -> bool:
+	var vor := polizei.festnahmen
+	polizei.setze_sterne(3)
+	var p := Polizist.new()
+	p.polizei = polizei
+	add_child(p)
+	p.global_position = _boden(spieler.global_position + Vector3(5, 0, 0)) + Vector3(0, 0.3, 0)
+	var frist := 6.0
+	while polizei.festnahmen == vor and frist > 0.0:
+		await get_tree().create_timer(0.25).timeout
+		frist -= 0.25
+	var ok := _pruefe("kontakt_festnahme=%d" % (polizei.festnahmen - vor),
+			polizei.festnahmen == vor + 1 and polizei.hole_sterne() == 0)
+	await get_tree().create_timer(1.0).timeout
+	return ok
 
 
 func _pruefe_bude() -> bool:
