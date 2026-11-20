@@ -24,7 +24,7 @@ AUFTRAEGE = {
     "Blasmusik": [
         "Instrumental Bavarian brass band polka, tuba oom-pah bass, clarinet and trumpets, "
         "cheerful village festival, no vocals",
-        "Instrumental brass band march in the style of Sousa, snare drum, trombones, "
+        "Instrumental American-style brass band parade march, snare drum, trombones, "
         "piccolo flute, triumphant, no vocals",
         "Instrumental Bavarian brass waltz, warm flugelhorns and tuba, gentle and nostalgic "
         "like a beer garden evening, no vocals",
