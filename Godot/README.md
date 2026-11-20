@@ -52,6 +52,9 @@ werden mit F bestiegen; Aussteigen nur am Boden.
 Krankenwagen, Streife), Paintball-Laden, Lackiererei, ein Konto mit Spielstand, Werten
 (Ausdauer, Zielsicherheit, Fahren, Ruf), Fundstücken und Merkern.
 
+**Farbdosen.** `farbdosen.gd` stellt fünfzig Dosen mit festem Zufall in das Straßennetz
+(mindestens 90 m auseinander); Einsammeln bringt 25 €, jede zehnte einen Staffelpreis.
+
 **Reviere.** Vier Reviere mit je vier Wahrzeichen-Säulen, Bewährung, Ruf und einem Kopf
 der Mannschaft, den man stellen muss (`revier.gd`).
 
@@ -107,7 +110,7 @@ Stand der Unreal-Version: Git-Historie, Commit `dea4cec`; ihre Dokumentation ste
 in `Docs/Unreal-Archiv/README-Unreal-Archiv.md`.
 
 - Radio mit drei Sendern, Ton
-- Schießbude und die fünfzig versteckten Farbdosen
+- Schießbude
 - Waffenmodelle, Insassen in den Autos, Figuren für die Polizei und die Kapseln in der Ferne
 - Überholen und der Kontakt-Einsatz der Polizei bei drei Sternen
 - Keine Bildraten- oder Größenmessung gegenüber Unreal

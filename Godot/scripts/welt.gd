@@ -20,6 +20,7 @@ var verkehr := Verkehr.new()
 var polizei := Polizei.new()
 var auftraege := Auftraege.new()
 var laeden := Laeden.new()
+var farbdosen := Farbdosen.new()
 var revier := Revier.new()
 var drehbuch := Drehbuch.new()
 var auto: Auto
@@ -62,6 +63,8 @@ func _ready() -> void:
 	revier.polizei = polizei
 	add_child(auftraege)
 	add_child(laeden)
+	farbdosen.polizei = polizei
+	add_child(farbdosen)
 	add_child(revier)
 	drehbuch.spieler = spieler
 	drehbuch.polizei = polizei
@@ -98,6 +101,7 @@ func _fokus_auf(wer: Node3D) -> void:
 	Verkehrsauto.fokus = wer
 	auftraege.fokus = wer
 	laeden.fokus = wer
+	farbdosen.fokus = wer
 	revier.fokus = wer
 	drehbuch.fokus = wer
 	hud.ziel = wer
@@ -481,6 +485,9 @@ func _rauchtest_ablauf() -> void:
 	# Panzer und Hubschrauber.
 	ok = await _pruefe_sonder() and ok
 
+	# Farbdosen: fuenfzig gestellt, zehn einsammeln bringt den Staffelpreis.
+	ok = _pruefe_dosen() and ok
+
 	# Karte und Menue.
 	ok = await _pruefe_karte() and ok
 
@@ -496,6 +503,19 @@ func _rauchtest_ablauf() -> void:
 		spieler.global_position, auto.global_position, ki,
 		Engine.get_frames_per_second(), ok])
 	get_tree().quit(0 if ok else 1)
+
+
+func _pruefe_dosen() -> bool:
+	var vor_dosen := Konto.dosen()
+	var vor_geld := Konto.geld()
+	for i in 50:
+		if Konto.dosen() >= 10:
+			break
+		farbdosen.sammle(i)
+	var gesammelt := Konto.dosen() - vor_dosen
+	var ok := _pruefe("dosen_gestellt=%d" % farbdosen.gestellt, farbdosen.gestellt == 50)
+	return _pruefe("dosen_gesammelt=%d geld=%d" % [gesammelt, Konto.geld() - vor_geld],
+			gesammelt >= 1 and Konto.geld() - vor_geld >= gesammelt * Farbdosen.PREIS) and ok
 
 
 func _pruefe_karte() -> bool:

@@ -76,6 +76,11 @@ func _lade_netz() -> void:
 
 # --- Auskunft ---------------------------------------------------------------
 
+## Die Knoten des Strassennetzes (Meter, Godot-Achsen), z. B. zum Verteilen von Sammelstuecken.
+func netz_knoten() -> PackedVector3Array:
+	return _knoten
+
+
 func hole_sterne() -> int:
 	return sterne
 
