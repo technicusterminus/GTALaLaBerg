@@ -179,8 +179,8 @@ func _vorbereiten() -> void:
 	_mat_licht.emission_energy_multiplier = 1.2
 	_lampe = ArrayMesh.new()
 	var mast := CylinderMesh.new()
-	mast.top_radius = 0.05
-	mast.bottom_radius = 0.09
+	mast.top_radius = 0.035
+	mast.bottom_radius = 0.06
 	mast.height = 5.0
 	mast.radial_segments = 6
 	mast.rings = 1

@@ -324,6 +324,9 @@ void fragment() {
 	} else if (stil == 4) {
 		if (abs(wn.y) > 0.2) {
 			c = dach(farbe, wn, px);
+		} else if (fassade_foto) {
+			// Senkrechte Teile der Dachflaeche (Giebeldreiecke): wie eine Hauswand behandeln.
+			c = fassade(farbe, wn, normalize((INV_VIEW_MATRIX * vec4(VIEW, 0.0)).xyz), px);
 		}
 	} else if (stil == 7) {
 		if (in_altstadt(welt)) {

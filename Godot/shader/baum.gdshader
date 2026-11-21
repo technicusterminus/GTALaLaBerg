@@ -15,7 +15,8 @@ void vertex() {
 
 void fragment() {
 	vec2 uv = welt.xz * 0.55 + welt.y * vec2(0.9, 0.6);
-	vec3 blatt = texture(laub, uv).rgb;
+	// Kontrast der Blatttextur zurueckgenommen (sonst flimmern dunkle Splitter beim Gehen).
+	vec3 blatt = mix(textureLod(laub, uv, 9.0).rgb, texture(laub, uv).rgb, 0.55);
 	float oben = clamp(NORMAL.y * 0.5 + 0.55, 0.0, 1.0);
 	ALBEDO = blatt * grundton * ton.rgb * (0.55 + 0.7 * oben);
 	ROUGHNESS = 0.95;

@@ -211,6 +211,16 @@ func _baue_sektor(d: Dictionary) -> void:
 	sektor_bereit.emit(id)
 
 
+## Fotofelder der Fassade (vom Bildmodell) an ein Material haengen; ohne sie zeichnet der Shader
+## die Fenster selbst.
+func _fassadentexturen(m: ShaderMaterial) -> void:
+	if not ResourceLoader.exists("res://texturen/fenster_a.jpg"):
+		return
+	for f in ["a", "b", "c", "d", "e"]:
+		m.set_shader_parameter("fenster_" + f, load("res://texturen/fenster_%s.jpg" % f))
+	m.set_shader_parameter("fassade_foto", true)
+
+
 func _material(art: String, farbe: Array) -> ShaderMaterial:
 	var schluessel := "%s|%s|%s|%s" % [art, farbe[0], farbe[1], farbe[2]]
 	if _materialien.has(schluessel):
@@ -242,13 +252,10 @@ func _material(art: String, farbe: Array) -> ShaderMaterial:
 		"Roof", "Wall", "Sockel", "Gesims":
 			if art == "Wall":
 				m.set_shader_parameter("stil", 3)
-				var da := ResourceLoader.exists("res://texturen/fenster_a.jpg")
-				if da:
-					for f in ["a", "b", "c", "d", "e"]:
-						m.set_shader_parameter("fenster_" + f, load("res://texturen/fenster_%s.jpg" % f))
-					m.set_shader_parameter("fassade_foto", true)
+				_fassadentexturen(m)
 			elif art == "Roof":
 				m.set_shader_parameter("stil", 4)
+				_fassadentexturen(m)   # fuer die senkrechten Giebeldreiecke der Dachflaeche
 			m.set_shader_parameter("rauheit", 0.8)
 		"Gehweg", "Sidewalk", "Plaza":
 			m.set_shader_parameter("stil", 5)
