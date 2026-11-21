@@ -86,6 +86,21 @@ die eine trifft, zählt 20 €. Die Bestleistung steht im Konto.
   gezeichneten Konstruktionszeichnung (`Tools/baue_auto_profil.py`, Daten in
   `Tools/Modelle/auto_profil.json`), mit Glas, Rädern, Leuchten und Spiegeln.
 
+**Relief.** Die Geländedaten sind echtes Höhenrelief (2 bis 66 m) und wirkten im Spiel viel zu steil.
+`Tools/hoehen.py` staucht es beim Umrechnen (`LALABERG_RELIEF`, Standard 0,4, 1,0 schaltet es
+aus): Bodenpunkte (Boden, Straßen, Plätze, Wasser) werden um diesen Faktor gestaucht, alles, was am
+Ort steht (Häuser, Bäume, Routen, Ampeln, Netz, Startpunkt), um dieselbe Verschiebung. Straßen
+über 20° Neigung: 0,8 % → 0 %, Plätze 7,7 % → 0,4 %.
+
+**Sprache und Musik (OpenRouter).** `Tools/erzeuge_sprache.py` vertont alle 250 Dialog- und
+Funkzeilen mit `gpt-audio-mini` (je Figur eine Stimme), `Tools/erzeuge_musik.py` erzeugt vier
+Stücke mit Lyria (Menü, Fahrt, Hubschrauber, Verfolgung). Das Kino (`kino.gd`) spielt die Zeilen,
+`musik.gd` wählt das Stück nach Lage. Die Dateien liegen in `Godot/daten/sprache` und
+`Godot/daten/musik` (nicht im Repo; ohne sie bleibt es stumm).
+
+**Altstadt.** Innerhalb des Altstadt-Rechtecks tragen die Wände Fachwerk (vier Module vom
+Bildmodell, kräftige Hausfarben) und die Straßen Kopfsteinpflaster (`flach.gdshader`).
+
 **Farbdosen.** `farbdosen.gd` stellt fünfzig Dosen mit festem Zufall in das Straßennetz
 (mindestens 90 m auseinander); Einsammeln bringt 25 €, jede zehnte einen Staffelpreis.
 
