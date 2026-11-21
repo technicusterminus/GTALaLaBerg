@@ -83,12 +83,12 @@ func _baue_blaulicht() -> void:
 		var b := BoxMesh.new()
 		b.size = Vector3(0.35, 0.12, 0.3)
 		m.mesh = b
-		m.position = Vector3(0.1, 1.2, -0.5 if i == 0 else 0.5)
+		m.position = Vector3(-0.6, 1.6, -0.45 if i == 0 else 0.45)
 		m.material_override = StandardMaterial3D.new()
 		m.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(m)
 		_leuchten.append(m)
-	_blaulicht.position = Vector3(0.1, 1.7, 0)
+	_blaulicht.position = Vector3(-0.6, 2.0, 0)
 	_blaulicht.omni_range = 22.0
 	_blaulicht.light_energy = 0.0
 	_blaulicht.shadow_enabled = false

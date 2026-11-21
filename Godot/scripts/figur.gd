@@ -69,6 +69,8 @@ func clip() -> String:
 ## Stellt das Modell so, dass die Figur HOEHE Meter hoch ist und mit den Fuessen auf y = 0
 ## steht. Wird einmal nach dem Einhaengen gerufen, wenn die Groesse bekannt ist.
 func passe_an() -> void:
+	if not is_inside_tree():
+		return   # noch nicht im Baum: ohne Weltlage laesst sich nichts messen
 	var box := _huelle(_innen)
 	if box.size.y < 0.01:
 		return

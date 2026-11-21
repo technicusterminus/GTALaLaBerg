@@ -22,7 +22,7 @@ const INSPEKTION := Vector3(-425.9, 0.0, 461.5)
 const GEWICHT := [1.0, 2.0, 2.0, 4.0]
 const TAT_NAMEN := ["passant_beschossen", "passant_angefahren", "auto_gestohlen",
 		"polizei_beschossen"]
-const STREIFE_LACK := Color(0.85, 0.86, 0.9)
+const STREIFE_LACK := Color(0.66, 0.68, 0.74)
 
 var fokus: Node3D           ## wer gerade gesteuert wird: Figur oder Wagen
 var sterne := 0
@@ -35,6 +35,7 @@ var einsatz_min_m := 250.0
 var einsatz_max_m := 450.0
 
 var _knoten := PackedVector3Array()
+var _kanten := PackedInt32Array()   ## Knotenpaare (a < b), ungerichtet und ohne Doppelte
 var _astar := AStar3D.new()
 var _punkte := 0.0
 var _gesehen := false
@@ -68,14 +69,26 @@ func _lade_netz() -> void:
 		_knoten.append(pos)
 		_astar.add_point(_knoten.size() - 1, pos)
 	var kanten := 0
+	var gesehen := {}
 	for i in range(0, e.size() - 2, 3):
 		# Gerichtete Kanten: Einbahnstrassen bleiben Einbahnstrassen.
 		_astar.connect_points(int(e[i]), int(e[i + 1]), false)
 		kanten += 1
+		var lo := mini(int(e[i]), int(e[i + 1]))
+		var hi := maxi(int(e[i]), int(e[i + 1]))
+		if not gesehen.has(lo * 100000 + hi):
+			gesehen[lo * 100000 + hi] = true
+			_kanten.append(lo)
+			_kanten.append(hi)
 	print("LALABERG_POLIZEI netz knoten=%d kanten=%d" % [_knoten.size(), kanten])
 
 
 # --- Auskunft ---------------------------------------------------------------
+
+## Die Strassenabschnitte als Knotenpaare (Indizes in netz_knoten()), jeder nur einmal.
+func netz_kanten() -> PackedInt32Array:
+	return _kanten
+
 
 ## Die Knoten des Strassennetzes (Meter, Godot-Achsen), z. B. zum Verteilen von Sammelstuecken.
 func netz_knoten() -> PackedVector3Array:

@@ -175,13 +175,20 @@ func _pfeil(zeichner: Control, mitte: Vector2, groesse: float) -> void:
 
 
 func _zeichne_mini() -> void:
-	_mini.draw_rect(Rect2(Vector2.ZERO, _mini.size), Color(0.1, 0.12, 0.16))
 	if _bild == null or fokus == null:
 		return
 	var halb := MINI_SICHT_M / _m_je_px / 2.0
 	var mitte := bild_punkt(fokus.global_position)
 	var quelle := Rect2(mitte - Vector2(halb, halb), Vector2(halb, halb) * 2.0)
-	_mini.draw_texture_rect_region(_bild, Rect2(Vector2.ZERO, _mini.size), quelle)
+	var kreis := PackedVector2Array()
+	var uvs := PackedVector2Array()
+	var radius := _mini.size.x / 2.0
+	for i in 64:
+		var w := TAU * float(i) / 64.0
+		var d := Vector2(cos(w), sin(w))
+		kreis.append(_mini.size / 2.0 + d * radius)
+		uvs.append((quelle.get_center() + d * halb) / _bild.get_size())
+	_mini.draw_colored_polygon(kreis, Color.WHITE, uvs, _bild)
 	var faktor := _mini.size.x / (halb * 2.0)
 	var mitte_mini := _mini.size / 2.0
 	if auftraege != null and auftraege.unterwegs:
@@ -189,7 +196,7 @@ func _zeichne_mini() -> void:
 		d = d.limit_length(MINI_PX / 2.0 - 8.0)
 		_mini.draw_circle(mitte_mini + d, 6.0, ZIEL)
 	_pfeil(_mini, mitte_mini, 9.0)
-	_mini.draw_rect(Rect2(Vector2.ZERO, _mini.size), RAND, false, 3.0)
+	_mini.draw_arc(_mini.size / 2.0, radius - 1.5, 0.0, TAU, 64, Color(0.65, 0.8, 1.0, 0.9), 3.0, true)
 
 
 func _zeichne_gross() -> void:

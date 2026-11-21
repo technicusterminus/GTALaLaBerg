@@ -346,9 +346,10 @@ func _stufe_film(s: Dictionary, id: int) -> bool:
 			await kino.zeige_titel(s["text"], s["unter"], float(s["dauer"]))
 		"funk":
 			var f := figur(s["wer"])
-			kino.funk(f.get("name", s["wer"]), f.get("farbe", "#ffffff"), s["text"])
+			var gesprochen := kino.funk(f.get("name", s["wer"]), f.get("farbe", "#ffffff"), s["text"],
+					s.get("id", ""))
 			if not test_modus:
-				var dauer := clampf(s["text"].length() * 0.055 + 1.5, 3.0, 7.0)
+				var dauer := maxf(clampf(s["text"].length() * 0.055 + 1.5, 3.0, 7.0), gesprochen + 0.3)
 				await get_tree().create_timer(dauer).timeout
 		"wahl":
 			var nr: int = await kino.frage(s["frage"], s["optionen"])

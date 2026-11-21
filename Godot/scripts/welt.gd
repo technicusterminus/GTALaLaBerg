@@ -23,6 +23,8 @@ var laeden := Laeden.new()
 var farbdosen := Farbdosen.new()
 var radio := Radio.new()
 var schiessbude := Schiessbude.new()
+var moebel := Strassenmoebel.new()
+var musik := Musik.new()
 var revier := Revier.new()
 var drehbuch := Drehbuch.new()
 var auto: Auto
@@ -69,6 +71,14 @@ func _ready() -> void:
 	farbdosen.polizei = polizei
 	add_child(farbdosen)
 	add_child(schiessbude)
+	moebel.stadt = stadt
+	moebel.polizei = polizei
+	add_child(moebel)
+	musik.welt = self
+	musik.karte = karte
+	musik.polizei = polizei
+	musik.radio = radio
+	add_child(musik)
 	add_child(revier)
 	drehbuch.spieler = spieler
 	drehbuch.polizei = polizei
@@ -374,9 +384,10 @@ func _process(delta: float) -> void:
 	hud.revier_text = revier.hud_text()
 	hud.laden_text = laeden.menue_text()
 	hud.bude_text = schiessbude.hud_text()
-	hud.status = "Leben %d    %d €    %s    Ruf %d" % [
-		ceili(spieler.leben), Konto.geld(), spieler.waffe.art_name(),
-		Konto.stufe(Konto.Wert.RUF)]
+	hud.leben = ceili(spieler.leben)
+	hud.geld = Konto.geld()
+	hud.waffe = spieler.waffe.art_name()
+	hud.ruf = Konto.stufe(Konto.Wert.RUF)
 	if _filmtest and not _bildpfad.is_empty():
 		_rauch_zeit += delta
 		# Zwei Bilder aus dem Film: der Prolog beginnt von selbst.
@@ -518,10 +529,15 @@ func _rauchtest_ablauf() -> void:
 	ok = await _pruefe_drehbuch() and ok
 
 	await get_tree().create_timer(maxf(0.0, 22.0 - _rauch_zeit)).timeout
+	ok = _pruefe("baeume=%d_gauben=%d" % [stadt.baeume, stadt.gauben],
+			stadt.baeume > 20 and stadt.gauben > 5) and ok
+	ok = _pruefe("moebel=%s" % [moebel.gestellt], moebel.gestellt["lampen"] > 5
+			and moebel.gestellt["baeume"] > 5 and moebel.gestellt["buesche"] > 5) and ok
 	var ki := verkehr.bewegung()
 	ok = _pruefe("verkehr", ki > 1.0) and ok
 	var knoten := verkehr.bewegung_knoten()
 	ok = _pruefe("verkehr_knoten_bewegt=%.1f" % knoten, knoten > 1.0) and ok
+	await _bild_am_ort()
 	print("LALABERG_RAUCHTEST ende pos=%s auto=%s ki_bewegt=%.1f fps=%d ok=%s" % [
 		spieler.global_position, auto.global_position, ki,
 		Engine.get_frames_per_second(), ok])
@@ -579,9 +595,38 @@ func _pruefe_kontakt() -> bool:
 	return ok
 
 
+## Eine echte Kugel aus der Pistole, vom Stand aus auf eine hochstehende Scheibe.
+func _pruefe_bude_schuss() -> bool:
+	spieler.global_position = _boden(schiessbude.stand()) + Vector3(0, 0.3, 0)
+	schiessbude.test_oben = true
+	schiessbude.starte()
+	var frist := 6.0
+	while schiessbude.hochstehende().is_empty() and frist > 0.0:
+		await get_tree().create_timer(0.1).timeout
+		frist -= 0.1
+	var versuche := 0
+	while schiessbude.treffer_runde == 0 and versuche < 8 and schiessbude.laeuft:
+		var oben := schiessbude.hochstehende()
+		if not oben.is_empty():
+			spieler.feuere_auf(oben[0].global_position)
+			versuche += 1
+		# Physikschritte statt Zeit: im Render-Lauf mit Schatten laeuft das Spiel mit 1 bis 2
+		# Bildern je Sekunde, die Kugel braucht aber ihre Schritte, um anzukommen.
+		for i in 40:
+			await get_tree().physics_frame
+	var treffer := schiessbude.treffer_runde
+	schiessbude.test_oben = false
+	schiessbude.beende()
+	return _pruefe("bude_echter_schuss_treffer=%d_versuche=%d" % [treffer, versuche], treffer >= 1)
+
+
 func _pruefe_bude() -> bool:
+	var echt := await _pruefe_bude_schuss()
 	var gestartet := schiessbude.starte()
-	await get_tree().create_timer(2.5).timeout
+	var frist := 6.0
+	while schiessbude.hochstehende().is_empty() and frist > 0.0:
+		await get_tree().create_timer(0.1).timeout
+		frist -= 0.1
 	var oben := schiessbude.hochstehende()
 	for k in oben:
 		schiessbude.treffer(k)
@@ -592,7 +637,7 @@ func _pruefe_bude() -> bool:
 	var lohn := Konto.geld() - geld0
 	return _pruefe("bude_start=%s_treffer=%d_lohn=%d" % [gestartet, treffer, lohn],
 			gestartet and treffer >= 1 and lohn == treffer * Schiessbude.PREIS
-			and Konto.beste_bude() >= treffer)
+			and Konto.beste_bude() >= treffer) and echt
 
 
 func _pruefe_radio() -> bool:
@@ -627,6 +672,19 @@ func _pruefe_karte() -> bool:
 	karte.schalte_vollkarte(false)
 	await get_tree().process_frame
 	return _pruefe("vollkarte", voll and not get_tree().paused) and ok
+
+
+## Mit --bildort=<Ortsname> steht am Ende ein Bild von diesem Ort (nur fuer Screenshots).
+func _bild_am_ort() -> void:
+	if _bildpfad.is_empty():
+		return
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--bildort="):
+			var name := arg.substr(10)
+			get_tree().call_group("welt", "versetze_spieler",
+					polizei.naechster_punkt(Orte.mitte(name)))
+			await get_tree().create_timer(14.0).timeout
+			_bild("ort")
 
 
 func _pruefe_sonder() -> bool:
@@ -904,7 +962,10 @@ func _umgebung() -> void:
 	var himmel := ProceduralSkyMaterial.new()
 	himmel.sky_top_color = Color(0.25, 0.45, 0.78)
 	himmel.sky_horizon_color = Color(0.65, 0.76, 0.88)
-	himmel.ground_horizon_color = Color(0.6, 0.64, 0.68)
+	himmel.ground_horizon_color = Color(0.62, 0.72, 0.84)
+	himmel.ground_bottom_color = Color(0.45, 0.52, 0.45)
+	himmel.sky_curve = 0.12
+	himmel.ground_curve = 0.05
 	var sky := Sky.new()
 	sky.sky_material = himmel
 	var env := Environment.new()
@@ -913,17 +974,31 @@ func _umgebung() -> void:
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	env.fog_enabled = true
-	env.fog_light_color = Color(0.7, 0.78, 0.88)
-	env.fog_density = 0.0004
+	env.fog_light_color = Color(0.70, 0.74, 0.80)
+	env.fog_density = 0.00028
+	env.fog_sky_affect = 0.3
+	env.fog_sun_scatter = 0.25
+	# Waermer, satter und mit leichtem Leuchten wie im Konzeptbild.
+	env.adjustment_enabled = true
+	env.adjustment_contrast = 1.08
+	env.adjustment_saturation = 1.08
+	env.glow_enabled = true
+	env.glow_intensity = 0.3
+	env.glow_bloom = 0.04
 	var we := WorldEnvironment.new()
 	we.environment = env
 	add_child(we)
 
 	var sonne := DirectionalLight3D.new()
-	sonne.rotation_degrees = Vector3(-50, 152, 0)
+	sonne.rotation_degrees = Vector3(-34, 150, 0)
+	sonne.light_color = Color(1.0, 0.89, 0.72)
 	sonne.shadow_enabled = not "--ohneschatten" in OS.get_cmdline_user_args()
-	sonne.directional_shadow_max_distance = 250.0
-	sonne.light_energy = 1.2
+	sonne.directional_shadow_max_distance = 450.0
+	sonne.light_energy = 1.25
+	# Gegen Schattenakne auf den senkrechten Waenden (streifige Flaechen im Streiflicht).
+	sonne.shadow_bias = 0.12
+	sonne.shadow_normal_bias = 3.2
+	sonne.shadow_blur = 1.6
 	add_child(sonne)
 
 

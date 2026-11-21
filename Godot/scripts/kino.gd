@@ -17,6 +17,7 @@ var _kam := Camera3D.new()
 var _oben := ColorRect.new()
 var _unten := ColorRect.new()
 var _untertitel := RichTextLabel.new()
+var _sprecher := AudioStreamPlayer.new()
 var _karte := ColorRect.new()
 var _karte_text := Label.new()
 var _karte_unter := Label.new()
@@ -68,6 +69,8 @@ func _ready() -> void:
 	_untertitel.offset_bottom = -20
 	_untertitel.visible = false
 	add_child(_untertitel)
+	_sprecher.volume_db = 0.0
+	add_child(_sprecher)
 
 	_karte.color = Color(0, 0, 0, 0)
 	_karte.anchor_right = 1.0
@@ -196,7 +199,7 @@ func _spiele_schnitt(sch: Dictionary, db: Drehbuch) -> void:
 		var farbe: String = f.get("farbe", "#ffffff")
 		_untertitel.text = "[color=%s][b]%s[/b][/color]   %s" % [farbe, name, z["text"]]
 		_untertitel.visible = true
-		var dauer := _zeilen_dauer(z["text"])
+		var dauer := maxf(_zeilen_dauer(z["text"]), _spreche(z.get("id", "")) + 0.35)
 		await _warte(dauer)
 		verstrichen += dauer
 	_untertitel.visible = false
@@ -204,6 +207,22 @@ func _spiele_schnitt(sch: Dictionary, db: Drehbuch) -> void:
 	if rest > 0.05:
 		await _warte(rest)
 	_raeume_figuren()
+
+
+## Spricht die Zeile mit dieser Kennung, wenn es eine Sprachdatei gibt (erzeuge_sprache.py);
+## liefert die Laenge in Sekunden, 0 ohne Datei und in schnellen Testlaeufen.
+func _spreche(kennung: String) -> float:
+	if kennung == "" or test_schnell:
+		return 0.0
+	var pfad := "res://daten/sprache/%s.ogg" % kennung
+	if not ResourceLoader.exists(pfad):
+		return 0.0
+	var strom := load(pfad) as AudioStream
+	if strom == null:
+		return 0.0
+	_sprecher.stream = strom
+	_sprecher.play()
+	return strom.get_length()
 
 
 func _zeilen_dauer(text: String) -> float:
@@ -271,6 +290,9 @@ func _baue_figuren(sch: Dictionary, zeilen: Array, ziel: Dictionary, db: Drehbuc
 		pos.y = db.boden_y(pos, _ziel.y)
 		var gestalt := _gestalt(f)
 		get_tree().current_scene.add_child(gestalt)
+		for kind in gestalt.get_children():
+			if kind is Figur:
+				(kind as Figur).passe_an()   # erst jetzt im Baum, jetzt laesst es sich messen
 		gestalt.global_position = pos
 		gestalt.look_at(Vector3(_ziel.x, pos.y, _ziel.z))
 		_figuren.append(gestalt)
@@ -281,7 +303,6 @@ func _gestalt(f: Dictionary) -> Node3D:
 	var figur: Figur = Figur.neu(hash(String(f.get("name", "")))) if Figur.verfuegbar() else null
 	if figur != null:
 		wurzel.add_child(figur)
-		figur.passe_an()
 		figur.spiele("Idle_Neutral")
 		_name_schild(wurzel, f)
 		return wurzel
@@ -365,7 +386,10 @@ func frage(text: String, optionen: Array) -> int:
 
 
 ## Ein Funkspruch oben im Bild, blendet nach sechs Sekunden aus; kein Warten.
-func funk(name: String, farbe: String, text: String) -> void:
+func funk(name: String, farbe: String, text: String, kennung := "") -> float:
 	_funk.text = "[color=%s][b]📻 %s[/b][/color]   %s" % [farbe, name, text]
 	_funk.visible = true
-	_funk_bis = Time.get_ticks_msec() / 1000.0 + clampf(text.length() * 0.06 + 2.5, 4.0, 9.0)
+	var gesprochen := _spreche(kennung)
+	_funk_bis = Time.get_ticks_msec() / 1000.0 + maxf(clampf(text.length() * 0.06 + 2.5, 4.0, 9.0),
+			gesprochen + 0.5)
+	return gesprochen

@@ -14,6 +14,8 @@ const SHADER := preload("res://shader/flach.gdshader")
 var fokus: Node3D
 var sektorgroesse := 500.0
 var spawn := {}
+var baeume := 0   ## wie viele Baum-Instanzen bisher gestellt wurden
+var gauben := 0   ## ... und Dachgauben
 
 var _eintraege := {}    # Vector2i -> Verzeichniseintrag
 var _geladen := {}      # id -> Node3D
@@ -23,6 +25,7 @@ var _sperre := Mutex.new()
 var _materialien := {}
 var _kopf_typ := -1     # Variant-Typkennung von PackedVector3Array, -1 = langsamer Weg
 var _takt := 0.0
+var _altstadt_m := Vector4.ZERO   ## x0, z0, x1, z1 der Altstadt in Metern
 
 
 func _ready() -> void:
@@ -36,6 +39,11 @@ func _ready() -> void:
 	for e in verz["sektoren"]:
 		_eintraege[Vector2i(int(e["index"][0]), int(e["index"][1]))] = e
 	_kopf_typ = _pruefe_schnellen_weg()
+	var orte = JSON.parse_string(FileAccess.get_file_as_string("res://daten/orte.json"))
+	if orte is Dictionary and orte.has("altstadt"):
+		var a: Array = orte["altstadt"]   # Zentimeter: x0, y0, x1, y1 -> Meter: x0, z0, x1, z1
+		_altstadt_m = Vector4(minf(a[0], a[2]), minf(a[1], a[3]), maxf(a[0], a[2]),
+				maxf(a[1], a[3])) / 100.0
 	print("LALABERG_STADT sektoren=%d schneller_weg=%s" % [_eintraege.size(), _kopf_typ >= 0])
 
 
@@ -106,8 +114,17 @@ func _lese(e: Dictionary) -> void:
 	var c := FileAccess.open("res://daten/sektoren/%s.col" % e["id"], FileAccess.READ)
 	if c != null and int(e["kollision_ecken"]) > 0:
 		flaechen = _zu_vec3(c.get_buffer(int(e["kollision_ecken"]) * 12).to_float32_array())
+	var gauben := PackedFloat32Array()
+	var gf := FileAccess.open("res://daten/sektoren/%s.gauben" % e["id"], FileAccess.READ)
+	if gf != null and int(e.get("gauben", 0)) > 0:
+		gauben = gf.get_buffer(int(e["gauben"]) * Gauben.SPALTEN * 4).to_float32_array()
+	var baeume := PackedFloat32Array()
+	var bf := FileAccess.open("res://daten/sektoren/%s.baeume" % e["id"], FileAccess.READ)
+	if bf != null and int(e.get("baeume", 0)) > 0:
+		baeume = bf.get_buffer(int(e["baeume"]) * Baeume.SPALTEN * 4).to_float32_array()
 	_sperre.lock()
-	_fertig.append({"eintrag": e, "abschnitte": abschnitte, "flaechen": flaechen})
+	_fertig.append({"eintrag": e, "abschnitte": abschnitte, "flaechen": flaechen, "baeume": baeume,
+			"gauben": gauben})
 	_sperre.unlock()
 
 
@@ -176,6 +193,9 @@ func _baue_sektor(d: Dictionary) -> void:
 	instanz.visibility_range_end = SICHTWEITE
 	wurzel.add_child(instanz)
 
+	baeume += Baeume.stelle(wurzel, d["baeume"])
+	gauben += Gauben.stelle(wurzel, d["gauben"])
+
 	var flaechen: PackedVector3Array = d["flaechen"]
 	if flaechen.size() > 0:
 		var form := ConcavePolygonShape3D.new()
@@ -191,6 +211,16 @@ func _baue_sektor(d: Dictionary) -> void:
 	sektor_bereit.emit(id)
 
 
+## Fotofelder der Fassade (vom Bildmodell) an ein Material haengen; ohne sie zeichnet der Shader
+## die Fenster selbst.
+func _fassadentexturen(m: ShaderMaterial) -> void:
+	if not ResourceLoader.exists("res://texturen/fenster_a.jpg"):
+		return
+	for f in ["a", "b", "c", "d", "e"]:
+		m.set_shader_parameter("fenster_" + f, load("res://texturen/fenster_%s.jpg" % f))
+	m.set_shader_parameter("fassade_foto", true)
+
+
 func _material(art: String, farbe: Array) -> ShaderMaterial:
 	var schluessel := "%s|%s|%s|%s" % [art, farbe[0], farbe[1], farbe[2]]
 	if _materialien.has(schluessel):
@@ -198,6 +228,16 @@ func _material(art: String, farbe: Array) -> ShaderMaterial:
 	var m := ShaderMaterial.new()
 	m.shader = SHADER
 	m.set_shader_parameter("farbe", Vector3(farbe[0], farbe[1], farbe[2]))
+	if _altstadt_m != Vector4.ZERO:
+		m.set_shader_parameter("altstadt", _altstadt_m)
+	for t in ["a", "b", "c", "d"]:
+		var fpfad := "res://texturen/fachwerk_%s.jpg" % t
+		if ResourceLoader.exists(fpfad):
+			m.set_shader_parameter("fachwerk_" + t, load(fpfad))
+	for t in ["dach", "putz", "pflaster", "wiese"]:
+		var pfad := "res://texturen/%s.jpg" % t
+		if ResourceLoader.exists(pfad):
+			m.set_shader_parameter("detail_" + t, load(pfad))
 	if art in ["Ground", "Road", "Sidewalk", "Gehweg", "Plaza", "Rail", "Water", "Roof"]:
 		m.set_shader_parameter("oben", true)
 	match art:
@@ -206,12 +246,25 @@ func _material(art: String, farbe: Array) -> ShaderMaterial:
 			m.set_shader_parameter("rauheit", 0.1)
 			m.set_shader_parameter("glanz", 1.0)
 		"Road", "Rail":
+			if art == "Road":
+				m.set_shader_parameter("stil", 7)
 			m.set_shader_parameter("rauheit", 0.85)
 		"Roof", "Wall", "Sockel", "Gesims":
+			if art == "Wall":
+				m.set_shader_parameter("stil", 3)
+				_fassadentexturen(m)
+			elif art == "Roof":
+				m.set_shader_parameter("stil", 4)
+				_fassadentexturen(m)   # fuer die senkrechten Giebeldreiecke der Dachflaeche
 			m.set_shader_parameter("rauheit", 0.8)
+		"Gehweg", "Sidewalk", "Plaza":
+			m.set_shader_parameter("stil", 5)
+			m.set_shader_parameter("rauheit", 0.9)
 		"Tree", "Trunk", "Ground":
 			if art == "Ground":
 				m.set_shader_parameter("stil", 1)
+			elif art == "Tree":
+				m.set_shader_parameter("stil", 6)
 			m.set_shader_parameter("rauheit", 1.0)
 	_materialien[schluessel] = m
 	return m
