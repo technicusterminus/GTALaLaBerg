@@ -194,7 +194,9 @@ vec3 fassade_fotos(vec3 wand, vec3 n, float px) {
 		float putzf = (1.0 - smoothstep(0.07, 0.20, saettf)) * (1.0 - smoothstep(0.62, 0.80, lumf))
 				* smoothstep(0.20, 0.34, lumf);
 		vec3 farbe_alt = altstadtfarbe(hash21(floor(welt.xz / 6.0)));
-		return mix(fw, farbe_alt * clamp(lumf / 0.50, 0.0, 1.35), putzf);
+		vec3 pastell = mix(farbe_alt, vec3(dot(farbe_alt, vec3(0.333))) + vec3(0.12), 0.45);
+		vec3 balken = fw * vec3(1.15, 1.0, 0.85);   // warmes Dunkelbraun statt fast Schwarz
+		return mix(balken, pastell * clamp(lumf / 0.50, 0.0, 1.35), putzf);
 	}
 	if (zufall < 0.20) {
 		tc = textureLod(fenster_a, uv, stufe_).rgb;
@@ -270,7 +272,8 @@ vec3 pflaster(vec3 farbe_daten, float px) {
 	vec3 foto = textureLod(detail_pflaster, uv / 1.9, stufe(px, 1.9)).rgb;
 	float foto_da = dot(textureLod(detail_pflaster, uv, 9.0).rgb, vec3(0.333));
 	if (foto_da > 0.02) {
-		vec3 gefaerbt = foto * mix(vec3(1.0), farbe_daten * 2.2, 0.3);
+		vec3 grau = vec3(dot(foto, vec3(0.333)));
+		vec3 gefaerbt = mix(foto, grau, 0.35) * 0.82 * mix(vec3(1.0), farbe_daten * 2.2, 0.3);
 		return mix(gefaerbt, farbe_daten * 0.9, smoothstep(0.08, 0.3, px * 1.6));
 	}
 	float fuge = smoothstep(0.0, 0.1, f.x) * smoothstep(1.0, 0.9, f.x) * smoothstep(0.0, 0.12, f.y)

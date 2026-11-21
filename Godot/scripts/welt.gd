@@ -971,8 +971,13 @@ func _umgebung() -> void:
 	var env := Environment.new()
 	env.background_mode = Environment.BG_SKY
 	env.sky = sky
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	# Feste, warme Umgebungsfarbe statt Himmel: sonst sind die Schatten knallblau.
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	env.ambient_light_color = Color(0.62, 0.58, 0.52)
+	env.ambient_light_energy = 0.65
+	env.tonemap_mode = Environment.TONE_MAPPER_ACES
+	env.tonemap_exposure = 0.82
+	env.tonemap_white = 6.0
 	env.fog_enabled = true
 	env.fog_light_color = Color(0.70, 0.74, 0.80)
 	env.fog_density = 0.00028
@@ -994,7 +999,7 @@ func _umgebung() -> void:
 	sonne.light_color = Color(1.0, 0.89, 0.72)
 	sonne.shadow_enabled = not "--ohneschatten" in OS.get_cmdline_user_args()
 	sonne.directional_shadow_max_distance = 450.0
-	sonne.light_energy = 1.25
+	sonne.light_energy = 1.1
 	# Gegen Schattenakne auf den senkrechten Waenden (streifige Flaechen im Streiflicht).
 	sonne.shadow_bias = 0.12
 	sonne.shadow_normal_bias = 3.2
