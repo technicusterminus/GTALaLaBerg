@@ -16,6 +16,7 @@ static var _laub: ArrayMesh
 static var _nadel: ArrayMesh
 static var _stamm: ArrayMesh
 static var _mat_laub: ShaderMaterial
+static var _mat_laub2: ShaderMaterial
 static var _mat_nadel: ShaderMaterial
 static var _mat_stamm: StandardMaterial3D
 
@@ -32,7 +33,14 @@ static func stelle(wurzel: Node3D, zeilen: PackedFloat32Array, mit_stamm := true
 		var radius := zeilen[i * SPALTEN + 4]
 		var hoehe := zeilen[i * SPALTEN + 5]
 		(nadel if hoehe > radius * NADEL_VERHAELTNIS else laub).append(i)
-	_krone(wurzel, zeilen, laub, _laub, _mat_laub)
+	# Ein Teil der Laubbaeume traegt das hellere Lindenlaub, damit nicht alle gleich gruen sind.
+	var laub_hell: Array[int] = []
+	var laub_dunkel: Array[int] = []
+	for i in laub:
+		(laub_hell if fposmod(zeilen[i * SPALTEN] * 0.37 + zeilen[i * SPALTEN + 2] * 0.61, 1.0)
+				< 0.4 else laub_dunkel).append(i)
+	_krone(wurzel, zeilen, laub_dunkel, _laub, _mat_laub)
+	_krone(wurzel, zeilen, laub_hell, _laub, _mat_laub2)
 	_krone(wurzel, zeilen, nadel, _nadel, _mat_nadel)
 	if mit_stamm:
 		_staemme(wurzel, zeilen, range(n))
@@ -111,7 +119,14 @@ static func _vorbereiten() -> void:
 	var tex: Texture2D = load("res://texturen/laub.jpg") if ResourceLoader.exists(
 			"res://texturen/laub.jpg") else null
 	_mat_laub = _laubmaterial(tex, Vector3(0.95, 1.05, 0.8))
-	_mat_nadel = _laubmaterial(tex, Vector3(0.45, 0.7, 0.55))
+	_mat_laub2 = _laubmaterial(_textur("laub2", tex), Vector3(1.0, 1.05, 0.85))
+	_mat_nadel = _laubmaterial(_textur("nadel", tex), Vector3(0.7, 0.9, 0.8))
+
+
+## Textur aus res://texturen; fehlt sie, gilt der Ersatz.
+static func _textur(name: String, ersatz: Texture2D) -> Texture2D:
+	var pfad := "res://texturen/%s.jpg" % name
+	return load(pfad) if ResourceLoader.exists(pfad) else ersatz
 
 
 static func _laubmaterial(tex: Texture2D, ton: Vector3) -> ShaderMaterial:

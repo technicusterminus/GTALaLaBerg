@@ -166,9 +166,20 @@ def uebernimm_texte(missionen) -> int:
     return n
 
 
+def vergebe_kennungen(missionen) -> None:
+    """Jede gesprochene Zeile (Dialog und Funk) bekommt die Kennung "<Mission>.<Nr>"; unter dieser
+    Kennung liegt ihre Sprachdatei (Godot/daten/sprache/<Kennung>.ogg, siehe erzeuge_sprache.py)."""
+    from ueberarbeite import felder  # noqa: E402
+    for m in missionen:
+        for i, (obj, _k, art, _w, _p) in enumerate(felder(m["stufen"])):
+            if art in ("ZEILE", "FUNK"):
+                obj["id"] = f"{m['id']}.{i}"
+
+
 def main() -> int:
     missionen = PROLOG + AKT1 + AKT2 + AKT3 + AKT4 + FINALE
     neu = uebernimm_texte(missionen)
+    vergebe_kennungen(missionen)
     fehler = pruefe(missionen)
     if fehler:
         print("\n".join(fehler), file=sys.stderr)

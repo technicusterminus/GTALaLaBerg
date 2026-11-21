@@ -14,7 +14,7 @@ uniform float glanz : hint_range(0.0, 1.0) = 0.0;
 uniform bool oben = false;
 // 0 = flach, 1 = Gelaende (Wiesenflecken, Erde am Hang), 2 = Wasser (Wellen, Glitzern),
 // 3 = Hausfassade (eingelassene Fenster mit Laibung, Rahmen, Bank und Laeden, Putz),
-// 4 = Ziegeldach, 5 = Pflaster, 6 = Laub.
+// 4 = Ziegeldach, 5 = Pflaster, 6 = Laub, 7 = Strasse (in der Altstadt Kopfsteinpflaster).
 uniform int stil = 0;
 
 // Fotoaehnliche Details (vom Bildmodell erzeugt, nahtlos gemacht); fehlen sie, bleibt es bei
@@ -24,11 +24,26 @@ uniform sampler2D detail_putz : source_color, filter_linear_mipmap, repeat_enabl
 uniform sampler2D detail_pflaster : source_color, filter_linear_mipmap, repeat_enable;
 uniform sampler2D detail_wiese : source_color, filter_linear_mipmap, repeat_enable;
 
+// Altstadt (x0, z0, x1, z1 in Metern): dort Fachwerk und Kopfsteinpflaster statt Putzfassade und
+// Asphalt. Leer (alles 0) heisst: ueberall Putzfassade.
+uniform vec4 altstadt = vec4(0.0);
+uniform sampler2D fachwerk_a : source_color, filter_linear_mipmap, repeat_enable;
+uniform sampler2D fachwerk_b : source_color, filter_linear_mipmap, repeat_enable;
+uniform sampler2D fachwerk_c : source_color, filter_linear_mipmap, repeat_enable;
+uniform sampler2D fachwerk_d : source_color, filter_linear_mipmap, repeat_enable;
+
+bool in_altstadt(vec3 p) {
+	return altstadt.z > altstadt.x && p.x > altstadt.x && p.x < altstadt.z
+			&& p.z > altstadt.y && p.z < altstadt.w;
+}
+
 // Fensterfelder (vom Bildmodell erzeugt): je Zelle ein Fenster auf neutralem Putz.
 uniform bool fassade_foto = false;
 uniform sampler2D fenster_a : source_color, filter_linear_mipmap, repeat_enable;
 uniform sampler2D fenster_b : source_color, filter_linear_mipmap, repeat_enable;
 uniform sampler2D fenster_c : source_color, filter_linear_mipmap, repeat_enable;
+uniform sampler2D fenster_d : source_color, filter_linear_mipmap, repeat_enable;
+uniform sampler2D fenster_e : source_color, filter_linear_mipmap, repeat_enable;
 
 varying vec3 welt;
 
@@ -130,6 +145,16 @@ vec3 fassade_detail(vec3 wand, vec3 n, vec3 vw, float px) {
 // Fassade aus den Fotofeldern: Zellen von 2,15 x 3,2 m, je Zelle eines der drei Felder (jede
 // zwoelfte bleibt glatter Putz). Neutraler Putz nimmt die Wandfarbe an, Rahmen (hell) und alles
 // Bunte (Laeden, Blumen, Glas, Stein) bleibt, wie gezeichnet.
+// Hausfarben der Altstadt, kraeftiger als sonst: Oliv, Ziegelrot, Hellblau, Gelb, Creme, Lachs.
+vec3 altstadtfarbe(float z) {
+	if (z < 0.17) return vec3(0.22, 0.38, 0.17);
+	if (z < 0.34) return vec3(0.48, 0.19, 0.12);
+	if (z < 0.50) return vec3(0.25, 0.34, 0.52);
+	if (z < 0.68) return vec3(0.66, 0.52, 0.15);
+	if (z < 0.84) return vec3(0.58, 0.52, 0.40);
+	return vec3(0.55, 0.30, 0.24);
+}
+
 // Putzfarben je Haus (linear): Creme, Ocker, Hellgelb, Lachs, Graugruen, Weiss, Sand.
 vec3 hausfarbe(float z) {
 	if (z < 0.16) return vec3(0.52, 0.42, 0.24);
@@ -152,12 +177,35 @@ vec3 fassade_fotos(vec3 wand, vec3 n, float px) {
 	float zufall = hash21(zelle + floor(n.xz * 5.0 + 0.5) * 13.7);
 	float stufe_ = stufe(px, 3.2);
 	vec3 tc;
-	if (zufall < 0.30) {
+	if (in_altstadt(welt)) {
+		// Fachwerk: kraeftige Hausfarben, dunkles Gebaelk.
+		vec3 fw;
+		if (zufall < 0.28) {
+			fw = textureLod(fachwerk_a, uv, stufe_).rgb;
+		} else if (zufall < 0.58) {
+			fw = textureLod(fachwerk_b, uv, stufe_).rgb;
+		} else if (zufall < 0.86) {
+			fw = textureLod(fachwerk_c, uv, stufe_).rgb;
+		} else {
+			fw = textureLod(fachwerk_d, uv, stufe_).rgb;
+		}
+		float lumf = dot(fw, vec3(0.333));
+		float saettf = max(max(fw.r, fw.g), fw.b) - min(min(fw.r, fw.g), fw.b);
+		float putzf = (1.0 - smoothstep(0.07, 0.20, saettf)) * (1.0 - smoothstep(0.62, 0.80, lumf))
+				* smoothstep(0.20, 0.34, lumf);
+		vec3 farbe_alt = altstadtfarbe(hash21(floor(welt.xz / 6.0)));
+		return mix(fw, farbe_alt * clamp(lumf / 0.50, 0.0, 1.35), putzf);
+	}
+	if (zufall < 0.20) {
 		tc = textureLod(fenster_a, uv, stufe_).rgb;
-	} else if (zufall < 0.60) {
+	} else if (zufall < 0.40) {
 		tc = textureLod(fenster_b, uv, stufe_).rgb;
-	} else if (zufall < 0.92) {
+	} else if (zufall < 0.60) {
 		tc = textureLod(fenster_c, uv, stufe_).rgb;
+	} else if (zufall < 0.78) {
+		tc = textureLod(fenster_d, uv, stufe_).rgb;
+	} else if (zufall < 0.93) {
+		tc = textureLod(fenster_e, uv, stufe_).rgb;
 	} else {
 		tc = textureLod(fenster_b, vec2(uv.x, 0.02), stufe_).rgb;   // nur Putz
 	}
@@ -276,6 +324,10 @@ void fragment() {
 	} else if (stil == 4) {
 		if (abs(wn.y) > 0.2) {
 			c = dach(farbe, wn, px);
+		}
+	} else if (stil == 7) {
+		if (in_altstadt(welt)) {
+			c = pflaster(vec3(0.34, 0.34, 0.36), px);
 		}
 	} else if (stil == 5) {
 		c = pflaster(farbe, px);

@@ -25,6 +25,7 @@ var _sperre := Mutex.new()
 var _materialien := {}
 var _kopf_typ := -1     # Variant-Typkennung von PackedVector3Array, -1 = langsamer Weg
 var _takt := 0.0
+var _altstadt_m := Vector4.ZERO   ## x0, z0, x1, z1 der Altstadt in Metern
 
 
 func _ready() -> void:
@@ -38,6 +39,11 @@ func _ready() -> void:
 	for e in verz["sektoren"]:
 		_eintraege[Vector2i(int(e["index"][0]), int(e["index"][1]))] = e
 	_kopf_typ = _pruefe_schnellen_weg()
+	var orte = JSON.parse_string(FileAccess.get_file_as_string("res://daten/orte.json"))
+	if orte is Dictionary and orte.has("altstadt"):
+		var a: Array = orte["altstadt"]   # Zentimeter: x0, y0, x1, y1 -> Meter: x0, z0, x1, z1
+		_altstadt_m = Vector4(minf(a[0], a[2]), minf(a[1], a[3]), maxf(a[0], a[2]),
+				maxf(a[1], a[3])) / 100.0
 	print("LALABERG_STADT sektoren=%d schneller_weg=%s" % [_eintraege.size(), _kopf_typ >= 0])
 
 
@@ -212,6 +218,12 @@ func _material(art: String, farbe: Array) -> ShaderMaterial:
 	var m := ShaderMaterial.new()
 	m.shader = SHADER
 	m.set_shader_parameter("farbe", Vector3(farbe[0], farbe[1], farbe[2]))
+	if _altstadt_m != Vector4.ZERO:
+		m.set_shader_parameter("altstadt", _altstadt_m)
+	for t in ["a", "b", "c", "d"]:
+		var fpfad := "res://texturen/fachwerk_%s.jpg" % t
+		if ResourceLoader.exists(fpfad):
+			m.set_shader_parameter("fachwerk_" + t, load(fpfad))
 	for t in ["dach", "putz", "pflaster", "wiese"]:
 		var pfad := "res://texturen/%s.jpg" % t
 		if ResourceLoader.exists(pfad):
@@ -224,13 +236,15 @@ func _material(art: String, farbe: Array) -> ShaderMaterial:
 			m.set_shader_parameter("rauheit", 0.1)
 			m.set_shader_parameter("glanz", 1.0)
 		"Road", "Rail":
+			if art == "Road":
+				m.set_shader_parameter("stil", 7)
 			m.set_shader_parameter("rauheit", 0.85)
 		"Roof", "Wall", "Sockel", "Gesims":
 			if art == "Wall":
 				m.set_shader_parameter("stil", 3)
 				var da := ResourceLoader.exists("res://texturen/fenster_a.jpg")
 				if da:
-					for f in ["a", "b", "c"]:
+					for f in ["a", "b", "c", "d", "e"]:
 						m.set_shader_parameter("fenster_" + f, load("res://texturen/fenster_%s.jpg" % f))
 					m.set_shader_parameter("fassade_foto", true)
 			elif art == "Roof":

@@ -24,6 +24,7 @@ var farbdosen := Farbdosen.new()
 var radio := Radio.new()
 var schiessbude := Schiessbude.new()
 var moebel := Strassenmoebel.new()
+var musik := Musik.new()
 var revier := Revier.new()
 var drehbuch := Drehbuch.new()
 var auto: Auto
@@ -73,6 +74,11 @@ func _ready() -> void:
 	moebel.stadt = stadt
 	moebel.polizei = polizei
 	add_child(moebel)
+	musik.welt = self
+	musik.karte = karte
+	musik.polizei = polizei
+	musik.radio = radio
+	add_child(musik)
 	add_child(revier)
 	drehbuch.spieler = spieler
 	drehbuch.polizei = polizei
@@ -378,9 +384,10 @@ func _process(delta: float) -> void:
 	hud.revier_text = revier.hud_text()
 	hud.laden_text = laeden.menue_text()
 	hud.bude_text = schiessbude.hud_text()
-	hud.status = "Leben %d    %d €    %s    Ruf %d" % [
-		ceili(spieler.leben), Konto.geld(), spieler.waffe.art_name(),
-		Konto.stufe(Konto.Wert.RUF)]
+	hud.leben = ceili(spieler.leben)
+	hud.geld = Konto.geld()
+	hud.waffe = spieler.waffe.art_name()
+	hud.ruf = Konto.stufe(Konto.Wert.RUF)
 	if _filmtest and not _bildpfad.is_empty():
 		_rauch_zeit += delta
 		# Zwei Bilder aus dem Film: der Prolog beginnt von selbst.
@@ -530,6 +537,7 @@ func _rauchtest_ablauf() -> void:
 	ok = _pruefe("verkehr", ki > 1.0) and ok
 	var knoten := verkehr.bewegung_knoten()
 	ok = _pruefe("verkehr_knoten_bewegt=%.1f" % knoten, knoten > 1.0) and ok
+	await _bild_am_ort()
 	print("LALABERG_RAUCHTEST ende pos=%s auto=%s ki_bewegt=%.1f fps=%d ok=%s" % [
 		spieler.global_position, auto.global_position, ki,
 		Engine.get_frames_per_second(), ok])
@@ -664,6 +672,19 @@ func _pruefe_karte() -> bool:
 	karte.schalte_vollkarte(false)
 	await get_tree().process_frame
 	return _pruefe("vollkarte", voll and not get_tree().paused) and ok
+
+
+## Mit --bildort=<Ortsname> steht am Ende ein Bild von diesem Ort (nur fuer Screenshots).
+func _bild_am_ort() -> void:
+	if _bildpfad.is_empty():
+		return
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--bildort="):
+			var name := arg.substr(10)
+			get_tree().call_group("welt", "versetze_spieler",
+					polizei.naechster_punkt(Orte.mitte(name)))
+			await get_tree().create_timer(14.0).timeout
+			_bild("ort")
 
 
 func _pruefe_sonder() -> bool:
