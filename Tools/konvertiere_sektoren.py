@@ -20,12 +20,16 @@ Je Sektor entstehen zwei Dateien in Godot/daten/sektoren/:
 sowie Godot/daten/sektoren.json als Verzeichnis dazu.
 """
 import json
+import os
 import re
 import shutil
 import sys
 from pathlib import Path
 
 import numpy as np
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from hoehen import Relief  # noqa: E402
 
 WURZEL = Path(__file__).resolve().parent.parent
 QUELLE = WURZEL / "Content" / "SourceData"
@@ -43,6 +47,50 @@ def nach_godot(p: np.ndarray) -> np.ndarray:
     """(n*3) Zentimeter in Unreal-Achsen -> (n,3) Meter in Godot-Achsen."""
     v = p.reshape(-1, 3).astype(np.float64) / 100.0
     return v[:, [0, 2, 1]].astype(np.float32)
+
+
+# Diese Abschnitte folgen dem Gelaende Punkt fuer Punkt; alles andere (Haeuser, Baeume ...) wird
+# je zusammenhaengendem Teil um denselben Betrag am Standort verschoben.
+VERTEXWEISE = {"Ground", "Road", "Sidewalk", "Gehweg", "Plaza", "Rail", "Stone", "Water"}
+RELIEF_ALPHA = float(os.environ.get("LALABERG_RELIEF", "0.5"))   # 1.0 = Gelaende unveraendert
+
+
+def baue_relief(manifest) -> "Relief | None":
+    """Liest einmal alle Bodenpunkte der Stadt und baut daraus das Reliefmodell (hoehen.py)."""
+    if RELIEF_ALPHA >= 0.999:
+        return None
+    teile = []
+    for eintrag in manifest["sectors"]:
+        daten = json.loads((QUELLE / "Sectors" / eintrag["file"]).read_text())
+        for a in daten["sections"]:
+            if art(a["name"]) in VERTEXWEISE:
+                teile.append(nach_godot(np.asarray(a["positions"], dtype=np.float64))[::2])
+    relief = Relief(np.concatenate(teile), alpha=RELIEF_ALPHA)
+    print("Relief: Gelaende %.0f bis %.0f m, auf %.0f %% gestaucht um %.0f m" % (
+        relief.hoehe_vorher[0], relief.hoehe_vorher[1], RELIEF_ALPHA * 100, relief.referenz))
+    return relief
+
+
+def relief_anwenden(relief, name: str, pos: np.ndarray, idx: np.ndarray) -> None:
+    """Verschiebt pos (n, 3; Godot-Achsen, Meter) in der Hoehe um die Reliefverschiebung."""
+    if relief is None:
+        return
+    if art(name) in VERTEXWEISE:
+        pos[:, 1] += relief.delta(pos[:, 0], pos[:, 2]).astype(np.float32)
+        return
+    for g in komponenten(pos, idx.reshape(-1, 3)):
+        p = pos[g]
+        pos[g, 1] += float(relief.delta((p[:, 0].min() + p[:, 0].max()) / 2,
+                                        (p[:, 2].min() + p[:, 2].max()) / 2))
+
+
+def verschiebe_flach(relief, zahlen: list) -> list:
+    """Flache Liste x, y, z, x, y, z ... in Zentimetern (Unreal-Achsen): z um die Verschiebung."""
+    if relief is None:
+        return zahlen
+    a = np.asarray(zahlen, dtype=np.float64).reshape(-1, 3)
+    a[:, 2] += relief.delta(a[:, 0] / 100.0, a[:, 1] / 100.0) * 100.0
+    return np.rint(a).astype(int).reshape(-1).tolist()
 
 
 def komponenten(pos: np.ndarray, idx: np.ndarray) -> list:
@@ -154,6 +202,7 @@ def main() -> int:
         return 1
     manifest = json.loads(manifest_pfad.read_text())
     (ZIEL / "sektoren").mkdir(parents=True, exist_ok=True)
+    relief = baue_relief(manifest)
 
     verzeichnis = []
     summe_msh = summe_col = dreiecke = 0
@@ -169,6 +218,7 @@ def main() -> int:
                 idx = np.asarray(a["indices"], dtype=np.int32)
                 if len(idx) % 3 or idx.max(initial=-1) >= len(pos):
                     raise ValueError(f"{eintrag['id']}/{a['name']}: Indizes passen nicht zu den Ecken")
+                relief_anwenden(relief, a["name"], pos, idx)
                 if art(a["name"]) == "Roof":
                     gauben_zeilen.extend(dach_details(pos, idx.reshape(-1, 3)))
                 if art(a["name"]) in ("Tree", "Trunk"):
@@ -201,14 +251,29 @@ def main() -> int:
     spawn = manifest["spawn"]
     (ZIEL / "sektoren.json").write_text(json.dumps({
         "sektorgroesse": manifest["cellSizeCm"] / 100,
-        "spawn": {"name": spawn["name"], "x": spawn["x"] / 100, "y": spawn["z"] / 100,
+        "spawn": {"name": spawn["name"], "x": spawn["x"] / 100,
+                  "y": spawn["z"] / 100 + (float(relief.delta(spawn["x"] / 100, spawn["y"] / 100))
+                                           if relief is not None else 0.0),
                   "z": spawn["y"] / 100, "blick": spawn.get("blick", 0)},
         "sektoren": verzeichnis}, separators=(",", ":")))
 
     # Kleine Datensaetze unveraendert mitnehmen; die Skripte lesen sie aus res://daten.
-    for datei in ("Orte/orte.json", "Fahrzeug/wagen.json", "Verkehr/verkehr.json", "Verkehr/netz.json",
-                  "Story/drehbuch.json", "Story/missionen.json"):
+    for datei in ("Orte/orte.json", "Fahrzeug/wagen.json", "Story/drehbuch.json",
+                  "Story/missionen.json"):
         shutil.copy(QUELLE / datei, ZIEL / Path(datei).name)
+    # Routen, Ampeln, geparkte Autos und das Strassennetz folgen dem gestauchten Relief.
+    verkehr = json.loads((QUELLE / "Verkehr" / "verkehr.json").read_text())
+    for gruppe in ("autos", "passanten"):
+        for eintrag in verkehr[gruppe]:
+            eintrag["p"] = verschiebe_flach(relief, eintrag["p"])
+    for gruppe in ("ampeln", "geparkt"):
+        for eintrag in verkehr[gruppe]:
+            z = verschiebe_flach(relief, [eintrag["x"], eintrag["y"], eintrag["z"]])
+            eintrag["z"] = z[2]
+    (ZIEL / "verkehr.json").write_text(json.dumps(verkehr, separators=(",", ":")))
+    netz = json.loads((QUELLE / "Verkehr" / "netz.json").read_text())
+    netz["p"] = verschiebe_flach(relief, netz["p"])
+    (ZIEL / "netz.json").write_text(json.dumps(netz, separators=(",", ":")))
 
     # Karte: die kleine Vorlage (3 m je Pixel) reicht fuer Mini- und Vollkarte.
     karte = QUELLE / "Karte" / "karte-klein.png"
