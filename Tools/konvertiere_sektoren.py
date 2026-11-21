@@ -52,7 +52,7 @@ def nach_godot(p: np.ndarray) -> np.ndarray:
 # Diese Abschnitte folgen dem Gelaende Punkt fuer Punkt; alles andere (Haeuser, Baeume ...) wird
 # je zusammenhaengendem Teil um denselben Betrag am Standort verschoben.
 VERTEXWEISE = {"Ground", "Road", "Sidewalk", "Gehweg", "Plaza", "Rail", "Stone", "Water"}
-RELIEF_ALPHA = float(os.environ.get("LALABERG_RELIEF", "0.5"))   # 1.0 = Gelaende unveraendert
+RELIEF_ALPHA = float(os.environ.get("LALABERG_RELIEF", "0.4"))   # 1.0 = Gelaende unveraendert
 
 
 def baue_relief(manifest) -> "Relief | None":
@@ -76,7 +76,7 @@ def relief_anwenden(relief, name: str, pos: np.ndarray, idx: np.ndarray) -> None
     if relief is None:
         return
     if art(name) in VERTEXWEISE:
-        pos[:, 1] += relief.delta(pos[:, 0], pos[:, 2]).astype(np.float32)
+        pos[:, 1] += relief.delta_punkt(pos[:, 1]).astype(np.float32)
         return
     for g in komponenten(pos, idx.reshape(-1, 3)):
         p = pos[g]
