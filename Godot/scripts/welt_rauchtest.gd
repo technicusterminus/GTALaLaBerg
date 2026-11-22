@@ -246,7 +246,13 @@ func _bild_am_ort() -> void:
 			var name := arg.substr(10)
 			var ziel := Orte.mitte(name)
 			# Aus 24 m Abstand auf den Ort schauen, nicht mitten hinein.
-			var stand := polizei.naechster_punkt(ziel + Vector3(0, 0, 24.0))
+			# Vom Hauptplatz her, wenn der Ort daran liegt (Rathaus, Schmalzturm), sonst von Sueden.
+			var platz := Orte.mitte("Hauptplatz")
+			var her := Vector3(0, 0, 1)
+			if Vector2(ziel.x - platz.x, ziel.z - platz.z).length() < 120.0 \
+					and Vector2(ziel.x - platz.x, ziel.z - platz.z).length() > 5.0:
+				her = Vector3(platz.x - ziel.x, 0, platz.z - ziel.z).normalized()
+			var stand := polizei.naechster_punkt(ziel + her * 30.0)
 			get_tree().call_group("welt", "versetze_spieler", stand)
 			var blick := ziel - stand
 			kamera.yaw = atan2(-blick.x, -blick.z)

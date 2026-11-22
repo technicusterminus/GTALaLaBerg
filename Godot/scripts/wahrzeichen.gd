@@ -237,7 +237,7 @@ void fragment() {
 
 ## Wand vor sich: waagerechter Strahl von von in Richtung richtung, bis 60 m. {} ohne Treffer.
 func _wand(von: Vector3, richtung: Vector3) -> Dictionary:
-	var abfrage := PhysicsRayQueryParameters3D.create(von, von + richtung.normalized() * 60.0)
+	var abfrage := PhysicsRayQueryParameters3D.create(von, von + richtung.normalized() * 90.0)
 	abfrage.collision_mask = 1
 	var t := stadt.get_world_3d().direct_space_state.intersect_ray(abfrage)
 	if t.is_empty() or absf(t["normal"].y) > 0.3:
@@ -296,8 +296,8 @@ func _cafes(platz: Vector3, boden_y: float) -> bool:
 		return true
 	var tex: Texture2D = load(pfad)
 	var zahl := 0
-	for i in 10:
-		var w := TAU * float(i) / 10.0 + 0.2
+	for i in 16:
+		var w := TAU * float(i) / 16.0 + 0.2
 		var richtung := Vector3(cos(w), 0, sin(w))
 		var t := _wand(Vector3(platz.x, boden_y + 1.5, platz.z), richtung)
 		if t.is_empty():

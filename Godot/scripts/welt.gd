@@ -500,6 +500,17 @@ func _umgebung() -> void:
 	env.glow_enabled = true
 	env.glow_intensity = 0.3
 	env.glow_bloom = 0.04
+	# Mit dem Forward+-Renderer (Grafikkarte, nicht Compatibility): Kontaktschatten (SSAO),
+	# Licht von hellen Flaechen (SSIL) und Spiegelungen (SSR). Compatibility kennt sie nicht.
+	if RenderingServer.get_current_rendering_method() == "forward_plus":
+		env.ssao_enabled = true
+		env.ssao_radius = 1.5
+		env.ssao_intensity = 2.5
+		env.ssao_power = 1.5
+		env.ssil_enabled = true
+		env.ssil_intensity = 0.8
+		env.ssr_enabled = true
+		print("LALABERG_RENDERER forward_plus: SSAO, SSIL und SSR an")
 	var we := WorldEnvironment.new()
 	we.environment = env
 	add_child(we)
