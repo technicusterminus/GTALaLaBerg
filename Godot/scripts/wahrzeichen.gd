@@ -18,12 +18,14 @@ var _offen := {}   # Name -> Callable, die das Modell an einem Ort baut
 func _ready() -> void:
 	_offen["Marienbrunnen"] = _brunnen
 	_offen["Schmalzturm"] = _turm
+	_offen["Historisches Rathaus"] = Callable()   # Fassade, siehe _rathaus
+	_offen["Cafe"] = Callable()                    # Tische am Platz, siehe _cafes
 	if stadt != null:
 		stadt.sektor_bereit.connect(func(_id: String) -> void: _versuche())
 
 
 func _ort(name: String) -> Vector3:
-	if name == "Marienbrunnen":
+	if name == "Marienbrunnen" or name == "Cafe":
 		return _hauptplatz_mitte()
 	return Orte.mitte(name)
 
@@ -55,6 +57,16 @@ func _versuche() -> void:
 		abfrage.collision_mask = 1
 		var treffer := stadt.get_world_3d().direct_space_state.intersect_ray(abfrage)
 		if treffer.is_empty():
+			continue
+		if name == "Historisches Rathaus":
+			if _rathaus(ort, treffer["position"].y):
+				_offen.erase(name)
+				gestellt.append(name)
+			continue
+		if name == "Cafe":
+			if _cafes(_hauptplatz_mitte(), treffer["position"].y):
+				_offen.erase(name)
+				gestellt.append(name)
 			continue
 		var bau: Callable = _offen[name]
 		var modell: Node3D = bau.call()
@@ -221,3 +233,85 @@ void fragment() {
 	var m := ShaderMaterial.new()
 	m.shader = sh
 	return m
+
+
+## Wand vor sich: waagerechter Strahl von von in Richtung richtung, bis 60 m. {} ohne Treffer.
+func _wand(von: Vector3, richtung: Vector3) -> Dictionary:
+	var abfrage := PhysicsRayQueryParameters3D.create(von, von + richtung.normalized() * 60.0)
+	abfrage.collision_mask = 1
+	var t := stadt.get_world_3d().direct_space_state.intersect_ray(abfrage)
+	if t.is_empty() or absf(t["normal"].y) > 0.3:
+		return {}
+	return t
+
+
+## Flaeche mit Textur (Alpha), Unterkante bei ort, Gesicht in Richtung normale.
+static func _bildflaeche(textur: Texture2D, breite: float, normale: Vector3,
+		beidseitig := false) -> MeshInstance3D:
+	var q := QuadMesh.new()
+	var hoehe := breite * float(textur.get_height()) / float(textur.get_width())
+	q.size = Vector2(breite, hoehe)
+	q.center_offset = Vector3(0, hoehe / 2.0, 0)
+	var m := StandardMaterial3D.new()
+	m.albedo_texture = textur
+	m.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+	m.alpha_scissor_threshold = 0.5
+	m.roughness = 0.85
+	if beidseitig:
+		m.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var mi := MeshInstance3D.new()
+	mi.mesh = q
+	mi.material_override = m
+	mi.basis = Basis.looking_at(-normale, Vector3.UP)
+	return mi
+
+
+## Die Stuckfassade des Historischen Rathauses (vom Bildmodell ueber OpenRouter gemalt) vor die
+## Hauswand zum Hauptplatz.
+func _rathaus(ort: Vector3, boden_y: float) -> bool:
+	var pfad := "res://texturen/rathaus_fassade.png"
+	if not ResourceLoader.exists(pfad):
+		return true
+	var platz := _hauptplatz_mitte()
+	var richtung := Vector3(platz.x - ort.x, 0, platz.z - ort.z)
+	# Vom Platz aus auf das Rathaus schauen und die Wand suchen.
+	var von := Vector3(platz.x, boden_y + 4.0, platz.z)
+	var t := _wand(von, -richtung)
+	if t.is_empty():
+		return false
+	var normale := Vector3(t["normal"].x, 0, t["normal"].z).normalized()
+	var flaeche := _bildflaeche(load(pfad), 13.0, normale)
+	add_child(flaeche)
+	flaeche.global_position = Vector3(t["position"].x, boden_y - 0.2, t["position"].z) \
+			+ normale * 0.12
+	print("LALABERG_WAHRZEICHEN Rathausfassade bei %s" % flaeche.global_position)
+	return true
+
+
+## Cafe-Tische mit Schirm (vom Bildmodell gemalt, je zwei gekreuzte Flaechen) vor den Hauswaenden
+## rund um den Hauptplatz.
+func _cafes(platz: Vector3, boden_y: float) -> bool:
+	var pfad := "res://texturen/cafe.png"
+	if not ResourceLoader.exists(pfad):
+		return true
+	var tex: Texture2D = load(pfad)
+	var zahl := 0
+	for i in 10:
+		var w := TAU * float(i) / 10.0 + 0.2
+		var richtung := Vector3(cos(w), 0, sin(w))
+		var t := _wand(Vector3(platz.x, boden_y + 1.5, platz.z), richtung)
+		if t.is_empty():
+			continue
+		var normale := Vector3(t["normal"].x, 0, t["normal"].z).normalized()
+		for k in 2:
+			var seitlich := normale.cross(Vector3.UP) * (k * 4.5 - 2.25)
+			var ort := Vector3(t["position"].x, boden_y, t["position"].z) + normale * 3.5 + seitlich
+			var gruppe := Node3D.new()
+			for drehung in [0.0, PI / 2.0]:
+				var f := _bildflaeche(tex, 3.0, normale.rotated(Vector3.UP, drehung), true)
+				gruppe.add_child(f)
+			add_child(gruppe)
+			gruppe.global_position = ort
+			zahl += 1
+	print("LALABERG_WAHRZEICHEN Cafes=%d" % zahl)
+	return zahl > 0
