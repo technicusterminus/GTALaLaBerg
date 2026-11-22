@@ -244,8 +244,13 @@ func _bild_am_ort() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--bildort="):
 			var name := arg.substr(10)
-			get_tree().call_group("welt", "versetze_spieler",
-					polizei.naechster_punkt(Orte.mitte(name)))
+			var ziel := Orte.mitte(name)
+			# Aus 24 m Abstand auf den Ort schauen, nicht mitten hinein.
+			var stand := polizei.naechster_punkt(ziel + Vector3(0, 0, 24.0))
+			get_tree().call_group("welt", "versetze_spieler", stand)
+			var blick := ziel - stand
+			kamera.yaw = atan2(-blick.x, -blick.z)
+			kamera.pitch = -0.08
 			await get_tree().create_timer(14.0).timeout
 			_bild("ort")
 

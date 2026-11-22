@@ -104,12 +104,20 @@ func _brunnen() -> Node3D:
 	w.name = "Marienbrunnen"
 	var stein := _stoff(STEIN)
 	_teil(w, _zylinder(4.6, 4.6, 0.25, 8), Vector3(0, 0.12, 0), stein)
-	_teil(w, _zylinder(4.0, 4.0, 0.9, 8), Vector3(0, 0.7, 0), stein)
+	_teil(w, _zylinder(4.0, 4.0, 0.7, 8), Vector3(0, 0.6, 0), stein)
+	var rand := TorusMesh.new()
+	rand.inner_radius = 3.65
+	rand.outer_radius = 4.05
+	rand.rings = 8
+	rand.ring_segments = 8
+	var rr := _teil(w, rand, Vector3(0, 1.0, 0), stein)
+	rr.scale = Vector3(1.0, 0.6, 1.0)
 	var wasser := StandardMaterial3D.new()
 	wasser.albedo_color = Color(0.10, 0.32, 0.34)
 	wasser.roughness = 0.05
 	wasser.metallic = 0.2
-	_teil(w, _zylinder(3.7, 3.7, 0.05, 8), Vector3(0, 1.12, 0), wasser)
+	# Becken als Ring (Rand), darin das Wasser knapp unter der Kante.
+	_teil(w, _zylinder(3.7, 3.7, 0.05, 8), Vector3(0, 1.08, 0), wasser)
 	_teil(w, _zylinder(0.55, 0.45, 1.2, 8), Vector3(0, 1.5, 0), stein)
 	_teil(w, _zylinder(0.28, 0.24, 4.2, 12), Vector3(0, 4.2, 0), _stoff(Color(0.70, 0.66, 0.60)))
 	_teil(w, _kasten(Vector3(0.75, 0.35, 0.75)), Vector3(0, 6.45, 0), stein)

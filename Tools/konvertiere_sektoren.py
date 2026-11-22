@@ -390,6 +390,8 @@ def main() -> int:
                 if art(a["name"]) == "Roof":
                     giebel_zeilen.extend(giebel_aus(pos, idx.reshape(-1, 3), altstadt))
                     gauben_zeilen.extend(dach_details(pos, idx.reshape(-1, 3)))
+                if art(a["name"]) in ("Stone", "Figure"):
+                    continue   # Platzhalter fuer Denkmaeler; die Wahrzeichen baut Godot nach
                 if art(a["name"]) in ("Tree", "Trunk"):
                     # Baeume werden als Instanzen gestellt (siehe baeume_aus), nicht als Netz.
                     baumquellen.append((a["name"], pos, idx.reshape(-1, 3), a["color"][:3]))
