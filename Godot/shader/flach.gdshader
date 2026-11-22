@@ -235,6 +235,11 @@ vec3 fassade(vec3 wand, vec3 n, vec3 vw, float px) {
 // Ziegeldach: Reihen von Biberschwaenzen, jede Reihe um eine halbe Ziegelbreite versetzt,
 // je Ziegel ein eigener Ton, dunkle Fugen und Schatten unter der ueberlappenden Reihe.
 vec3 dach(vec3 farbe_daten, vec3 wn, float px) {
+	if (abs(wn.y) > 0.97) {
+		// Flachdach: Kies und Dachpappe in Grau statt gestreckter Ziegel.
+		float k = wert(welt.xz * 1.7) * 0.5 + wert(welt.xz * 9.0) * 0.3 + wert(welt.xz * 0.15) * 0.2;
+		return vec3(0.30, 0.30, 0.29) * (0.78 + 0.4 * k);
+	}
 	vec3 t = normalize(cross(vec3(0.0, 1.0, 0.0), wn));
 	vec3 hang = cross(wn, t);
 	vec2 uv = vec2(dot(welt, t), dot(welt, hang));
@@ -319,9 +324,9 @@ void fragment() {
 		float feld = wert(welt.xz / 230.0 + 3.1);
 		float reif = smoothstep(0.58, 0.68, feld);
 		float streifen = 0.5 + 0.5 * sin(dot(welt.xz, vec2(0.83, 0.56)) * 3.9);
-		vec3 gruen = vec3(0.13, 0.27, 0.05) * (0.85 + 0.35 * g) * (0.93 + 0.07 * streifen);
+		vec3 gruen = vec3(0.07, 0.22, 0.035) * (0.85 + 0.35 * g) * (0.93 + 0.07 * streifen);
 		vec3 weizen = vec3(0.34, 0.29, 0.12) * (0.85 + 0.3 * g) * (0.9 + 0.1 * streifen);
-		c = mix(c, mix(gruen, weizen, reif), 0.8);
+		c = mix(c, mix(gruen, weizen, reif * 0.6), 0.85);
 		float steil = smoothstep(0.93, 0.72, abs(wn.y));
 		c = mix(c, vec3(0.20, 0.13, 0.07) * (0.8 + 0.4 * g), steil);
 	} else if (stil == 4) {
