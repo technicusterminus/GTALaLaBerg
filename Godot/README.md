@@ -98,6 +98,15 @@ Stücke mit Lyria (Menü, Fahrt, Hubschrauber, Verfolgung). Das Kino (`kino.gd`)
 `musik.gd` wählt das Stück nach Lage. Die Dateien liegen in `Godot/daten/sprache` und
 `Godot/daten/musik` (nicht im Repo; ohne sie bleibt es stumm).
 
+**Leistung.** Der Bildlauf misst je Screenshot Zeichenaufrufe und Dreiecke (`LALABERG_LAST`).
+Baumkronen haben eine Nah- (bis 140 m, mit Schatten) und eine Fernstufe, geparkte Autos sind
+vereinfacht und bis 380 m sichtbar, Schatten reichen 180 m. Am Bayertor: rund 2 Mio. statt
+12 Mio. Dreiecke, 1000 statt 1800 Aufrufe.
+
+**Straßenraum.** Der Konverter setzt Bordsteine an die Ränder der Fahrbahn (nicht an Nähte
+zwischen Straßenstücken und nicht in der Altstadt) und entfernt Gehwegstreifen, die in den
+Quelldaten über der Fahrbahn liegen. Läden haben Schaufenster, Sockel Naturstein, Türen Holz.
+
 **Altstadt.** Innerhalb des Altstadt-Rechtecks tragen die Wände Fachwerk (vier Module vom
 Bildmodell, kräftige Hausfarben) und die Straßen Kopfsteinpflaster (`flach.gdshader`).
 
@@ -139,7 +148,7 @@ godot --path Godot --headless -- --rauchtest
 Er prüft unter anderem: Boden und Kollision, Konto, Treffer auf Passanten und Autos,
 Krankenhaus, Fahndung bis zur Festnahme, Straßensperre, Ampelplan und Bremsen, Aufträge,
 Laden und Lackiererei, Verfolgung, Reviernahme und die ganze Hauptgeschichte im
-Zeitraffer mit allen drei Enden (knapp 60 Prüfungen, `LALABERG_PRUEFUNG ... ok=`).
+Zeitraffer mit allen drei Enden (über 70 Prüfungen (`welt_rauchtest.gd`), `LALABERG_PRUEFUNG ... ok=`).
 
 Bilder (nicht headless; ohne GPU mit Software-OpenGL unter Xvfb):
 
