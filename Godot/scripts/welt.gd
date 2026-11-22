@@ -465,11 +465,11 @@ func _maler() -> void:
 
 func _umgebung() -> void:
 	var himmel := ProceduralSkyMaterial.new()
-	himmel.sky_top_color = Color(0.42, 0.56, 0.74)
+	himmel.sky_top_color = Color(0.30, 0.50, 0.82)
+	himmel.sky_curve = 0.25
 	himmel.sky_horizon_color = Color(0.98, 0.84, 0.70)
 	himmel.ground_horizon_color = Color(0.98, 0.84, 0.70)
 	himmel.ground_bottom_color = Color(0.45, 0.52, 0.45)
-	himmel.sky_curve = 0.12
 	himmel.ground_curve = 0.05
 	var sky := Sky.new()
 	sky.sky_material = himmel
@@ -479,15 +479,15 @@ func _umgebung() -> void:
 	# Feste, warme Umgebungsfarbe statt Himmel: sonst sind die Schatten knallblau.
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(0.80, 0.74, 0.76)
-	env.ambient_light_energy = 0.95
+	env.ambient_light_energy = 0.8
 	env.tonemap_mode = Environment.TONE_MAPPER_AGX
 	env.tonemap_exposure = 1.05
 	env.tonemap_white = 6.0
 	env.fog_enabled = true
 	env.fog_light_color = Color(0.95, 0.80, 0.66)
-	env.fog_density = 0.0011
-	env.fog_aerial_perspective = 0.5
-	env.fog_sky_affect = 0.3
+	env.fog_density = 0.00035
+	env.fog_aerial_perspective = 0.35
+	env.fog_sky_affect = 0.08
 	env.fog_sun_scatter = 0.4
 	# Waermer, satter und mit leichtem Leuchten wie im Konzeptbild.
 	env.adjustment_enabled = true

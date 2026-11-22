@@ -158,12 +158,12 @@ vec3 altstadtfarbe(float z) {
 
 // Pastellputz der Landsberger Altstadt (linear), nach dem Zielbild ziel-hauptplatz-real.png.
 vec3 landsbergputz(float z) {
-	if (z < 0.20) return vec3(0.66, 0.36, 0.36);   // Altrosa
-	if (z < 0.38) return vec3(0.62, 0.44, 0.17);   // Ocker
-	if (z < 0.56) return vec3(0.74, 0.64, 0.32);   // Hellgelb
-	if (z < 0.70) return vec3(0.44, 0.58, 0.44);   // Mint
-	if (z < 0.86) return vec3(0.76, 0.74, 0.70);   // Weiss
-	return vec3(0.68, 0.46, 0.36);                  // Lachs
+	if (z < 0.20) return vec3(0.62, 0.27, 0.28);   // Altrosa
+	if (z < 0.38) return vec3(0.58, 0.36, 0.10);   // Ocker
+	if (z < 0.56) return vec3(0.70, 0.57, 0.20);   // Hellgelb
+	if (z < 0.70) return vec3(0.33, 0.50, 0.34);   // Mint
+	if (z < 0.84) return vec3(0.72, 0.70, 0.66);   // Weiss
+	return vec3(0.64, 0.36, 0.26);                  // Lachs
 }
 
 // Putzfarben je Haus (linear): Creme, Ocker, Hellgelb, Lachs, Graugruen, Weiss, Sand.
