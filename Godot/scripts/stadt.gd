@@ -268,6 +268,9 @@ func _material(art: String, farbe: Array) -> ShaderMaterial:
 			m.set_shader_parameter("rauheit", 0.7)
 		"Gehweg", "Sidewalk", "Plaza":
 			m.set_shader_parameter("stil", 5)
+			if art != "Plaza":
+				# Gehwege grau statt cremefarben (die Quelldaten faerben sie hellgelb).
+				m.set_shader_parameter("farbe", Vector3(0.40, 0.40, 0.38))
 			m.set_shader_parameter("rauheit", 0.9)
 		"Tree", "Trunk", "Ground":
 			if art == "Ground":

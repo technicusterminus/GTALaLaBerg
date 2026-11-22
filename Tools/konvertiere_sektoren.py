@@ -93,7 +93,38 @@ def verschiebe_flach(relief, zahlen: list) -> list:
     return np.rint(a).astype(int).reshape(-1).tolist()
 
 
-def bordsteine(teile: list, grenzen_m, ohne=None, hoehe: float = 0.14, breite: float = 0.22):
+class Flaechenraster:
+    """Schnelle Abfrage, ob ein Punkt (x, z) auf einer der gegebenen Flaechen liegt (2D)."""
+
+    def __init__(self, teile: list, zelle: float = 4.0):
+        self.zelle = zelle
+        self.tris = []
+        self.raster: dict = {}
+        for pos, idx in teile:
+            for t in idx.reshape(-1, 3):
+                a, b, c = pos[t[0]][[0, 2]], pos[t[1]][[0, 2]], pos[t[2]][[0, 2]]
+                n = len(self.tris)
+                self.tris.append((a, b, c))
+                lo = np.floor(np.minimum(np.minimum(a, b), c) / zelle).astype(int)
+                hi = np.floor(np.maximum(np.maximum(a, b), c) / zelle).astype(int)
+                for i in range(lo[0], hi[0] + 1):
+                    for j in range(lo[1], hi[1] + 1):
+                        self.raster.setdefault((i, j), []).append(n)
+
+    def enthaelt(self, x: float, z: float) -> bool:
+        p = np.array([x, z])
+        for n in self.raster.get((int(np.floor(x / self.zelle)), int(np.floor(z / self.zelle))), ()):
+            a, b, c = self.tris[n]
+            d1 = (p[0] - b[0]) * (a[1] - b[1]) - (a[0] - b[0]) * (p[1] - b[1])
+            d2 = (p[0] - c[0]) * (b[1] - c[1]) - (b[0] - c[0]) * (p[1] - c[1])
+            d3 = (p[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (p[1] - a[1])
+            if not ((d1 < 0 or d2 < 0 or d3 < 0) and (d1 > 0 or d2 > 0 or d3 > 0)):
+                return True
+        return False
+
+
+def bordsteine(teile: list, grenzen_m, ohne=None, hoehe: float = 0.14, breite: float = 0.22,
+               raster=None):
     """Bordsteine an den Raendern der Strassenflaechen eines Sektors. teile: Liste (pos, idx) der
     Strassenabschnitte (Godot-Achsen, Meter, idx in Quellwicklung). Eine Kante, die nur zu einem
     Strassendreieck gehoert, ist ein Rand; dort entsteht ein Steinstreifen nach aussen (eine
@@ -135,6 +166,11 @@ def bordsteine(teile: list, grenzen_m, ohne=None, hoehe: float = 0.14, breite: f
         aussen = np.array([richtung[1], -richtung[0]]) / laenge
         if np.dot(aussen, [c[0] - a[0], c[2] - a[2]]) > 0:
             aussen = -aussen
+        # Liegt jenseits der Kante wieder Strasse (Naht zwischen zwei Strassenstuecken), ist das
+        # kein Rand: sonst laege ein Bordstein quer ueber der Fahrbahn.
+        mitte = (a + b) / 2
+        if raster is not None and raster.enthaelt(mitte[0] + aussen[0] * 0.6, mitte[2] + aussen[1] * 0.6):
+            continue
         n = np.array([aussen[0], 0.0, aussen[1]]) * breite
         h = np.array([0.0, hoehe, 0.0])
         s = len(ecken)
@@ -273,12 +309,28 @@ def main() -> int:
         baumquellen = []
         strassen = []
         gauben_zeilen = []
+        # Strassenflaechen des Sektors vorab: fuer Bordsteine und um Gehwege auf der Fahrbahn
+        # zu entfernen (die Quelldaten legen Gehwegstreifen teils quer ueber die Strasse).
+        vorab = []
+        for a in daten["sections"]:
+            if art(a["name"]) == "Road":
+                vp = nach_godot(np.asarray(a["positions"], dtype=np.float64))
+                vorab.append((vp, np.asarray(a["indices"], dtype=np.int32)))
+        strassenraster = Flaechenraster(vorab)
         with open(ZIEL / "sektoren" / f"{eintrag['id']}.msh", "wb") as msh:
             for a in daten["sections"]:
                 pos = nach_godot(np.asarray(a["positions"], dtype=np.float64))
                 idx = np.asarray(a["indices"], dtype=np.int32)
                 if len(idx) % 3 or idx.max(initial=-1) >= len(pos):
                     raise ValueError(f"{eintrag['id']}/{a['name']}: Indizes passen nicht zu den Ecken")
+                if art(a["name"]) in ("Gehweg", "Sidewalk") and vorab:
+                    tri = idx.reshape(-1, 3)
+                    mitten = pos[tri].mean(axis=1)
+                    behalten = [i for i, m in enumerate(mitten)
+                                if not strassenraster.enthaelt(m[0], m[2])]
+                    if not behalten:
+                        continue
+                    idx = tri[behalten].reshape(-1)
                 relief_anwenden(relief, a["name"], pos, idx)
                 if art(a["name"]) == "Roof":
                     gauben_zeilen.extend(dach_details(pos, idx.reshape(-1, 3)))
@@ -298,7 +350,8 @@ def main() -> int:
                 if art(a["name"]) in KOLLISION:
                     kollision.append(pos[idx])
             b = eintrag["boundsCm"]
-            kanten = bordsteine(strassen, (b[0] / 100, b[1] / 100, b[2] / 100, b[3] / 100), altstadt)
+            kanten = bordsteine(strassen, (b[0] / 100, b[1] / 100, b[2] / 100, b[3] / 100), altstadt,
+                                raster=strassenraster)
             if kanten is not None:
                 bpos, bidx = kanten
                 msh.write(bpos.tobytes())
