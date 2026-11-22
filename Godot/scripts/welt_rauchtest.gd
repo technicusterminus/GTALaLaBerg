@@ -91,6 +91,7 @@ func _rauchtest_ablauf() -> void:
 	ok = await _pruefe_drehbuch() and ok
 
 	await get_tree().create_timer(maxf(0.0, 22.0 - _rauch_zeit)).timeout
+	ok = _pruefe("giebel=%d" % stadt.giebel_zahl, stadt.giebel_zahl >= 0) and ok
 	ok = _pruefe("baeume=%d_gauben=%d" % [stadt.baeume, stadt.gauben],
 			stadt.baeume > 20 and stadt.gauben > 5) and ok
 	ok = _pruefe("moebel=%s" % [moebel.gestellt], moebel.gestellt["lampen"] > 5

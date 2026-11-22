@@ -25,6 +25,7 @@ var radio := Radio.new()
 var schiessbude := Schiessbude.new()
 var moebel := Strassenmoebel.new()
 var musik := Musik.new()
+var wahrzeichen := Wahrzeichen.new()
 var revier := Revier.new()
 var drehbuch := Drehbuch.new()
 var auto: Auto
@@ -80,6 +81,9 @@ func _ready() -> void:
 	musik.polizei = polizei
 	musik.radio = radio
 	add_child(musik)
+	wahrzeichen.stadt = stadt
+	wahrzeichen.polizei = polizei
+	add_child(wahrzeichen)
 	add_child(revier)
 	drehbuch.spieler = spieler
 	drehbuch.polizei = polizei
