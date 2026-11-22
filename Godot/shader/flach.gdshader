@@ -156,6 +156,16 @@ vec3 altstadtfarbe(float z) {
 	return vec3(0.55, 0.30, 0.24);
 }
 
+// Pastellputz der Landsberger Altstadt (linear), nach dem Zielbild ziel-hauptplatz-real.png.
+vec3 landsbergputz(float z) {
+	if (z < 0.20) return vec3(0.66, 0.36, 0.36);   // Altrosa
+	if (z < 0.38) return vec3(0.62, 0.44, 0.17);   // Ocker
+	if (z < 0.56) return vec3(0.74, 0.64, 0.32);   // Hellgelb
+	if (z < 0.70) return vec3(0.44, 0.58, 0.44);   // Mint
+	if (z < 0.86) return vec3(0.76, 0.74, 0.70);   // Weiss
+	return vec3(0.68, 0.46, 0.36);                  // Lachs
+}
+
 // Putzfarben je Haus (linear): Creme, Ocker, Hellgelb, Lachs, Graugruen, Weiss, Sand.
 vec3 hausfarbe(float z) {
 	if (z < 0.16) return vec3(0.52, 0.42, 0.24);
@@ -169,7 +179,10 @@ vec3 hausfarbe(float z) {
 
 vec3 fassade_fotos(vec3 wand, vec3 n, float px) {
 	// Ein Haus ist rund 10 m gross: die Farbe haengt an der Gegend, nicht an der einzelnen Wand.
-	wand = mix(wand, hausfarbe(hash21(floor(welt.xz / 10.0))), 0.9);
+	float haus = hash21(floor(welt.xz / 10.0));
+	bool alt = in_altstadt(welt);
+	// Altstadt wie das echte Landsberg: Pastellputz (Rosa, Ocker, Hellgelb, Mint, Weiss).
+	wand = mix(wand, alt ? landsbergputz(haus) : hausfarbe(haus), 0.92);
 	vec3 t = normalize(cross(vec3(0.0, 1.0, 0.0), n));
 	float u = dot(welt, t) / 2.15;
 	float v = welt.y / 3.2;
@@ -178,8 +191,8 @@ vec3 fassade_fotos(vec3 wand, vec3 n, float px) {
 	float zufall = hash21(zelle + floor(n.xz * 5.0 + 0.5) * 13.7);
 	float stufe_ = stufe(px, 3.2);
 	vec3 tc;
-	if (in_altstadt(welt)) {
-		// Fachwerk: kraeftige Hausfarben, dunkles Gebaelk.
+	if (alt && hash21(floor(welt.xz / 9.0) + 7.3) < 0.14) {
+		// Nur vereinzelt Fachwerk; die Landsberger Altstadt ist ueberwiegend verputzt.
 		vec3 fw;
 		if (zufall < 0.28) {
 			fw = textureLod(fachwerk_a, uv, stufe_).rgb;
@@ -368,7 +381,7 @@ void fragment() {
 		float feld = wert(welt.xz / 230.0 + 3.1);
 		float reif = smoothstep(0.58, 0.68, feld);
 		float streifen = 0.5 + 0.5 * sin(dot(welt.xz, vec2(0.83, 0.56)) * 3.9);
-		vec3 gruen = vec3(0.07, 0.22, 0.035) * (0.85 + 0.35 * g) * (0.93 + 0.07 * streifen);
+		vec3 gruen = vec3(0.14, 0.19, 0.05) * (0.85 + 0.35 * g) * (0.93 + 0.07 * streifen);
 		vec3 weizen = vec3(0.34, 0.29, 0.12) * (0.85 + 0.3 * g) * (0.9 + 0.1 * streifen);
 		c = mix(c, mix(gruen, weizen, reif * 0.6), 0.85);
 		float steil = smoothstep(0.93, 0.72, abs(wn.y));
@@ -413,9 +426,10 @@ void fragment() {
 	} else if (stil == 2) {
 		float w1 = wert(welt.xz / 11.0 + vec2(TIME * 0.05, TIME * 0.03));
 		float w2 = wert(welt.xz / 2.6 - vec2(TIME * 0.11, TIME * 0.07));
-		c *= 0.78 + 0.45 * w1;
+		// Der Lech ist tuerkis (Gletscherwasser), nicht blaugrau.
+		c = vec3(0.05, 0.30, 0.30) * (0.78 + 0.45 * w1);
 		float rand = pow(1.0 - clamp(dot(n, VIEW), 0.0, 1.0), 3.0);
-		c = mix(c, vec3(0.30, 0.45, 0.65), rand * 0.65);
+		c = mix(c, vec3(0.35, 0.55, 0.62), rand * 0.6);
 		EMISSION = vec3(0.9, 0.95, 1.0) * pow(w2, 9.0) * 0.55;
 		rau = 0.06;
 	}

@@ -75,6 +75,8 @@ func feuern(ort: Vector3, richtung: Vector3, halter: Node3D) -> bool:
 		return false
 	_letzter_schuss = jetzt
 	Ton.einmal(get_tree(), SCHUSSKLANG[art], ort, -3.0, randf_range(0.96, 1.04))
+	get_tree().call_group("passanten", "hoere_schuss", ort)
+	get_tree().call_group("verkehrsauto", "hoere_schuss", ort)
 	for i in int(k["kugeln"]):
 		# Zielsicherheit halbiert die Streuung, wenn sie ausgebaut ist.
 		var streuung: float = k["streuung"] * (1.0 - 0.5 * Konto.anteil(Konto.Wert.ZIELSICHERHEIT))

@@ -47,6 +47,7 @@ func _ready() -> void:
 	add_to_group("welt")
 	_eingaben()
 	_umgebung()
+	_maler()
 	_rauchtest = "--rauchtest" in OS.get_cmdline_user_args()
 	_filmtest = "--filmtest" in OS.get_cmdline_user_args()
 	for arg in OS.get_cmdline_user_args():
@@ -446,11 +447,27 @@ func _bild(name: String) -> void:
 			Engine.get_frames_per_second()])
 
 
+## Malerei-Filter (maler.gdshader) zwischen 3D-Bild und Oberflaeche; --ohnemaler schaltet ab.
+func _maler() -> void:
+	if "--ohnemaler" in OS.get_cmdline_user_args():
+		return
+	var ebene := CanvasLayer.new()
+	ebene.layer = 0
+	var flaeche := ColorRect.new()
+	flaeche.set_anchors_preset(Control.PRESET_FULL_RECT)
+	flaeche.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var m := ShaderMaterial.new()
+	m.shader = preload("res://shader/maler.gdshader")
+	flaeche.material = m
+	ebene.add_child(flaeche)
+	add_child(ebene)
+
+
 func _umgebung() -> void:
 	var himmel := ProceduralSkyMaterial.new()
-	himmel.sky_top_color = Color(0.25, 0.45, 0.78)
-	himmel.sky_horizon_color = Color(0.65, 0.76, 0.88)
-	himmel.ground_horizon_color = Color(0.62, 0.72, 0.84)
+	himmel.sky_top_color = Color(0.42, 0.56, 0.74)
+	himmel.sky_horizon_color = Color(0.98, 0.84, 0.70)
+	himmel.ground_horizon_color = Color(0.98, 0.84, 0.70)
 	himmel.ground_bottom_color = Color(0.45, 0.52, 0.45)
 	himmel.sky_curve = 0.12
 	himmel.ground_curve = 0.05
@@ -461,20 +478,21 @@ func _umgebung() -> void:
 	env.sky = sky
 	# Feste, warme Umgebungsfarbe statt Himmel: sonst sind die Schatten knallblau.
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.74, 0.72, 0.70)
-	env.ambient_light_energy = 1.05
-	env.tonemap_mode = Environment.TONE_MAPPER_ACES
+	env.ambient_light_color = Color(0.80, 0.74, 0.76)
+	env.ambient_light_energy = 0.95
+	env.tonemap_mode = Environment.TONE_MAPPER_AGX
 	env.tonemap_exposure = 1.05
 	env.tonemap_white = 6.0
 	env.fog_enabled = true
-	env.fog_light_color = Color(0.70, 0.74, 0.80)
-	env.fog_density = 0.00028
+	env.fog_light_color = Color(0.95, 0.80, 0.66)
+	env.fog_density = 0.0011
+	env.fog_aerial_perspective = 0.5
 	env.fog_sky_affect = 0.3
-	env.fog_sun_scatter = 0.25
+	env.fog_sun_scatter = 0.4
 	# Waermer, satter und mit leichtem Leuchten wie im Konzeptbild.
 	env.adjustment_enabled = true
-	env.adjustment_contrast = 1.08
-	env.adjustment_saturation = 1.08
+	env.adjustment_contrast = 1.0
+	env.adjustment_saturation = 1.0
 	env.glow_enabled = true
 	env.glow_intensity = 0.3
 	env.glow_bloom = 0.04
@@ -483,17 +501,18 @@ func _umgebung() -> void:
 	add_child(we)
 
 	var sonne := DirectionalLight3D.new()
-	sonne.rotation_degrees = Vector3(-34, 150, 0)
-	sonne.light_color = Color(1.0, 0.89, 0.72)
+	# Tiefe, warme Abendsonne wie im Zielbild: lange, weiche Schatten.
+	sonne.rotation_degrees = Vector3(-20, 150, 0)
+	sonne.light_color = Color(1.0, 0.80, 0.58)
 	sonne.shadow_enabled = not "--ohneschatten" in OS.get_cmdline_user_args()
 	# Schatten nur in der Naehe: dort sieht man sie, weiter weg kosten sie nur.
 	sonne.directional_shadow_max_distance = 180.0
 	sonne.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
-	sonne.light_energy = 1.0
+	sonne.light_energy = 1.35
 	# Gegen Schattenakne auf den senkrechten Waenden (streifige Flaechen im Streiflicht).
 	sonne.shadow_bias = 0.12
 	sonne.shadow_normal_bias = 3.2
-	sonne.shadow_blur = 1.6
+	sonne.shadow_blur = 2.5
 	add_child(sonne)
 
 

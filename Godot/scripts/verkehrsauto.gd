@@ -45,6 +45,10 @@ var _stoerung_bis := 0.0
 var _faktor := 1.0
 var _bremse := 1.0
 var _bremse_objekt := 1.0
+var _flucht_bis := 0.0      ## nach Schuessen in der Naehe: Gas geben
+var _gasse := 0.0           ## > 0: Streife mit Blaulicht naht von hinten -> rechts ran, langsam
+var _blockiert_spieler := 0.0
+var _gehupt := -10.0
 var _bremse_in := randf() * 0.12   ## Sekunden bis zur naechsten Berechnung, versetzt
 var _seitversatz := 0.0
 var _ueberholt: Node3D
@@ -94,6 +98,44 @@ func _baue_blaulicht() -> void:
 	_blaulicht.shadow_enabled = false
 	add_child(_blaulicht)
 	_sirene = Ton.schleife(self, "SFX_Sirene", 2.0)
+
+
+func blaulicht_an() -> bool:
+	return polizei and not geparkt and (weg.gueltig() or gesperrt) and not ist_ausgeschaltet()
+
+
+## Ein Schuss in der Naehe: normale Fahrer geben Gas und machen sich davon.
+func hoere_schuss(ort: Vector3) -> void:
+	if polizei or geparkt or ist_ausgeschaltet():
+		return
+	if _lage.distance_to(ort) < 40.0:
+		_flucht_bis = Time.get_ticks_msec() / 1000.0 + 7.0
+
+
+## Rettungsgasse: naht eine Streife mit Blaulicht von hinten, faehrt der Wagen rechts ran.
+func _pruefe_gasse() -> void:
+	_gasse = 0.0
+	if polizei:
+		return
+	for s: Verkehrsauto in get_tree().get_nodes_in_group("verkehrsauto"):
+		if s == self or not s.blaulicht_an():
+			continue
+		var hinter := _lage - s.position_jetzt()
+		if hinter.length() < 45.0 and hinter.dot(_blick) > 0.0 and s.vorwaerts().dot(_blick) > 0.3:
+			_gasse = 1.0
+			return
+
+
+## Steht der Spieler im Weg, wird nach gut zwei Sekunden gehupt.
+func _pruefe_hupe(delta_s: float) -> void:
+	if polizei or Verkehrsbremse.vor_spieler(self) > 0.3:
+		_blockiert_spieler = 0.0
+		return
+	_blockiert_spieler += delta_s
+	var jetzt := Time.get_ticks_msec() / 1000.0
+	if _blockiert_spieler > 2.2 and jetzt - _gehupt > 6.0:
+		_gehupt = jetzt
+		Ton.einmal(get_tree(), "SFX_Hupe", _lage, 2.0, randf_range(0.95, 1.08))
 
 
 func _blinke() -> void:
@@ -222,6 +264,10 @@ func _berechne_bremse() -> void:
 	var ampel := 1.0 if polizei else Verkehrsbremse.vor_ampel(self)
 	var kreuzung := 1.0 if polizei else Verkehrsbremse.vor_kreuzung(self)
 	_bremse = minf(minf(_bremse_objekt, ampel), minf(kreuzung, Verkehrsbremse.in_kurve(weg)))
+	_pruefe_gasse()
+	_pruefe_hupe(0.12)
+	if _gasse > 0.0:
+		_bremse = minf(_bremse, 0.3)
 
 
 ## Stellt den Wagen an einen Ort und dreht ihn in eine Richtung.
@@ -326,7 +372,8 @@ func _physics_process(delta: float) -> void:
 		_bremse_in = 0.12
 		_berechne_bremse()
 	var vorher := _lage
-	weg.bewege(tempo_ms * _faktor * _bremse * (1.25 if _ueberholt != null else 1.0) * delta)
+	var flucht := 1.5 if Time.get_ticks_msec() / 1000.0 < _flucht_bis else 1.0
+	weg.bewege(tempo_ms * _faktor * _bremse * flucht * (1.25 if _ueberholt != null else 1.0) * delta)
 	if weg.blick != Vector3.ZERO:
 		_blick = _blick.lerp(weg.blick, minf(8.0 * delta, 1.0)).normalized()
 	var rechts_soll := Vector3(-_blick.z, 0.0, _blick.x)
@@ -342,6 +389,8 @@ func _physics_process(delta: float) -> void:
 	var ziel := minf(spur + (MAX_SEITVERSATZ if _bremse_objekt < 0.9 else 0.0), rand)
 	if _ueberholt != null:
 		ziel = -minf(spur, rand)   # auf die Gegenspur
+	elif _gasse > 0.0:
+		ziel = rand   # ganz nach rechts, Platz fuer die Streife
 	_seitversatz = lerpf(_seitversatz, ziel, minf((1.6 if _ueberholt != null else 0.7) * delta, 1.0))
 	# Das Netz schaut nach +X; Drehung um Y bringt +X auf die Blickrichtung.
 	_setze_transform(weg.ort + _rechts * _seitversatz, -atan2(_blick.z, _blick.x))
