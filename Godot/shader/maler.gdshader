@@ -5,21 +5,21 @@ shader_type canvas_item;
 
 uniform sampler2D bild : hint_screen_texture, filter_linear_mipmap;
 
-uniform float weich : hint_range(0.0, 1.0) = 0.5;
-uniform float bloom_staerke : hint_range(0.0, 1.5) = 0.22;
-uniform float bloom_schwelle : hint_range(0.0, 0.95) = 0.55;
+uniform float weich : hint_range(0.0, 1.0) = 0.3;
+uniform float bloom_staerke : hint_range(0.0, 1.5) = 0.3;
+uniform float bloom_schwelle : hint_range(0.0, 0.95) = 0.75;
 uniform float dunst : hint_range(0.0, 1.0) = 0.12;
 uniform vec3 dunst_farbe : source_color = vec3(0.95, 0.82, 0.70);
 uniform float horizont : hint_range(0.0, 1.0) = 0.42;
-uniform float belichtung : hint_range(0.5, 2.0) = 0.95;
-uniform float kontrast : hint_range(0.5, 1.5) = 1.0;
-uniform float schatten_hebung : hint_range(0.0, 0.2) = 0.05;
+uniform float belichtung : hint_range(0.5, 2.0) = 0.85;
+uniform float kontrast : hint_range(0.5, 1.5) = 1.12;
+uniform float schatten_hebung : hint_range(0.0, 0.2) = 0.03;
 uniform vec3 schatten_ton : source_color = vec3(0.55, 0.52, 0.68);
 uniform vec3 licht_ton : source_color = vec3(1.0, 0.84, 0.62);
 uniform float split : hint_range(0.0, 1.0) = 0.28;
-uniform float saettigung : hint_range(0.0, 2.0) = 1.12;
-uniform float gruen_daempfung : hint_range(0.0, 1.0) = 0.4;
-uniform float vignette : hint_range(0.0, 1.0) = 0.22;
+uniform float saettigung : hint_range(0.0, 2.0) = 1.25;
+uniform float gruen_daempfung : hint_range(0.0, 1.0) = 0.15;
+uniform float vignette : hint_range(0.0, 1.0) = 0.25;
 uniform float korn : hint_range(0.0, 0.05) = 0.012;
 
 float luma(vec3 c) { return dot(c, vec3(0.2126, 0.7152, 0.0722)); }

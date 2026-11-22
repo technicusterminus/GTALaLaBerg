@@ -478,10 +478,10 @@ func _umgebung() -> void:
 	env.sky = sky
 	# Feste, warme Umgebungsfarbe statt Himmel: sonst sind die Schatten knallblau.
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.80, 0.74, 0.76)
-	env.ambient_light_energy = 0.8
+	env.ambient_light_color = Color(0.74, 0.73, 0.80)
+	env.ambient_light_energy = 0.7
 	env.tonemap_mode = Environment.TONE_MAPPER_AGX
-	env.tonemap_exposure = 1.05
+	env.tonemap_exposure = 0.85
 	env.tonemap_white = 6.0
 	env.fog_enabled = true
 	env.fog_light_color = Color(0.95, 0.80, 0.66)
@@ -502,13 +502,13 @@ func _umgebung() -> void:
 
 	var sonne := DirectionalLight3D.new()
 	# Tiefe, warme Abendsonne wie im Zielbild: lange, weiche Schatten.
-	sonne.rotation_degrees = Vector3(-20, 150, 0)
-	sonne.light_color = Color(1.0, 0.80, 0.58)
+	sonne.rotation_degrees = Vector3(-15, 150, 0)
+	sonne.light_color = Color(1.0, 0.76, 0.52)
 	sonne.shadow_enabled = not "--ohneschatten" in OS.get_cmdline_user_args()
 	# Schatten nur in der Naehe: dort sieht man sie, weiter weg kosten sie nur.
 	sonne.directional_shadow_max_distance = 180.0
 	sonne.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
-	sonne.light_energy = 1.35
+	sonne.light_energy = 2.0
 	# Gegen Schattenakne auf den senkrechten Waenden (streifige Flaechen im Streiflicht).
 	sonne.shadow_bias = 0.12
 	sonne.shadow_normal_bias = 3.2

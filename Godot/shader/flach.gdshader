@@ -288,11 +288,13 @@ vec3 pflaster(vec3 farbe_daten, float px) {
 	vec2 f = vec2(fract(spalte), fract(reihe));
 	float id = hash21(vec2(floor(spalte), rid));
 	vec3 stein = farbe_daten * (0.72 + 0.4 * id) * (0.9 + 0.2 * wert(uv * 0.8));
-	vec3 foto = textureLod(detail_pflaster, uv / 1.9, stufe(px, 1.9)).rgb;
+	// Kleinere Steine (Kleinpflaster wie in der Altstadt), Fugen dunkler.
+	vec3 foto = textureLod(detail_pflaster, uv / 1.0, stufe(px, 1.0)).rgb;
 	float foto_da = dot(textureLod(detail_pflaster, uv, 9.0).rgb, vec3(0.333));
 	if (foto_da > 0.02) {
 		vec3 grau = vec3(dot(foto, vec3(0.333)));
 		vec3 gefaerbt = mix(foto, grau, 0.35) * 0.82 * mix(vec3(1.0), farbe_daten * 2.2, 0.3);
+		gefaerbt *= mix(0.55, 1.0, smoothstep(0.18, 0.42, dot(foto, vec3(0.333))));
 		return mix(gefaerbt, farbe_daten * 0.9, smoothstep(0.08, 0.3, px * 1.6));
 	}
 	float fuge = smoothstep(0.0, 0.1, f.x) * smoothstep(1.0, 0.9, f.x) * smoothstep(0.0, 0.12, f.y)
