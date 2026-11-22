@@ -10,9 +10,13 @@ const SPALTEN := 9
 ## Ab diesem Verhaeltnis Hoehe zu Radius gilt ein Baum als Nadelbaum.
 const NADEL_VERHAELTNIS := 1.7
 const SICHT_KRONE := 700.0
+## Bis hierhin die ausgeformte Krone mit Schatten, dahinter eine einfache Kugel ohne Schatten.
+const NAH_KRONE := 140.0
 const SICHT_STAMM := 260.0
 
 static var _laub: ArrayMesh
+static var _laub_fern: ArrayMesh
+static var _nadel_fern: ArrayMesh
 static var _nadel: ArrayMesh
 static var _stamm: ArrayMesh
 static var _mat_laub: ShaderMaterial
@@ -39,16 +43,16 @@ static func stelle(wurzel: Node3D, zeilen: PackedFloat32Array, mit_stamm := true
 	for i in laub:
 		(laub_hell if fposmod(zeilen[i * SPALTEN] * 0.37 + zeilen[i * SPALTEN + 2] * 0.61, 1.0)
 				< 0.4 else laub_dunkel).append(i)
-	_krone(wurzel, zeilen, laub_dunkel, _laub, _mat_laub)
-	_krone(wurzel, zeilen, laub_hell, _laub, _mat_laub2)
-	_krone(wurzel, zeilen, nadel, _nadel, _mat_nadel)
+	_krone(wurzel, zeilen, laub_dunkel, _laub, _laub_fern, _mat_laub)
+	_krone(wurzel, zeilen, laub_hell, _laub, _laub_fern, _mat_laub2)
+	_krone(wurzel, zeilen, nadel, _nadel, _nadel_fern, _mat_nadel)
 	if mit_stamm:
 		_staemme(wurzel, zeilen, range(n))
 	return n
 
 
 static func _krone(wurzel: Node3D, zeilen: PackedFloat32Array, liste: Array[int], netz: Mesh,
-		material: Material) -> void:
+		fern: Mesh, material: Material) -> void:
 	if liste.is_empty():
 		return
 	var mm := MultiMesh.new()
@@ -69,8 +73,24 @@ static func _krone(wurzel: Node3D, zeilen: PackedFloat32Array, liste: Array[int]
 	var inst := MultiMeshInstance3D.new()
 	inst.multimesh = mm
 	inst.material_override = material
-	inst.visibility_range_end = SICHT_KRONE
+	inst.visibility_range_end = NAH_KRONE
 	wurzel.add_child(inst)
+	# Ferne Stufe: dieselben Instanzen mit einfacher Kugel, ohne Schatten.
+	var mm_fern := MultiMesh.new()
+	mm_fern.transform_format = MultiMesh.TRANSFORM_3D
+	mm_fern.use_colors = true
+	mm_fern.mesh = fern
+	mm_fern.instance_count = mm.instance_count
+	for j in mm.instance_count:
+		mm_fern.set_instance_transform(j, mm.get_instance_transform(j))
+		mm_fern.set_instance_color(j, mm.get_instance_color(j))
+	var weit := MultiMeshInstance3D.new()
+	weit.multimesh = mm_fern
+	weit.material_override = material
+	weit.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	weit.visibility_range_begin = NAH_KRONE
+	weit.visibility_range_end = SICHT_KRONE
+	wurzel.add_child(weit)
 
 
 static func _staemme(wurzel: Node3D, zeilen: PackedFloat32Array, liste: Array) -> void:
@@ -98,6 +118,8 @@ static func _vorbereiten() -> void:
 		return
 	_laub = _runde_krone()
 	_nadel = _kegel_krone()
+	_laub_fern = _einfache_kugel(7, 4)
+	_nadel_fern = _einfacher_kegel()
 	var zyl := CylinderMesh.new()
 	zyl.top_radius = 0.10
 	zyl.bottom_radius = 0.17
@@ -141,6 +163,32 @@ static func _laubmaterial(tex: Texture2D, ton: Vector3) -> ShaderMaterial:
 ## Mehrere sich durchdringende Kugeln ergeben eine unregelmaessige, runde Krone im
 ## Einheitsmass (Radius 1, Hoehe von -1 bis 1). Normalen zeigen vom Kronenmittelpunkt weg:
 ## so wirkt sie als eine Kugel und nicht als Kugelhaufen.
+## Ferne Stufe der Laubkrone: eine einfache Kugel (Einheitsmass).
+static func _einfache_kugel(segmente: int, ringe: int) -> ArrayMesh:
+	var k := SphereMesh.new()
+	k.radius = 1.0
+	k.height = 2.0
+	k.radial_segments = segmente
+	k.rings = ringe
+	var m := ArrayMesh.new()
+	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, k.get_mesh_arrays())
+	return m
+
+
+## Ferne Stufe des Nadelbaums: ein einziger Kegel.
+static func _einfacher_kegel() -> ArrayMesh:
+	var k := CylinderMesh.new()
+	k.top_radius = 0.0
+	k.bottom_radius = 0.9
+	k.height = 2.0
+	k.radial_segments = 6
+	k.rings = 1
+	k.cap_top = false
+	var m := ArrayMesh.new()
+	m.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, k.get_mesh_arrays())
+	return m
+
+
 static func _runde_krone() -> ArrayMesh:
 	var lappen := [
 		[Vector3(0.0, 0.0, 0.0), 0.72], [Vector3(0.45, -0.15, 0.2), 0.5],
@@ -154,8 +202,8 @@ static func _runde_krone() -> ArrayMesh:
 		var kugel := SphereMesh.new()
 		kugel.radius = 1.0
 		kugel.height = 2.0
-		kugel.radial_segments = 10
-		kugel.rings = 6
+		kugel.radial_segments = 8
+		kugel.rings = 5
 		var a := kugel.get_mesh_arrays()
 		var v: PackedVector3Array = a[Mesh.ARRAY_VERTEX]
 		var ni: PackedInt32Array = a[Mesh.ARRAY_INDEX]

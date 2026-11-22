@@ -118,6 +118,11 @@ static func _karosserie(lack: Color, instanziert: bool, p: Dictionary) -> ArrayM
 	var laenge: float = p["laenge"]
 	var dach: Array = p["dach"]
 	var breiten: Array = p["halbe_breite"]
+	# Geparkte Autos (Hunderte, instanziert) mit jedem zweiten Schnitt: halb so viele Dreiecke,
+	# auf Abstand nicht zu unterscheiden.
+	if instanziert:
+		dach = _jeder_zweite(dach)
+		breiten = _jeder_zweite(breiten)
 	var n := dach.size()
 	var schwelle: float = p["schwelle"]
 	var gurt: float = p["gurt"]
@@ -204,6 +209,15 @@ static func _zeichnung_zuweisen(m: ShaderMaterial, p: Dictionary) -> void:
 	m.set_shader_parameter("detail_an", true)
 
 
+static func _jeder_zweite(a: Array) -> Array:
+	var r: Array = []
+	for i in range(0, a.size(), 2):
+		r.append(a[i])
+	if (a.size() - 1) % 2 != 0:
+		r.append(a[a.size() - 1])
+	return r
+
+
 static func _anfuegen(netz: ArrayMesh, st: SurfaceTool, material: Material) -> void:
 	st.generate_normals()
 	st.commit(netz)
@@ -230,13 +244,15 @@ static func _raeder_und_licht(netz: ArrayMesh, p: Dictionary, halbringe: Array) 
 			reif.top_radius = r
 			reif.bottom_radius = r
 			reif.height = 0.22
-			reif.radial_segments = 16
+			reif.radial_segments = 12
+			reif.rings = 1
 			reifen.append_from(reif, 0, t)
 			var felge := CylinderMesh.new()
 			felge.top_radius = r * 0.62
 			felge.bottom_radius = r * 0.62
 			felge.height = 0.23
-			felge.radial_segments = 12
+			felge.radial_segments = 10
+			felge.rings = 1
 			felgen.append_from(felge, 0, t)
 	var schwelle: float = p["schwelle"]
 	for s in [1.0, -1.0]:

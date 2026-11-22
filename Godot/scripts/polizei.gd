@@ -356,6 +356,9 @@ func _plane(s: Dictionary, ziel: Vector3) -> void:
 	# am letzten Knoten stehen.
 	if _abstand2(route_punkte[route_punkte.size() - 1], ziel) < 150.0:
 		route_punkte.append(_haltepunkt(route_punkte[route_punkte.size() - 1], ziel, auto))
+	# Auf den letzten 40 m nur noch Schritttempo bis 25 km/h: anhalten, nicht rammen.
+	if _abstand2(ort, ziel) < 40.0:
+		tempo = minf(tempo, 25.0)
 	auto.folge_weg(route_punkte, tempo)
 
 

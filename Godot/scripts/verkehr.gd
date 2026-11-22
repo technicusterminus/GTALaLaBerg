@@ -5,7 +5,7 @@ extends Node3D
 ## je Karosserieteil und Sektor, Lack aus der Instanzfarbe).
 
 const SEKTOR_M := 500.0
-const PARKSICHT := 700.0
+const PARKSICHT := 380.0
 const LACKE := [
 	Color(0.55, 0.06, 0.05), Color(0.08, 0.12, 0.30), Color(0.75, 0.75, 0.77),
 	Color(0.10, 0.10, 0.11), Color(0.80, 0.78, 0.70), Color(0.12, 0.30, 0.18),

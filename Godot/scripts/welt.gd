@@ -439,6 +439,11 @@ func _bild(name: String) -> void:
 	var pfad := _bildpfad.replace(".png", "_%s.png" % name)
 	get_viewport().get_texture().get_image().save_png(pfad)
 	print("LALABERG_BILD %s" % pfad)
+	print("LALABERG_LAST %s aufrufe=%d dreiecke=%d objekte=%d fps=%d" % [name,
+			Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),
+			Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME),
+			Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME),
+			Engine.get_frames_per_second()])
 
 
 func _pruefe(name: String, bedingung: bool) -> bool:
@@ -998,7 +1003,9 @@ func _umgebung() -> void:
 	sonne.rotation_degrees = Vector3(-34, 150, 0)
 	sonne.light_color = Color(1.0, 0.89, 0.72)
 	sonne.shadow_enabled = not "--ohneschatten" in OS.get_cmdline_user_args()
-	sonne.directional_shadow_max_distance = 450.0
+	# Schatten nur in der Naehe: dort sieht man sie, weiter weg kosten sie nur.
+	sonne.directional_shadow_max_distance = 180.0
+	sonne.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 	sonne.light_energy = 1.0
 	# Gegen Schattenakne auf den senkrechten Waenden (streifige Flaechen im Streiflicht).
 	sonne.shadow_bias = 0.12

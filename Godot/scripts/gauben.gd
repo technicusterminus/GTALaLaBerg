@@ -6,7 +6,7 @@ extends RefCounted
 ## kleines Satteldach, vorn ueber die Front hinaus.
 
 const SPALTEN := 5
-const SICHT := 330.0
+const SICHT := 240.0
 
 static var _netz: ArrayMesh
 
