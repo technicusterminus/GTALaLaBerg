@@ -233,6 +233,60 @@ def baeume_aus(abschnitte: list) -> np.ndarray:
     return np.asarray(zeilen, dtype=np.float32).reshape(-1, 9)
 
 
+def giebel_aus(pos: np.ndarray, idx: np.ndarray, altstadt) -> list:
+    """Giebel der Satteldaecher in der Altstadt, aus der Dachform: First = hoechste Ecken,
+    Traufe = tiefste Ecken; an jedem Firstende liegt ein Giebel, dessen Grundkante die zwei
+    Traufecken an diesem Ende bilden. Walmdaecher (First endet weit vor der Traufkante) bleiben
+    aus. Je Giebel eine Zeile [x, y_traufe, z, normale_x, normale_z, breite, hoehe]; Godot setzt
+    dort einen geschwungenen Barockgiebel (giebel.gd)."""
+    if altstadt is None:
+        return []
+    zeilen = []
+    # Die Dachflaechen sind einzelne Vierecke mit eigenen Ecken: erst gleiche Positionen
+    # zusammenfuehren (auf 5 cm), dann zusammenhaengende Daecher bilden.
+    schluessel = np.round(pos / 0.05).astype(np.int64)
+    _, gleich = np.unique(schluessel, axis=0, return_inverse=True)
+    gleich = gleich.reshape(-1)
+    for g0 in komponenten(np.zeros((gleich.max() + 1, 3)), gleich[idx]):
+        g = np.where(np.isin(gleich, g0))[0]
+        p = pos[g]
+        mitte = p.mean(axis=0)
+        if not (altstadt[0] < mitte[0] < altstadt[2] and altstadt[1] < mitte[2] < altstadt[3]):
+            continue
+        unten_y, oben_y = p[:, 1].min(), p[:, 1].max()
+        hoehe = float(oben_y - unten_y)
+        if hoehe < 1.8 or hoehe > 12.0:
+            continue
+        first = p[p[:, 1] > oben_y - 0.25][:, [0, 2]]
+        traufe = p[p[:, 1] < unten_y + 0.25][:, [0, 2]]
+        if len(first) < 2 or len(traufe) < 4:
+            continue
+        d = first[:, None, :] - first[None, :, :]
+        i, j = np.unravel_index(np.argmax((d ** 2).sum(-1)), (len(first), len(first)))
+        a_end, b_end = first[i], first[j]
+        achse = b_end - a_end
+        flen = float(np.linalg.norm(achse))
+        if flen < 2.0:
+            continue
+        achse /= flen
+        quer = np.array([-achse[1], achse[0]])
+        lage = (traufe - a_end) @ achse          # Lage der Traufecken entlang des Firsts
+        for ende, richtung, grenze in ((a_end, -1.0, lage.min()), (b_end, 1.0, lage.max())):
+            am_ende = traufe[np.abs(lage - grenze) < 0.6]
+            if len(am_ende) < 2:
+                continue
+            s_quer = (am_ende - ende) @ quer
+            l, r = am_ende[np.argmin(s_quer)], am_ende[np.argmax(s_quer)]
+            breite = float(np.linalg.norm(r - l))
+            fuss = (l + r) / 2
+            # Walmdach: Firstende liegt weit hinter der Traufkante.
+            if breite < 3.0 or abs(float((ende - fuss) @ achse)) > 0.9:
+                continue
+            zeilen.append([fuss[0], unten_y, fuss[1], achse[0] * richtung, achse[1] * richtung,
+                           breite, hoehe])
+    return zeilen
+
+
 def dach_details(pos: np.ndarray, idx: np.ndarray) -> list:
     """Dachueberstand und Gauben. pos wird veraendert: die tiefsten Ecken jedes Dachteils
     (die Traufe) ruecken 45 cm nach aussen und 6 cm nach unten, so steht das Dach ueber die
@@ -309,6 +363,7 @@ def main() -> int:
         baumquellen = []
         strassen = []
         gauben_zeilen = []
+        giebel_zeilen = []
         # Strassenflaechen des Sektors vorab: fuer Bordsteine und um Gehwege auf der Fahrbahn
         # zu entfernen (die Quelldaten legen Gehwegstreifen teils quer ueber die Strasse).
         vorab = []
@@ -333,6 +388,7 @@ def main() -> int:
                     idx = tri[behalten].reshape(-1)
                 relief_anwenden(relief, a["name"], pos, idx)
                 if art(a["name"]) == "Roof":
+                    giebel_zeilen.extend(giebel_aus(pos, idx.reshape(-1, 3), altstadt))
                     gauben_zeilen.extend(dach_details(pos, idx.reshape(-1, 3)))
                 if art(a["name"]) in ("Tree", "Trunk"):
                     # Baeume werden als Instanzen gestellt (siehe baeume_aus), nicht als Netz.
@@ -361,6 +417,8 @@ def main() -> int:
                 dreiecke += len(bidx) // 3
         gauben = np.asarray(gauben_zeilen, dtype=np.float32).reshape(-1, 5)
         (ZIEL / "sektoren" / f"{eintrag['id']}.gauben").write_bytes(gauben.tobytes())
+        giebel = np.asarray(giebel_zeilen, dtype=np.float32).reshape(-1, 7)
+        (ZIEL / "sektoren" / f"{eintrag['id']}.giebel").write_bytes(giebel.tobytes())
         baeume = baeume_aus(baumquellen)
         (ZIEL / "sektoren" / f"{eintrag['id']}.baeume").write_bytes(baeume.tobytes())
         flaechen = np.concatenate(kollision) if kollision else np.zeros((0, 3), np.float32)
@@ -371,6 +429,7 @@ def main() -> int:
         verzeichnis.append({"id": eintrag["id"], "index": eintrag["index"],
                             "grenzen": [b[0] / 100, b[1] / 100, b[2] / 100, b[3] / 100],
                             "kollision_ecken": int(len(flaechen)), "baeume": int(len(baeume)), "gauben": int(len(gauben)),
+                            "giebel": int(len(giebel)),
                             "abschnitte": abschnitte})
 
     spawn = manifest["spawn"]
