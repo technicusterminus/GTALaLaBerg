@@ -256,7 +256,16 @@ func _material(art: String, farbe: Array) -> ShaderMaterial:
 			elif art == "Roof":
 				m.set_shader_parameter("stil", 4)
 				_fassadentexturen(m)   # fuer die senkrechten Giebeldreiecke der Dachflaeche
+			elif art == "Sockel":
+				m.set_shader_parameter("stil", 9)
+			elif art == "Gesims":
+				m.set_shader_parameter("stil", 11)
 			m.set_shader_parameter("rauheit", 0.8)
+		"Laden":
+			m.set_shader_parameter("stil", 8)
+		"Tuer":
+			m.set_shader_parameter("stil", 10)
+			m.set_shader_parameter("rauheit", 0.7)
 		"Gehweg", "Sidewalk", "Plaza":
 			m.set_shader_parameter("stil", 5)
 			m.set_shader_parameter("rauheit", 0.9)

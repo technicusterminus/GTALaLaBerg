@@ -93,6 +93,62 @@ def verschiebe_flach(relief, zahlen: list) -> list:
     return np.rint(a).astype(int).reshape(-1).tolist()
 
 
+def bordsteine(teile: list, grenzen_m, ohne=None, hoehe: float = 0.14, breite: float = 0.22):
+    """Bordsteine an den Raendern der Strassenflaechen eines Sektors. teile: Liste (pos, idx) der
+    Strassenabschnitte (Godot-Achsen, Meter, idx in Quellwicklung). Eine Kante, die nur zu einem
+    Strassendreieck gehoert, ist ein Rand; dort entsteht ein Steinstreifen nach aussen (eine
+    senkrechte Stirn und eine Oberseite). Kanten auf der Sektorgrenze sind Nahtstellen, keine Raender.
+    Liefert (pos, idx) in Godot-Wicklung oder None."""
+    if not teile:
+        return None
+    alle_p = np.concatenate([p for p, _ in teile])
+    alle_i = []
+    versatz = 0
+    for p, i in teile:
+        alle_i.append(i.reshape(-1, 3) + versatz)
+        versatz += len(p)
+    tris = np.concatenate(alle_i)
+    # Gleiche Ecken verschiedener Abschnitte zusammenfuehren (auf 1 cm gerundet).
+    schluessel = np.round(alle_p[:, [0, 2]] * 100).astype(np.int64)
+    _, eindeutig = np.unique(schluessel[:, 0] * 10_000_000 + schluessel[:, 1], return_inverse=True)
+    t = eindeutig[tris]
+    kanten = np.concatenate([t[:, [0, 1]], t[:, [1, 2]], t[:, [2, 0]]])
+    gegen = np.concatenate([t[:, 2], t[:, 0], t[:, 1]])
+    roh = np.concatenate([tris[:, [0, 1]], tris[:, [1, 2]], tris[:, [2, 0]]])
+    roh_gegen = np.concatenate([tris[:, 2], tris[:, 0], tris[:, 1]])
+    sortiert = np.sort(kanten, axis=1)
+    code = sortiert[:, 0] * 10_000_000 + sortiert[:, 1]
+    werte, anzahl = np.unique(code, return_counts=True)
+    rand = np.isin(code, werte[anzahl == 1])
+    x0, z0, x1, z1 = grenzen_m
+    ecken, flaechen = [], []
+    for (ia, ib), ic in zip(roh[rand], roh_gegen[rand]):
+        a, b, c = alle_p[ia], alle_p[ib], alle_p[ic]
+        auf_grenze = any(abs(a[k] - g) < 0.05 and abs(b[k] - g) < 0.05
+                         for k, g in ((0, x0), (0, x1), (2, z0), (2, z1)))
+        richtung = np.array([b[0] - a[0], b[2] - a[2]])
+        laenge = float(np.linalg.norm(richtung))
+        # In der Altstadt (ohne: x0, z0, x1, z1) liegen Gassen und Plaetze ebenerdig.
+        in_altstadt = ohne is not None and ohne[0] < a[0] < ohne[2] and ohne[1] < a[2] < ohne[3]
+        if auf_grenze or laenge < 0.3 or in_altstadt:
+            continue
+        aussen = np.array([richtung[1], -richtung[0]]) / laenge
+        if np.dot(aussen, [c[0] - a[0], c[2] - a[2]]) > 0:
+            aussen = -aussen
+        n = np.array([aussen[0], 0.0, aussen[1]]) * breite
+        h = np.array([0.0, hoehe, 0.0])
+        s = len(ecken)
+        ecken += [a, b, a + h, b + h, a + h + n, b + h + n]
+        flaechen += [[s, s + 1, s + 3], [s, s + 3, s + 2],          # Stirn zur Strasse
+                     [s + 2, s + 3, s + 5], [s + 2, s + 5, s + 4]]  # Oberseite
+    if not ecken:
+        return None
+    pos = np.asarray(ecken, dtype=np.float32)
+    idx = np.asarray(flaechen, dtype=np.int32)
+    # Beide Seiten zeichnen (der Shader kehrt die Normale ohnehin zur Kamera).
+    return pos, np.ascontiguousarray(idx[:, [0, 2, 1]]).reshape(-1)
+
+
 def komponenten(pos: np.ndarray, idx: np.ndarray) -> list:
     """Zusammenhaengende Teile eines Netzes: Liste von Eckenindex-Arrays."""
     eltern = np.arange(len(pos))
@@ -203,6 +259,10 @@ def main() -> int:
     manifest = json.loads(manifest_pfad.read_text())
     (ZIEL / "sektoren").mkdir(parents=True, exist_ok=True)
     relief = baue_relief(manifest)
+    orte = json.loads((QUELLE / "Orte" / "orte.json").read_text())
+    a = orte.get("altstadt")
+    altstadt = (min(a[0], a[2]) / 100, min(a[1], a[3]) / 100, max(a[0], a[2]) / 100,
+                max(a[1], a[3]) / 100) if a else None
 
     verzeichnis = []
     summe_msh = summe_col = dreiecke = 0
@@ -211,6 +271,7 @@ def main() -> int:
         abschnitte = []
         kollision = []
         baumquellen = []
+        strassen = []
         gauben_zeilen = []
         with open(ZIEL / "sektoren" / f"{eintrag['id']}.msh", "wb") as msh:
             for a in daten["sections"]:
@@ -225,6 +286,8 @@ def main() -> int:
                     # Baeume werden als Instanzen gestellt (siehe baeume_aus), nicht als Netz.
                     baumquellen.append((a["name"], pos, idx.reshape(-1, 3), a["color"][:3]))
                     continue
+                if art(a["name"]) == "Road":
+                    strassen.append((pos.copy(), idx.copy()))
                 idx = np.ascontiguousarray(idx.reshape(-1, 3)[:, [0, 2, 1]]).reshape(-1)
                 msh.write(pos.tobytes())
                 msh.write(idx.tobytes())
@@ -234,6 +297,15 @@ def main() -> int:
                 dreiecke += len(idx) // 3
                 if art(a["name"]) in KOLLISION:
                     kollision.append(pos[idx])
+            b = eintrag["boundsCm"]
+            kanten = bordsteine(strassen, (b[0] / 100, b[1] / 100, b[2] / 100, b[3] / 100), altstadt)
+            if kanten is not None:
+                bpos, bidx = kanten
+                msh.write(bpos.tobytes())
+                msh.write(bidx.tobytes())
+                abschnitte.append({"n": "Bordstein_0", "a": "Bordstein", "c": [0.42, 0.42, 0.40],
+                                   "v": len(bpos), "i": len(bidx)})
+                dreiecke += len(bidx) // 3
         gauben = np.asarray(gauben_zeilen, dtype=np.float32).reshape(-1, 5)
         (ZIEL / "sektoren" / f"{eintrag['id']}.gauben").write_bytes(gauben.tobytes())
         baeume = baeume_aus(baumquellen)

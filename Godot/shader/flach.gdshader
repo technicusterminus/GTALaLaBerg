@@ -14,7 +14,8 @@ uniform float glanz : hint_range(0.0, 1.0) = 0.0;
 uniform bool oben = false;
 // 0 = flach, 1 = Gelaende (Wiesenflecken, Erde am Hang), 2 = Wasser (Wellen, Glitzern),
 // 3 = Hausfassade (eingelassene Fenster mit Laibung, Rahmen, Bank und Laeden, Putz),
-// 4 = Ziegeldach, 5 = Pflaster, 6 = Laub, 7 = Strasse (in der Altstadt Kopfsteinpflaster).
+// 4 = Ziegeldach, 5 = Pflaster, 6 = Laub, 7 = Strasse (in der Altstadt Kopfsteinpflaster),
+// 8 = Ladenfront (Schaufenster), 9 = Sockel (Naturstein), 10 = Tuer (Holz), 11 = Gesims.
 uniform int stil = 0;
 
 // Fotoaehnliche Details (vom Bildmodell erzeugt, nahtlos gemacht); fehlen sie, bleibt es bei
@@ -288,6 +289,49 @@ vec3 pflaster(vec3 farbe_daten, float px) {
 	return mix(stein * (0.45 + 0.55 * fuge), farbe_daten * 0.9, weich);
 }
 
+// Ladenfront: grosse Glasscheiben mit Sprossen alle 1,6 m, hellem Rahmen und Spiegelung des
+// Himmels; nicht mehr als dunkler Kasten.
+vec3 laden(vec3 wn, float px) {
+	vec3 t = normalize(cross(vec3(0.0, 1.0, 0.0), wn));
+	float u = dot(welt, t);
+	float f = fract(u / 1.6);
+	float pfosten = 1.0 - smoothstep(0.035, 0.06, min(f, 1.0 - f));
+	float hoehe = fract(welt.y / 3.6);
+	float kaempfer = 1.0 - smoothstep(0.012, 0.03, abs(hoehe - 0.78));
+	vec3 glas = mix(vec3(0.06, 0.09, 0.12), vec3(0.42, 0.52, 0.62), smoothstep(0.1, 0.9, hoehe));
+	glas += vec3(0.25) * pow(wert(vec2(u * 0.3, welt.y * 0.2)), 6.0);
+	vec3 rahmen = vec3(0.86, 0.84, 0.78);
+	float weich = smoothstep(0.05, 0.25, px * 1.6);
+	return mix(mix(glas, rahmen, max(pfosten, kaempfer)), mix(glas, rahmen, 0.25), weich);
+}
+
+// Sockel: Natursteinquader in hellem Grau-Beige, Reihen 0,35 m, versetzt, dunkle Fugen.
+vec3 sockel(vec3 wn, float px) {
+	vec3 t = normalize(cross(vec3(0.0, 1.0, 0.0), wn));
+	float u = dot(welt, t);
+	float reihe = welt.y / 0.35;
+	float rid = floor(reihe);
+	float spalte = (u + 0.3 * mod(rid, 2.0)) / 0.6;
+	vec2 f = vec2(fract(spalte), fract(reihe));
+	float id = hash21(vec2(floor(spalte), rid));
+	vec3 stein = vec3(0.50, 0.47, 0.41) * (0.82 + 0.3 * id) * (0.9 + 0.2 * wert(vec2(u, welt.y) * 3.0));
+	float fuge = smoothstep(0.0, 0.05, f.x) * smoothstep(1.0, 0.95, f.x) * smoothstep(0.0, 0.07, f.y)
+			* smoothstep(1.0, 0.93, f.y);
+	float weich = smoothstep(0.05, 0.25, px * 1.6);
+	return mix(stein * (0.55 + 0.45 * fuge), vec3(0.46, 0.43, 0.38), weich);
+}
+
+// Tuer: Holz mit senkrechter Maserung und Fuellungen.
+vec3 tuer(vec3 farbe_daten, vec3 wn) {
+	vec3 t = normalize(cross(vec3(0.0, 1.0, 0.0), wn));
+	float u = dot(welt, t);
+	float maser = wert(vec2(u * 18.0, welt.y * 1.5));
+	vec3 holz = mix(vec3(0.22, 0.12, 0.06), vec3(0.34, 0.20, 0.10), maser);
+	float fuellung = step(0.15, fract(u / 0.5)) * step(fract(u / 0.5), 0.85)
+			* step(0.12, fract(welt.y / 1.0)) * step(fract(welt.y / 1.0), 0.88);
+	return holz * mix(0.8, 1.05, fuellung) * mix(vec3(1.0), farbe_daten * 1.6, 0.15);
+}
+
 void vertex() {
 	welt = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	if (oben) {
@@ -329,6 +373,20 @@ void fragment() {
 		c = mix(c, mix(gruen, weizen, reif * 0.6), 0.85);
 		float steil = smoothstep(0.93, 0.72, abs(wn.y));
 		c = mix(c, vec3(0.20, 0.13, 0.07) * (0.8 + 0.4 * g), steil);
+	} else if (stil == 8) {
+		if (abs(wn.y) < 0.4) {
+			c = laden(wn, px);
+			rau = 0.15;
+		}
+	} else if (stil == 9) {
+		if (abs(wn.y) < 0.4) {
+			c = sockel(wn, px);
+		}
+	} else if (stil == 10) {
+		c = tuer(farbe, wn);
+	} else if (stil == 11) {
+		// Gesims: heller Stuck, leicht abgesetzt von der Wand.
+		c = mix(farbe, vec3(0.80, 0.77, 0.70), 0.65);
 	} else if (stil == 4) {
 		if (abs(wn.y) > 0.2) {
 			c = dach(farbe, wn, px);
