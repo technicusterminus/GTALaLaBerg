@@ -40,6 +40,12 @@ bool in_altstadt(vec3 p) {
 
 // Fensterfelder (vom Bildmodell erzeugt): je Zelle ein Fenster auf neutralem Putz.
 uniform bool fassade_foto = false;
+// Ladenfronten (vom Bildmodell): Baeckerei, Cafe, Apotheke, Buchladen, je 4,2 x 3,6 m.
+uniform bool laden_foto = false;
+uniform sampler2D laden_a : source_color, filter_linear_mipmap, repeat_enable;
+uniform sampler2D laden_b : source_color, filter_linear_mipmap, repeat_enable;
+uniform sampler2D laden_c : source_color, filter_linear_mipmap, repeat_enable;
+uniform sampler2D laden_d : source_color, filter_linear_mipmap, repeat_enable;
 uniform sampler2D fenster_a : source_color, filter_linear_mipmap, repeat_enable;
 uniform sampler2D fenster_b : source_color, filter_linear_mipmap, repeat_enable;
 uniform sampler2D fenster_c : source_color, filter_linear_mipmap, repeat_enable;
@@ -309,6 +315,18 @@ vec3 pflaster(vec3 farbe_daten, float px) {
 vec3 laden(vec3 wn, float px) {
 	vec3 t = normalize(cross(vec3(0.0, 1.0, 0.0), wn));
 	float u = dot(welt, t);
+	if (laden_foto) {
+		float zu = u / 4.2;
+		float zv = welt.y / 3.6;
+		vec2 zelle = vec2(floor(zu), floor(zv));
+		vec2 uv = vec2(fract(zu), 1.0 - fract(zv));
+		float z = hash21(zelle + floor(wn.xz * 5.0 + 0.5) * 11.3);
+		float s = stufe(px, 4.2);
+		if (z < 0.25) return textureLod(laden_a, uv, s).rgb;
+		if (z < 0.5) return textureLod(laden_b, uv, s).rgb;
+		if (z < 0.75) return textureLod(laden_c, uv, s).rgb;
+		return textureLod(laden_d, uv, s).rgb;
+	}
 	float f = fract(u / 1.6);
 	float pfosten = 1.0 - smoothstep(0.035, 0.06, min(f, 1.0 - f));
 	float hoehe = fract(welt.y / 3.6);

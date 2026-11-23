@@ -269,6 +269,10 @@ func _material(art: String, farbe: Array) -> ShaderMaterial:
 			m.set_shader_parameter("rauheit", 0.8)
 		"Laden":
 			m.set_shader_parameter("stil", 8)
+			if ResourceLoader.exists("res://texturen/laden_a.jpg"):
+				for k in ["a", "b", "c", "d"]:
+					m.set_shader_parameter("laden_" + k, load("res://texturen/laden_%s.jpg" % k))
+				m.set_shader_parameter("laden_foto", true)
 		"Tuer":
 			m.set_shader_parameter("stil", 10)
 			m.set_shader_parameter("rauheit", 0.7)
