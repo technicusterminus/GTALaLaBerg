@@ -408,6 +408,15 @@ void fragment() {
 		vec3 gruen = vec3(0.14, 0.19, 0.05) * (0.85 + 0.35 * g) * (0.93 + 0.07 * streifen);
 		vec3 weizen = vec3(0.34, 0.29, 0.12) * (0.85 + 0.3 * g) * (0.9 + 0.1 * streifen);
 		c = mix(c, mix(gruen, weizen, reif * 0.6), 0.85);
+		// Wildblumen: kleine Tupfen in Weiss, Gelb und Violett, nur nah (sonst flimmert es).
+		vec2 bz = floor(welt.xz / 0.35);
+		float bl = hash21(bz);
+		float flecken = smoothstep(0.55, 0.75, wert(welt.xz / 9.0));
+		if (bl > 1.0 - 0.10 * flecken && px < 0.06) {
+			vec3 blume = bl > 0.985 ? vec3(0.55, 0.30, 0.70) : (bl > 0.96 ? vec3(0.85, 0.72, 0.12) : vec3(0.85, 0.85, 0.80));
+			vec2 f = fract(welt.xz / 0.35) - 0.5;
+			c = mix(c, blume, (1.0 - smoothstep(0.08, 0.18, length(f))) * (1.0 - smoothstep(0.03, 0.06, px)));
+		}
 		float steil = smoothstep(0.93, 0.72, abs(wn.y));
 		c = mix(c, vec3(0.20, 0.13, 0.07) * (0.8 + 0.4 * g), steil);
 	} else if (stil == 8) {

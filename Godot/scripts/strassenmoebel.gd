@@ -7,16 +7,18 @@ extends Node
 ## etwas gestellt. Alles haengt am Sektorknoten und verschwindet mit ihm.
 
 const LAMPE_ABSTAND := 32.0
-const BAUM_ABSTAND := 17.0
-const BUSCH_ABSTAND := 7.0
+const BAUM_ABSTAND := 12.0
+const BUSCH_ABSTAND := 4.5
+const BANK_ABSTAND := 55.0
 const PRUEFE_JE_BILD := 160
 
 var stadt: Stadt
 var polizei: Polizei
-var gestellt := {"lampen": 0, "baeume": 0, "buesche": 0}
+var gestellt := {"lampen": 0, "baeume": 0, "buesche": 0, "baenke": 0}
 
 var _plaetze := {}   # Vector2i -> {"lampen": Array, "baeume": Array, "buesche": Array}
 var _lampe: ArrayMesh
+var _bank: ArrayMesh
 var _mat_metall: StandardMaterial3D
 var _mat_licht: StandardMaterial3D
 
@@ -65,10 +67,17 @@ func _berechne() -> void:
 		while s < laenge - 2.0:
 			var p := a.lerp(b, s / laenge)
 			var wuerfel := _hash(p.x * 1.7, p.z * 2.3)
-			if wuerfel < 0.45:
-				var seite := 1.0 if wuerfel < 0.22 else -1.0
+			if wuerfel < 0.6:
+				var seite := 1.0 if wuerfel < 0.3 else -1.0
 				_merke(p, rechts, seite, 6.3 + 1.4 * wuerfel, "buesche", r)
 			s += BUSCH_ABSTAND
+		s = 20.0 + samen * 25.0
+		zaehler = 0
+		while s < laenge - 6.0:
+			var p := a.lerp(b, s / laenge)
+			_merke(p, rechts, 1.0 if zaehler % 2 == 0 else -1.0, 4.6, "baenke", r)
+			zaehler += 1
+			s += BANK_ABSTAND
 
 
 func _merke(p: Vector3, rechts: Vector3, seite: float, abstand: float, art: String,
@@ -76,7 +85,7 @@ func _merke(p: Vector3, rechts: Vector3, seite: float, abstand: float, art: Stri
 	var ort := p + rechts * seite * abstand
 	var k := stadt.sektor_an(ort)
 	if not _plaetze.has(k):
-		_plaetze[k] = {"lampen": [], "baeume": [], "buesche": []}
+		_plaetze[k] = {"lampen": [], "baeume": [], "buesche": [], "baenke": []}
 	# Zur Strasse hin zeigt die Laterne: Gegenrichtung der Seite.
 	_plaetze[k][art].append({"ort": ort, "y": p.y, "zur_strasse": -rechts * seite,
 			"richtung": richtung})
@@ -97,7 +106,7 @@ func _stelle(wurzel: Node3D, plaetze: Dictionary) -> void:
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	var raum := stadt.get_world_3d().direct_space_state
-	var gueltig := {"lampen": [], "baeume": [], "buesche": []}
+	var gueltig := {"lampen": [], "baeume": [], "buesche": [], "baenke": []}
 	var zaehler := 0
 	for art: String in plaetze:
 		for p: Dictionary in plaetze[art]:
@@ -122,6 +131,61 @@ func _stelle(wurzel: Node3D, plaetze: Dictionary) -> void:
 	_lampen(wurzel, gueltig["lampen"])
 	_baeume(wurzel, gueltig["baeume"], false)
 	_baeume(wurzel, gueltig["buesche"], true)
+	_baenke(wurzel, gueltig["baenke"])
+
+
+## Parkbaenke (Holzlatten, Gusseisenfuesse) mit Muelleimer daneben, zur Strasse gedreht.
+func _baenke(wurzel: Node3D, liste: Array) -> void:
+	if liste.is_empty():
+		return
+	if _bank == null:
+		_bank = ArrayMesh.new()
+		var holz := StandardMaterial3D.new()
+		holz.albedo_color = Color(0.42, 0.26, 0.13)
+		holz.roughness = 0.8
+		var eisen := StandardMaterial3D.new()
+		eisen.albedo_color = Color(0.08, 0.09, 0.08)
+		eisen.roughness = 0.5
+		var gruen := StandardMaterial3D.new()
+		gruen.albedo_color = Color(0.10, 0.28, 0.16)
+		gruen.roughness = 0.6
+		_teil_in(_bank, [[Vector3(1.8, 0.05, 0.14), Vector3(0, 0.45, -0.16)],
+				[Vector3(1.8, 0.05, 0.14), Vector3(0, 0.45, 0.0)],
+				[Vector3(1.8, 0.05, 0.14), Vector3(0, 0.45, 0.16)],
+				[Vector3(1.8, 0.14, 0.04), Vector3(0, 0.72, 0.26)],
+				[Vector3(1.8, 0.14, 0.04), Vector3(0, 0.9, 0.28)]], holz)
+		_teil_in(_bank, [[Vector3(0.06, 0.45, 0.5), Vector3(-0.8, 0.22, 0.05)],
+				[Vector3(0.06, 0.45, 0.5), Vector3(0.8, 0.22, 0.05)],
+				[Vector3(0.06, 0.55, 0.06), Vector3(-0.8, 0.72, 0.28)],
+				[Vector3(0.06, 0.55, 0.06), Vector3(0.8, 0.72, 0.28)]], eisen)
+		_teil_in(_bank, [[Vector3(0.38, 0.75, 0.38), Vector3(1.4, 0.38, 0.1)]], gruen)
+	var mm := MultiMesh.new()
+	mm.transform_format = MultiMesh.TRANSFORM_3D
+	mm.mesh = _bank
+	mm.instance_count = liste.size()
+	for i in liste.size():
+		var p: Dictionary = liste[i]
+		var zur: Vector3 = (p["zur_strasse"] as Vector3).normalized()
+		var basis := Basis.looking_at(zur, Vector3.UP)
+		var o: Vector3 = p["ort"]
+		mm.set_instance_transform(i, Transform3D(basis, Vector3(o.x, p["boden"], o.z)))
+	var inst := MultiMeshInstance3D.new()
+	inst.multimesh = mm
+	inst.visibility_range_end = 160.0
+	wurzel.add_child(inst)
+	gestellt["baenke"] += liste.size()
+
+
+static func _teil_in(netz: ArrayMesh, kaesten: Array, stoff: Material) -> void:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for k: Array in kaesten:
+		var b := BoxMesh.new()
+		b.size = k[0]
+		st.append_from(b, 0, Transform3D(Basis(), k[1]))
+	st.generate_normals()
+	st.commit(netz)
+	netz.surface_set_material(netz.get_surface_count() - 1, stoff)
 
 
 func _lampen(wurzel: Node3D, liste: Array) -> void:
