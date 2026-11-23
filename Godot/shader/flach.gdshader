@@ -271,13 +271,17 @@ vec3 dach(vec3 farbe_daten, vec3 wn, float px) {
 	float id = hash21(vec2(sid, rid));
 	// Terrakotta; die Datenfarbe faerbt leicht um (graue und braune Daecher bleiben moeglich).
 	vec3 terrakotta = mix(vec3(0.40, 0.11, 0.045), vec3(0.66, 0.25, 0.10), id);
-	vec3 foto = textureLod(detail_dach, uv / 3.2, stufe(px, 3.2)).rgb;
+	// Biberschwaenze in echter Groesse (die Kachel zeigt rund 1,1 m Dach).
+	vec3 foto = textureLod(detail_dach, uv / 1.1, stufe(px, 1.1)).rgb;
 	float foto_da = dot(textureLod(detail_dach, uv, 9.0).rgb, vec3(0.333));
 	vec3 ton = mix(terrakotta, terrakotta * (farbe_daten / max(0.15, dot(farbe_daten, vec3(0.333)))), 0.3);
 	ton *= 0.82 + 0.34 * wert(uv * 0.55) + 0.06 * (wert(uv * 6.0) - 0.5);
 	float naht = smoothstep(0.0, 0.07, f.y) * smoothstep(0.0, 0.05, f.x) * smoothstep(1.0, 0.95, f.x);
 	float ueberlappung = mix(0.62, 1.0, smoothstep(0.0, 0.55, f.y));
 	vec3 procedural = ton * (0.5 + 0.5 * naht) * ueberlappung;
+	// Je Dach ein eigener Ton: helles Orange bis dunkles, altes Ziegelrot.
+	float dachton = hash21(floor(welt.xz / 11.0) + 3.7);
+	foto *= mix(vec3(1.05, 0.98, 0.92), vec3(0.72, 0.58, 0.52), dachton);
 	vec3 detail = foto_da > 0.02 ? foto * (0.85 + 0.3 * wert(uv * 0.55))
 			* mix(vec3(1.0), farbe_daten / max(0.15, dot(farbe_daten, vec3(0.333))), 0.2) : procedural;
 	float pixel = px * 1.6;
