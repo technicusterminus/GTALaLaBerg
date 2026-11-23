@@ -148,6 +148,12 @@ func _brunnen() -> Node3D:
 	kranz.outer_radius = 0.26
 	var k := _teil(w, kranz, Vector3(0, 8.0, -0.05), gold)
 	k.rotation.x = PI / 2.0
+	# Plaetschern (gerechnet, Tools/Sounds/SFX_Brunnen.wav), hoerbar bis gut 40 m.
+	var klang := Ton.schleife(w, "SFX_Brunnen", -4.0)
+	if klang != null:
+		klang.position = Vector3(0, 1.2, 0)
+		klang.max_distance = 45.0
+		klang.autoplay = true
 	# Gitter: duenne Staebe rund um das Becken.
 	var eisen := _stoff(Color(0.08, 0.08, 0.09), 0.5)
 	var stab := _kasten(Vector3(0.04, 1.1, 0.04))

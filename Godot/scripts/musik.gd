@@ -18,6 +18,7 @@ var aktuell := ""
 
 var _strom := {}
 var _spieler := AudioStreamPlayer.new()
+var _atmo := AudioStreamPlayer.new()
 var _takt := 0.0
 
 
@@ -25,6 +26,17 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_spieler.volume_db = -60.0
 	add_child(_spieler)
+	# Atmosphaere draussen (Voegel, Wind; Lyria ueber OpenRouter, daten/ton_atmo), immer leise
+	# unter allem; fehlt die Datei, bleibt es still.
+	var atmo := ProjectSettings.globalize_path("res://daten/ton_atmo/draussen.mp3")
+	if FileAccess.file_exists(atmo):
+		var mp3 := AudioStreamMP3.load_from_file(atmo)
+		if mp3 != null:
+			mp3.loop = true
+			_atmo.stream = mp3
+			_atmo.volume_db = -16.0
+			add_child(_atmo)
+			_atmo.play()
 	for n: String in NAMEN:
 		var pfad := ProjectSettings.globalize_path("res://daten/musik/%s.mp3" % n)
 		if FileAccess.file_exists(pfad):
