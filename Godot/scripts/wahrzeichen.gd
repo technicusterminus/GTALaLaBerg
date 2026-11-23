@@ -312,6 +312,8 @@ func _cafes(platz: Vector3, boden_y: float) -> bool:
 				gruppe.add_child(f)
 			add_child(gruppe)
 			gruppe.global_position = ort
+			if zahl == 0:
+				print("LALABERG_WAHRZEICHEN erstes Cafe bei %s" % ort)
 			zahl += 1
 	print("LALABERG_WAHRZEICHEN Cafes=%d" % zahl)
 	return zahl > 0

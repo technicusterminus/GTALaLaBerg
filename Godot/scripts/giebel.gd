@@ -99,6 +99,7 @@ static func _vorbereiten() -> void:
 	var putz := StandardMaterial3D.new()
 	putz.vertex_color_use_as_albedo = true
 	putz.roughness = 0.9
+	putz.cull_mode = BaseMaterial3D.CULL_DISABLED   # Wicklung der Triangulierung ist beliebig
 	_netz.surface_set_material(0, putz)
 	# Stuckkante entlang des Umrisses (vorn), Ochsenauge und Fenster.
 	var stuck := SurfaceTool.new()

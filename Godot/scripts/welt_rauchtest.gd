@@ -242,6 +242,16 @@ func _bild_am_ort() -> void:
 	if _bildpfad.is_empty():
 		return
 	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--bildpunkt="):
+			# --bildpunkt=stand_x,stand_z,ziel_x,ziel_y,ziel_z: Nahaufnahme eines Details.
+			var w := arg.substr(12).split_floats(",")
+			var stand := _boden(Vector3(w[0], 0.0, w[1]))
+			get_tree().call_group("welt", "versetze_spieler", stand)
+			var blick := Vector3(w[2], w[3], w[4]) - (stand + Vector3(0, 1.7, 0))
+			kamera.yaw = atan2(-blick.x, -blick.z)
+			kamera.pitch = clampf(atan2(blick.y, Vector2(blick.x, blick.z).length()), -1.2, 1.2)
+			await get_tree().create_timer(14.0).timeout
+			_bild("punkt")
 		if arg.begins_with("--bildort="):
 			var name := arg.substr(10)
 			var ziel := Orte.mitte(name)
