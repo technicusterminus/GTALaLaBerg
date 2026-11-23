@@ -110,3 +110,36 @@ func uniformiere() -> void:
 				var neu := (mat as BaseMaterial3D).duplicate() as BaseMaterial3D
 				neu.albedo_color = farben[mat.resource_name]
 				m.set_surface_override_material(i, neu)
+
+
+## Abwechslungsreiche Kleidung fuer Passanten (Oberteil, Hose, Schuhe, Haare) je nach samen;
+## greift ueber die Materialnamen der Quaternius-Modelle.
+func einkleiden(samen: int) -> void:
+	var oben := [Color(0.80, 0.20, 0.18), Color(0.18, 0.32, 0.62), Color(0.92, 0.90, 0.84),
+			Color(0.24, 0.48, 0.30), Color(0.86, 0.68, 0.22), Color(0.50, 0.30, 0.56),
+			Color(0.20, 0.20, 0.22), Color(0.88, 0.58, 0.62)]
+	var unten := [Color(0.16, 0.22, 0.36), Color(0.12, 0.12, 0.13), Color(0.52, 0.44, 0.32),
+			Color(0.30, 0.32, 0.36), Color(0.62, 0.58, 0.50)]
+	var haare := [Color(0.18, 0.11, 0.06), Color(0.55, 0.40, 0.20), Color(0.08, 0.07, 0.06),
+			Color(0.70, 0.58, 0.36), Color(0.45, 0.45, 0.45)]
+	var rng := RandomNumberGenerator.new()
+	rng.seed = samen * 7919 + 13
+	var wahl := {
+		"LightBrown": oben[rng.randi() % oben.size()],
+		"Worker_Yellow": oben[rng.randi() % oben.size()],
+		"Worker_Vest": oben[rng.randi() % oben.size()],
+		"LightBlue": unten[rng.randi() % unten.size()],
+		"Brown": unten[rng.randi() % unten.size()],
+		"Brown2": unten[rng.randi() % unten.size()],
+		"Red_Dark": unten[rng.randi() % unten.size()].darkened(0.3),
+		"Grey": unten[rng.randi() % unten.size()].darkened(0.3),
+		"Hair": haare[rng.randi() % haare.size()],
+		"Moustache": haare[rng.randi() % haare.size()],
+	}
+	for m: MeshInstance3D in _innen.find_children("*", "MeshInstance3D", true, false):
+		for i in m.mesh.get_surface_count():
+			var mat := m.mesh.surface_get_material(i)
+			if mat is BaseMaterial3D and wahl.has(mat.resource_name):
+				var neu := (mat as BaseMaterial3D).duplicate() as BaseMaterial3D
+				neu.albedo_color = wahl[mat.resource_name]
+				m.set_surface_override_material(i, neu)

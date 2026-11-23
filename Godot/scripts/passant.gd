@@ -83,6 +83,7 @@ func _pruefe_figur(delta: float) -> void:
 		_figur = Figur.neu(farbe)
 		add_child(_figur)
 		_figur.passe_an()
+		_figur.einkleiden(get_instance_id() % 100003)
 		_figuren_zahl += 1
 		_instanz.visible = false
 	elif _figur != null and abstand > FIGUR_FERN:
