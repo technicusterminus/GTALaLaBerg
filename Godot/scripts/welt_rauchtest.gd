@@ -429,7 +429,12 @@ func _pruefe_wirtschaft() -> bool:
 	var geld_v := Konto.geld()
 	auftraege.test_erzwinge(Auftraege.Art.VERFOLGUNG)
 	auftraege.setze_start_ort(auto.global_position)
-	await get_tree().create_timer(0.8).timeout
+	# Bis zu 6 s warten: die Annahme braucht ein paar Bilder, und eine Beute im passenden
+	# Abstand gibt es nicht immer im ersten Augenblick.
+	var frist_v := 6.0
+	while (not auftraege.unterwegs or auftraege.beute() == null) and frist_v > 0.0:
+		await get_tree().create_timer(0.25).timeout
+		frist_v -= 0.25
 	var beute := auftraege.beute()
 	ok = _pruefe("verfolgung_beute", auftraege.unterwegs and beute != null
 			and auftraege.art == Auftraege.Art.VERFOLGUNG) and ok
