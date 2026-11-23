@@ -154,6 +154,14 @@ func _brunnen() -> Node3D:
 		klang.position = Vector3(0, 1.2, 0)
 		klang.max_distance = 45.0
 		klang.autoplay = true
+	# Stimmengewirr des Platzes (Saetze vom Audio-Modell ueber OpenRouter, gemischt in
+	# Tools/Sounds/SFX_Platz.wav), hoerbar ueber den ganzen Hauptplatz.
+	var leute := Ton.schleife(w, "SFX_Platz", 2.0)
+	if leute != null:
+		leute.position = Vector3(0, 2.0, 0)
+		leute.unit_size = 30.0
+		leute.max_distance = 90.0
+		leute.autoplay = true
 	# Gitter: duenne Staebe rund um das Becken.
 	var eisen := _stoff(Color(0.08, 0.08, 0.09), 0.5)
 	var stab := _kasten(Vector3(0.04, 1.1, 0.04))
