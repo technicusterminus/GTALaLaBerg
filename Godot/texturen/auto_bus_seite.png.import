@@ -3,19 +3,20 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://b1j0l7x5pu6xd"
-path="res://.godot/imported/auto_bus_seite.png-a01e6c3a7b1b7abab44da6107d8667f3.ctex"
+path.s3tc="res://.godot/imported/auto_bus_seite.png-a01e6c3a7b1b7abab44da6107d8667f3.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 
 [deps]
 
 source_file="res://texturen/auto_bus_seite.png"
-dest_files=["res://.godot/imported/auto_bus_seite.png-a01e6c3a7b1b7abab44da6107d8667f3.ctex"]
+dest_files=["res://.godot/imported/auto_bus_seite.png-a01e6c3a7b1b7abab44da6107d8667f3.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -23,7 +24,7 @@ compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
 compress/normal_map=0
 compress/channel_pack=0
-mipmaps/generate=false
+mipmaps/generate=true
 mipmaps/limit=-1
 roughness/mode=0
 roughness/src_normal=""

@@ -103,7 +103,7 @@ def verfeinere(modell: str, ansicht: str, neu: bool) -> None:
         if maske.size != hd.size:
             maske = maske.resize(hd.size, Image.BICUBIC)
         kanaele = np.asarray(maske).astype(np.float32) / 255.0
-        kanaele[..., 3] = hoehe(np.asarray(hd), kanaele[..., 1], hd.width / w)
+        kanaele[..., 3] = hoehe(np.asarray(hd), kanaele[..., 1], float(FAKTOR))
         Image.fromarray((np.clip(kanaele, 0, 1) * 255).astype(np.uint8), "RGBA").save(mpfad)
 
 
