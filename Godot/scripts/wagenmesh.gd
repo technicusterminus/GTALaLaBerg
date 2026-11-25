@@ -8,6 +8,7 @@ const SHADER := preload("res://shader/flach.gdshader")
 const SHADER_INSTANZ := preload("res://shader/flach_instanz.gdshader")
 
 const AUTO_SHADER := preload("res://shader/auto.gdshader")
+const GLAS_SHADER := preload("res://shader/auto_glas.gdshader")
 const RING := 18   ## Punkte je Querschnitt: Mitte unten, rechte Haelfte hinauf, linke herunter
 
 static var _cache := {}
@@ -323,6 +324,11 @@ static func _radmaterial(modell: String) -> ShaderMaterial:
 	var sportlich := modell in ["sport", "super", "renn"]
 	m.set_shader_parameter("sattel_farbe",
 			Vector3(0.75, 0.05, 0.03) if sportlich else Vector3(0.25, 0.25, 0.26))
+	# Innenraum: Leder oder Stoff je Modell.
+	var innen := {"limousine": Vector3(0.34, 0.28, 0.21), "kombi": Vector3(0.14, 0.14, 0.15),
+			"sport": Vector3(0.30, 0.04, 0.03), "super": Vector3(0.36, 0.20, 0.10),
+			"renn": Vector3(0.04, 0.04, 0.045), "bus": Vector3(0.12, 0.13, 0.16)}
+	m.set_shader_parameter("innen_farbe", innen.get(modell, Vector3(0.09, 0.09, 0.10)))
 	_rad_cache[schluessel] = m
 	return m
 
@@ -457,7 +463,11 @@ static func _karosserie(lack: Color, instanziert: bool, p: Dictionary, modell: S
 	var lackflaeche := SurfaceTool.new()
 	var glasflaeche := SurfaceTool.new()
 	var unterbau := SurfaceTool.new()
-	for st in [lackflaeche, glasflaeche, unterbau]:
+	# Mit Zeichnung: das Glashaus (Fensterband, Dachkante, Scheiben vorn und hinten) ist eine
+	# eigene, leicht eingesetzte Flaeche; die Glasmaske macht dort Scheiben durchsichtig, Saeulen
+	# und Rahmen bleiben deckend.
+	var scheiben := SurfaceTool.new()
+	for st in [lackflaeche, glasflaeche, unterbau, scheiben]:
 		(st as SurfaceTool).begin(Mesh.PRIMITIVE_TRIANGLES)
 	for i in n - 1:
 		var u := float(i) / float(n - 1)
@@ -480,6 +490,10 @@ static func _karosserie(lack: Color, instanziert: bool, p: Dictionary, modell: S
 				ziel = glasflaeche
 			elif (halb == 7 or halb == 8) and frontglas and not mit_zeichnung:
 				ziel = glasflaeche
+			var eingesetzt := mit_zeichnung and kabine \
+					and (halb == 6 or halb == 7 or (halb == 8 and frontglas))
+			if eingesetzt:
+				ziel = scheiben
 			var j2 := (j + 1) % RING
 			var a0: Vector3 = gitter[i][j]
 			var a1: Vector3 = gitter[i][j2]
@@ -487,7 +501,12 @@ static func _karosserie(lack: Color, instanziert: bool, p: Dictionary, modell: S
 			var b1: Vector3 = gitter[i + 1][j2]
 			for tri in [[a0, b0, a1], [a1, b0, b1]]:
 				for v: Vector3 in tri:
-					ziel.add_vertex(v)
+					var ecke := v
+					if eingesetzt:
+						# 1,5 cm nach innen: am Rand bleibt eine dunkle Fuge wie eine Dichtung.
+						var mitte := Vector3(v.x, schwelle + (float(dach[i]) - schwelle) * 0.45, 0.0)
+						ecke -= (v - mitte).normalized() * 0.015
+					ziel.add_vertex(ecke)
 	# Aussenspiegel auf dem Lack: die Textur der Seitenansicht zeigt dort den gezeichneten
 	# Spiegel (Gehaeuse mit Fuss, von Hand, damit das Format der Lackflaeche bleibt).
 	for s in [1.0, -1.0]:
@@ -517,8 +536,121 @@ static func _karosserie(lack: Color, instanziert: bool, p: Dictionary, modell: S
 	if not mit_zeichnung:
 		_anfuegen(netz, glasflaeche, _material(Color(0.02, 0.03, 0.04), false, false, true))
 	_anfuegen(netz, unterbau, _material(Color(0.02, 0.02, 0.022), false, false, false, 0.9))
+	if mit_zeichnung:
+		var glasmaterial := _material(lack, true, instanziert, false, 0.3)
+		glasmaterial.shader = GLAS_SHADER
+		_zeichnung_zuweisen(glasmaterial, p, modell)
+		_innenraum(netz, p, modell, halbringe, dach, gitter)
+		_anfuegen(netz, scheiben, glasmaterial)
 	_raeder_und_licht(netz, p, halbringe, modell, mit_raedern)
 	return netz
+
+
+## Innenraum hinter den Scheiben: Verkleidung und Himmel (Innenseite des Glashauses), Boden,
+## Armaturenbrett, Lenkrad (links), Sitze mit Lehnen und Kopfstuetzen; Sportler zwei Sitze,
+## der Bus mehrere Reihen. Eine Flaeche mit dem Radmaterial (Teil in UV2).
+static func _innenraum(netz: ArrayMesh, p: Dictionary, modell: String, halbringe: Array,
+		dach: Array, gitter: Array) -> void:
+	var laenge: float = p["laenge"]
+	var schwelle: float = p["schwelle"]
+	var gurt: float = p["gurt"]
+	var wind: Array = p["windschutz"]
+	var heck: Array = p["heckscheibe"]
+	var n := dach.size()
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	st.set_smooth_group(-1)
+	var x_vorn := (0.5 - float(wind[0])) * laenge
+	var x_hinten := (0.5 - float(heck[1])) * laenge
+	var i_mitte := clampi(roundi((float(wind[1]) + float(heck[0])) * 0.5 * (n - 1)), 0, n - 1)
+	var b: float = (halbringe[i_mitte][4] as Vector2).x * 0.9
+	var boden := schwelle + 0.2
+	# Verkleidung und Himmel: die Karosserie im Kabinenbereich 5 cm nach innen versetzt, von
+	# innen sichtbar (Vorderseiten zur Mitte); vorn und hinten mit einer Wand geschlossen.
+	var i0 := clampi(roundi(float(wind[0]) * (n - 1)), 0, n - 2)
+	var i1 := clampi(roundi(float(heck[1]) * (n - 1)), i0 + 1, n - 1)
+	var innen_ring := func(i: int) -> PackedVector3Array:
+		var ring: PackedVector3Array = gitter[i]
+		var r := PackedVector3Array()
+		var mitte_y := boden + (float(dach[i]) - boden) * 0.45
+		for v in ring:
+			var w := Vector3(v.x, maxf(v.y, boden), v.z)
+			var zur_mitte := Vector3(0.0, mitte_y, 0.0) - Vector3(0.0, w.y, w.z)
+			r.append(w + zur_mitte.normalized() * 0.05)
+		return r
+	for i in range(i0, i1):
+		var ra: PackedVector3Array = innen_ring.call(i)
+		var rb: PackedVector3Array = innen_ring.call(i + 1)
+		for j in RING:
+			var halb := j if j <= 8 else 17 - j
+			if halb < 3:
+				continue
+			var j2 := (j + 1) % RING
+			var mitte_q := (ra[j] + ra[j2] + rb[j] + rb[j2]) * 0.25
+			var achse := Vector3(mitte_q.x, boden + (float(dach[i]) - boden) * 0.45, 0.0)
+			var teil := 6 if halb >= 8 else 8
+			_viereck(st, ra[j], rb[j], rb[j2], ra[j2], achse - mitte_q, teil)
+	for ende in [i0, i1]:
+		var ring: PackedVector3Array = innen_ring.call(ende)
+		var mitte_w := Vector3.ZERO
+		for v in ring:
+			mitte_w += v
+		mitte_w /= ring.size()
+		var nach_innen := Vector3(-1.0 if ende == i0 else 1.0, 0.0, 0.0)
+		for j in RING:
+			_dreieck(st, ring[j], ring[(j + 1) % RING], mitte_w, nach_innen, 8)
+	# Boden
+	_viereck(st, Vector3(x_vorn, boden, -b), Vector3(x_vorn, boden, b),
+			Vector3(x_hinten, boden, b), Vector3(x_hinten, boden, -b), Vector3.UP, 7)
+	# Armaturenbrett unter der Windschutzscheibe, Mittelkonsole.
+	var x_brett := x_vorn - 0.28
+	_quader(st, Transform3D(Basis(), Vector3(x_brett, gurt - 0.08, 0.0)),
+			Vector3(0.42, 0.20, b * 1.9), 7)
+	_quader(st, Transform3D(Basis(), Vector3(x_brett - 0.45, boden + 0.15, 0.0)),
+			Vector3(0.6, 0.22, 0.2), 7)
+	# Lenkrad links (Fahrerseite -Z): Kranz aus acht Stuecken, schraeg zum Fahrer.
+	var zentrum := Vector3(x_brett - 0.32, gurt + 0.02, -b * 0.45)
+	var schraeg := Basis(Vector3.BACK, 0.45)
+	for k in 10:
+		var w := TAU * float(k) / 10.0
+		var ort := zentrum + schraeg * Vector3(0.0, sin(w) * 0.17, cos(w) * 0.17)
+		_quader(st, Transform3D(schraeg * Basis(Vector3.RIGHT, -w), ort),
+				Vector3(0.035, 0.035, 0.11), 7)
+	_quader(st, Transform3D(schraeg, zentrum), Vector3(0.05, 0.08, 0.08), 7)
+	# Sitze: Hoehe nach dem Platz unter dem Dach ueber der Reihe (Kopfstuetzen sollen nicht
+	# durch eine schraege Heckscheibe stossen).
+	var dach_bei := func(x: float) -> float:
+		var uu := clampf(0.5 - x / laenge, 0.0, 1.0) * (n - 1)
+		var k := mini(floori(uu), n - 2)
+		return lerpf(float(dach[k]), float(dach[k + 1]), uu - k)
+	var reihen: Array = [x_vorn - 0.95]
+	if modell == "bus":
+		var x := x_vorn - 1.95
+		while x - 0.4 > x_hinten:
+			reihen.append(x)
+			x -= 0.9
+	elif not modell in ["sport", "super", "renn"]:
+		if x_vorn - 1.9 - 0.35 > x_hinten:
+			reihen.append(x_vorn - 1.9)
+	for r in reihen.size():
+		var x_sitz: float = reihen[r]
+		var oben := minf(float(dach_bei.call(x_sitz - 0.4)), float(dach_bei.call(x_sitz)))
+		var platz := clampf((oben - 0.1 - boden) / 1.05, 0.45, 1.0)
+		var plaetze := [-0.45, 0.45] if r == 0 or modell != "bus" else [-0.6, 0.0, 0.6]
+		if r > 0 and modell != "bus":
+			plaetze = [-0.5, 0.0, 0.5]
+		for zf in plaetze:
+			var z: float = float(zf) * b
+			var breite := 0.48 if plaetze.size() == 2 else 0.42
+			var y0 := boden + 0.25 * platz
+			_quader(st, Transform3D(Basis(), Vector3(x_sitz, y0, z)),
+					Vector3(0.5, 0.12, breite), 5)
+			var lehne := Basis(Vector3.BACK, 0.25)
+			_quader(st, Transform3D(lehne, Vector3(x_sitz - 0.3, y0 + 0.33 * platz, z)),
+					Vector3(0.12, 0.62 * platz, breite), 5)
+			_quader(st, Transform3D(lehne, Vector3(x_sitz - 0.39, y0 + 0.72 * platz, z)),
+					Vector3(0.10, 0.17, breite * 0.55), 5)
+	_anfuegen(netz, st, _radmaterial(modell))
 
 
 ## Hat die Linienzeichnung (Texturen aus Tools/baue_auto_profil.py), liegt sie auf dem Lack.
@@ -528,6 +660,7 @@ static func _zeichnung_zuweisen(m: ShaderMaterial, p: Dictionary, modell: String
 			return
 	for ansicht in ["seite", "oben", "front", "heck"]:
 		m.set_shader_parameter("tex_" + ansicht, _textur(modell, ansicht))
+		m.set_shader_parameter("maske_" + ansicht, _textur(modell, ansicht + "_maske"))
 	m.set_shader_parameter("front_breite", p.get("front_breite", 2.08))
 	m.set_shader_parameter("heck_breite", p.get("heck_breite", 2.08))
 	m.set_shader_parameter("laenge", p["laenge"])

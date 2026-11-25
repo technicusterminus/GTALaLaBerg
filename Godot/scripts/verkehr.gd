@@ -171,5 +171,6 @@ func _stelle_geparkte(liste: Array) -> void:
 		var instanz := MultiMeshInstance3D.new()
 		instanz.multimesh = mm
 		instanz.visibility_range_end = PARKSICHT
+		instanz.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_DOUBLE_SIDED
 		add_child(instanz)
 		geparkt += teil.size()

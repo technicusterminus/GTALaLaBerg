@@ -12,7 +12,7 @@ import sys
 import numpy as np
 from PIL import Image
 
-from baue_auto_modelle import mit_hoehe   # Hoehenkarte ins Alpha (Relief im Shader)
+from baue_auto_modelle import speichere_ansicht   # Farbe und Masken (Lack, Glas, Lampen, Hoehe)
 
 HIER = os.path.dirname(os.path.abspath(__file__))
 QUELLE = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
@@ -141,13 +141,17 @@ def main() -> None:
     # Zugeschnitten auf die Umrisse jeder Ansicht; u laeuft ueber die Laenge (vorn = 0).
     farbe_pfad = os.path.join(HIER, "..", "Docs", "Konzept", "auto-farbtextur.png")
     bild_rgb = Image.open(farbe_pfad if os.path.exists(farbe_pfad) else QUELLE).convert("RGB")
+    # Vom Bildmodell eingefaerbtes Blatt (Lack gruen, Glas magenta, Lampen gelb), gleiches Layout.
+    seg_pfad = os.path.join(HIER, "..", "Docs", "Konzept", "auto-maske.png")
+    seg_bild = Image.open(seg_pfad).convert("RGB").resize(bild_rgb.size, Image.NEAREST)
+
+    def ansicht(kasten, name):
+        speichere_ansicht(np.asarray(bild_rgb.crop(kasten)), np.asarray(seg_bild.crop(kasten)),
+                          "auto_", name)
     texturen = os.path.join(HIER, "..", "Godot", "texturen")
     os.makedirs(texturen, exist_ok=True)
-    mit_hoehe(np.asarray(bild_rgb.crop((int(sx0), int(sy0), int(sx1) + 1, int(sy1) + 1)))).save(
-        os.path.join(texturen, "auto_seite.png"))
-    mit_hoehe(np.asarray(bild_rgb.crop((int(ox0), int(trenn + oy.min()), int(ox1) + 1,
-                                        int(trenn + oy.max()) + 1)))).save(
-        os.path.join(texturen, "auto_oben.png"))
+    ansicht((int(sx0), int(sy0), int(sx1) + 1, int(sy1) + 1), "seite")
+    ansicht((int(ox0), int(trenn + oy.min()), int(ox1) + 1, int(trenn + oy.max()) + 1), "oben")
     profil["seite_hoehe"] = round(float((sy1 - sy0 + 1) * masst), 3)
     profil["oben_breite"] = round(float((oy.max() - oy.min() + 1) * LAENGE_M / (ox1 - ox0 + 1)), 3)
     # Front (unten rechts) und Heck (oben rechts) stehen rechts neben den beiden Ansichten.
@@ -159,8 +163,7 @@ def main() -> None:
             continue
         x0, x1 = xs2.min() + int(breite * 0.65), xs2.max() + int(breite * 0.65)
         y0, y1 = ys2.min() + zeilen_von, ys2.max() + zeilen_von
-        mit_hoehe(np.asarray(bild_rgb.crop((int(x0), int(y0), int(x1) + 1, int(y1) + 1)))).save(
-            os.path.join(texturen, f"auto_{name}.png"))
+        ansicht((int(x0), int(y0), int(x1) + 1, int(y1) + 1), name)
         # Masstab: dieselbe Hoehe wie die Seitenansicht (Boden bis Dach).
         hoehe_m = profil["seite_hoehe"]
         profil[f"{name}_breite"] = round(float((x1 - x0 + 1) * hoehe_m / (y1 - y0 + 1)), 3)

@@ -97,6 +97,8 @@ func _ready() -> void:
 	_netz.mesh = Wagenmesh.netz(lack, false, modell, false)
 	_aufbau.scale = karosserie
 	_netz.visibility_range_end = 500.0
+	# Beidseitig: der Innenraum zeigt nach innen und soll trotzdem Schatten werfen.
+	_netz.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_DOUBLE_SIDED
 	_aufbau.add_child(_netz)
 	add_child(_aufbau)
 	_baue_raeder()

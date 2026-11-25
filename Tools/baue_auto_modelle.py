@@ -63,19 +63,33 @@ def ansichten(bild: np.ndarray) -> dict:
     return ergebnis
 
 
-def mit_hoehe(rgb: np.ndarray) -> Image.Image:
-    """RGBA: im Alpha eine Hoehenkarte fuer Relief und Parallaxe im Shader. Lack und Hintergrund
-    oben (1), Fugen, Grill, Scheiben, Lufteinlaesse tief (dunkel = tief), weich gezeichnet."""
-    # Nur was dunkler ist als seine Umgebung (Fugen, Grilloeffnungen, Einlaesse, Scheiben-
-    # raender) liegt tief; weiche Schattierung im Bild (Woelbung) gibt keine Dellen.
+def masken(rgb: np.ndarray, segment: np.ndarray) -> Image.Image:
+    """Maskentextur zu einer Ansicht: R Lack, G Glas, B Lampen (aus dem vom Bildmodell
+    eingefaerbten Blatt: gruen, magenta, gelb), A Hoehe fuer Relief und Parallaxe (1 oben;
+    Fugen, Grill, Einlaesse tief: nur was dunkler ist als seine Umgebung)."""
+    f = segment.astype(np.float32)
+    r, g, b = f[..., 0], f[..., 1], f[..., 2]
+    lack = (g > 170) & (r < 150) & (b < 150)
+    glas = (r > 170) & (b > 170) & (g < 120)
+    lampe = (r > 180) & (g > 180) & (b < 120)
+    kanaele = []
+    for m in (lack, glas, lampe):
+        m = ndimage.binary_opening(m, iterations=1)
+        kanaele.append(ndimage.gaussian_filter(m.astype(np.float32), 0.7))
     lum = rgb.astype(np.float32).mean(axis=2) / 255.0
     umgebung = ndimage.gaussian_filter(lum, 7.0)
     tiefe = np.clip((umgebung - lum) * 4.0, 0.0, 1.0)
-    # Grosse sehr dunkle Flaechen (Grill, Einlaesse) zusaetzlich etwas tiefer.
     tiefe = np.maximum(tiefe, np.clip((0.22 - ndimage.gaussian_filter(lum, 2.0)) * 3.0, 0, 0.7))
+    tiefe[kanaele[1] > 0.5] = 0.0      # Glas ist eigene Geometrie, kein Relief
     h = 1.0 - ndimage.gaussian_filter(tiefe, 0.8)
-    a = (h * 255).astype(np.uint8)
-    return Image.fromarray(np.dstack([rgb.astype(np.uint8), a]), "RGBA")
+    alle = np.dstack(kanaele + [h])
+    return Image.fromarray((np.clip(alle, 0, 1) * 255).astype(np.uint8), "RGBA")
+
+
+def speichere_ansicht(rgb: np.ndarray, segment: np.ndarray, praefix: str, name: str) -> None:
+    Image.fromarray(rgb.astype(np.uint8)[..., :3]).save(
+        os.path.join(TEXTUREN, f"{praefix}{name}.png"))
+    masken(rgb, segment).save(os.path.join(TEXTUREN, f"{praefix}{name}_maske.png"))
 
 
 def laeufe(spalten: np.ndarray, luecke: int) -> list:
@@ -94,14 +108,18 @@ def laeufe(spalten: np.ndarray, luecke: int) -> list:
 def baue(modell: str, laenge: float, spiegeln: bool) -> dict:
     farbbild = Image.open(os.path.join(BLAETTER, f"{modell}_farbe.png")).convert("RGB")
     bild = np.asarray(farbbild).astype(np.int32)
+    seg = np.asarray(Image.open(os.path.join(BLAETTER, f"{modell}_maske.png")).convert("RGB")
+                     .resize(farbbild.size, Image.NEAREST)).astype(np.int32)
     v = ansichten(bild)
     s_sl, s_maske = v["seite"]
     o_sl, o_maske = v["oben"]
     s_rgb = bild[s_sl]
     o_rgb = bild[o_sl]
+    s_seg = seg[s_sl]
+    o_seg = seg[o_sl]
     if spiegeln:
-        s_maske, s_rgb = s_maske[:, ::-1], s_rgb[:, ::-1]
-        o_maske, o_rgb = o_maske[:, ::-1], o_rgb[:, ::-1]
+        s_maske, s_rgb, s_seg = s_maske[:, ::-1], s_rgb[:, ::-1], s_seg[:, ::-1]
+        o_maske, o_rgb, o_seg = o_maske[:, ::-1], o_rgb[:, ::-1], o_seg[:, ::-1]
     h, w = s_maske.shape
     masst = laenge / w                         # Meter je Pixel
     grau = s_rgb.mean(axis=2)
@@ -222,12 +240,12 @@ def baue(modell: str, laenge: float, spiegeln: bool) -> dict:
         profil["fluegel"] = fluegel
     # Texturen: die Ansichten zugeschnitten (Seite und Draufsicht ggf. gespiegelt).
     os.makedirs(TEXTUREN, exist_ok=True)
-    mit_hoehe(s_rgb).save(os.path.join(TEXTUREN, f"auto_{modell}_seite.png"))
-    mit_hoehe(o_rgb).save(os.path.join(TEXTUREN, f"auto_{modell}_oben.png"))
+    speichere_ansicht(s_rgb, s_seg, f"auto_{modell}_", "seite")
+    speichere_ansicht(o_rgb, o_seg, f"auto_{modell}_", "oben")
     for name in ("front", "heck"):
         sl, _ = v[name]
         teil = bild[sl]
-        mit_hoehe(teil).save(os.path.join(TEXTUREN, f"auto_{modell}_{name}.png"))
+        speichere_ansicht(teil, seg[sl], f"auto_{modell}_", name)
         # Masstab: dieselbe Hoehe wie die Seitenansicht (Boden bis Dach).
         profil[f"{name}_breite"] = round(teil.shape[1] * seite_hoehe / teil.shape[0], 3)
     with open(os.path.join(HIER, "Modelle", f"auto_profil_{modell}.json"), "w") as f:

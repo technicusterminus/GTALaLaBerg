@@ -254,5 +254,6 @@ func setze_lack(farbe: Color) -> void:
 
 func _baue_karosserie() -> MeshInstance3D:
 	_karosserie = MeshInstance3D.new()
+	_karosserie.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_DOUBLE_SIDED
 	_karosserie.mesh = Wagenmesh.netz(lack, false, modell, false)
 	return _karosserie
