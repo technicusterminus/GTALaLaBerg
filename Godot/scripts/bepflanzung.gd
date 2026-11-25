@@ -21,6 +21,28 @@ const LECH := [
 	Vector3(-274, 2.672, 185), Vector3(-273, 1.292, 166), Vector3(-276, 0.108, 151),
 	Vector3(-286, 1.793, 143), Vector3(-297, 1.975, 101),
 ]
+# Kronenpositionen aus dem Orthofoto, Stammfüße auf dem importierten Gelände.
+const PLATANENSCHULE_BAEUME := [
+	Vector4(-1163.71, 20.335, -474.56, 6.5), Vector4(-1183.58, 20.240, -473.64, 7.1),
+	Vector4(-1173.46, 20.269, -471.42, 7.6), Vector4(-1160.77, 20.230, -466.06, 7.3),
+	Vector4(-1152.49, 20.231, -469.20, 6.9), Vector4(-1140.34, 20.052, -467.54, 8.1),
+	Vector4(-1130.96, 19.871, -475.86, 7.0), Vector4(-1124.15, 19.578, -468.09, 8.4),
+	Vector4(-1113.29, 19.099, -473.46, 8.0), Vector4(-1098.94, 18.578, -479.56, 8.6),
+	Vector4(-1091.95, 18.197, -489.74, 9.0), Vector4(-1093.97, 18.434, -501.94, 8.4),
+	Vector4(-1092.13, 18.557, -518.41, 8.9), Vector4(-1083.85, 18.301, -523.96, 7.9),
+	Vector4(-1087.17, 18.614, -538.02, 8.7), Vector4(-1091.95, 18.888, -548.01, 8.1),
+	Vector4(-1095.45, 19.006, -558.92, 7.6), Vector4(-1089.01, 19.018, -570.21, 8.8),
+	Vector4(-1089.19, 18.935, -581.50, 7.4), Vector4(-1093.61, 18.927, -594.82, 8.8),
+	Vector4(-1097.29, 18.912, -605.91, 8.4), Vector4(-1093.61, 18.732, -618.31, 8.4),
+	Vector4(-1092.69, 18.546, -631.45, 7.9), Vector4(-1109.61, 18.843, -636.25, 8.8),
+	Vector4(-1120.84, 19.049, -636.44, 8.3), Vector4(-1132.06, 19.244, -637.18, 7.2),
+	Vector4(-1144.02, 19.455, -636.07, 8.6), Vector4(-1159.66, 19.708, -637.00, 8.2),
+	Vector4(-1172.36, 19.910, -635.51, 7.8), Vector4(-1187.81, 20.145, -631.63, 7.4),
+	Vector4(-1175.49, 19.981, -605.91, 8.8), Vector4(-1187.81, 20.170, -596.30, 7.5),
+	Vector4(-1181.56, 20.123, -581.87, 7.7), Vector4(-1165.73, 20.298, -536.73, 6.4),
+	Vector4(-1125.62, 19.881, -524.33, 6.1), Vector4(-1138.87, 19.750, -568.91, 6.3),
+	Vector4(-1144.76, 19.802, -571.50, 7.1),
+]
 const BLUETEN := [
 	[Color("#8e79b7"), Color("#b7a1d6"), Color("#e7d4ee")],
 	[Color("#c77b63"), Color("#e4a17a"), Color("#f4d795")],
@@ -68,6 +90,13 @@ func baue(wurzel: Node3D, k: Vector2i, groesse: float, wiese: Array, kronen: Arr
 	for krone: Array in kronen:
 		_baumkrone(Vector3(krone[0], krone[1], krone[2]),
 				Vector3(krone[3], krone[4], krone[5]), bool(krone[6]))
+	for baum: Vector4 in PLATANENSCHULE_BAEUME:
+		var fuss := Vector3(baum.x, baum.y, baum.z)
+		if _im_sektor(fuss, k, groesse):
+			var masse := Vector3(baum.w * 0.90, baum.w, baum.w * 0.88)
+			_baumkrone(fuss + Vector3.UP * masse.y * 0.44, masse, false)
+			for i in 3:
+				_strauch(fuss + _versatz(1.45), _zufall.randf_range(0.55, 1.13))
 	if _teile.all(func(teile: Array) -> bool: return teile.is_empty()):
 		return
 	if _formen.is_empty():

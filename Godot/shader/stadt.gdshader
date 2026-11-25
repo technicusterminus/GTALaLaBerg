@@ -332,7 +332,7 @@ void fragment() {
 			float rand = rechteck(welt.xz - vec2(-1143.0, -547.9), vec2(12.0, 14.34), 0.20);
 			float moos = wert(welt.xz * 1.19);
 			c = mix(vec3(0.53, 0.55, 0.51), mix(vec3(0.17, 0.19, 0.085), vec3(0.28, 0.29, 0.123), moos), rand);
-		} else if (welt.x <= -1167.5 && welt.z > -500.1 && welt.z < -480.0 && welt.y < 24.80) {
+		} else if (welt.x <= -1167.5 && welt.z > -500.1 && welt.z < -480.0 && welt.y < 25.06) {
 			c = vec3(0.32, 0.33, 0.32) * (0.91 + 0.15 * wert(welt.xz * 0.71));
 		}
 	}

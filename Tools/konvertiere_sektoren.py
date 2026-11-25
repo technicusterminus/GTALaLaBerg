@@ -74,11 +74,11 @@ def platanenschule_dachprofil(pos):
     """LoD2-Grundrisse behalten, die Dachstaffelung an Fotos anpassen."""
     x, y, z = pos.T
     rund = (x > -1170) & (x < -1124) & (z > -521) & (z < -477)
-    anbau = (x >= -1214) & (x <= -1167.5) & (z >= -500) & (z <= -480)
+    anbau = (x >= -1214) & (x <= -1167.3) & (z >= -500.2) & (z <= -480)
     halle = (x >= -1156.1) & (x <= -1129.9) & (z >= -563.4) & (z <= -532.3)
     y[rund & (np.abs(y - 30.86) < 0.005)] = 28.02
-    y[anbau & (np.abs(y - 30.34) < 0.005)] = 24.58
-    y[anbau & (np.abs(y - 30.79) < 0.005)] = 24.77
+    dachkante = anbau & (y > 29.99) & (y < 30.80)
+    y[dachkante] -= 5.76
     # Das amtliche Luftbild zeigt ein weitgehend ebenes Gründach.
     hoehere_dachteile = halle & (y > 28.01)
     y[hoehere_dachteile] = 28.0 + (y[hoehere_dachteile] - 28.0) * 0.035
@@ -389,7 +389,9 @@ def main() -> int:
                     kronen.extend(neue_kronen)
                     if len(idx) == 0:
                         continue
-                if eintrag["id"] in PLATANENSCHULE_SEKTOREN and abschnittsart in {"Roof", "Wall"}:
+                if eintrag["id"] in PLATANENSCHULE_SEKTOREN and abschnittsart in {
+                    "Roof", "Wall", "Gesims", "Kamin", "Sockel", "Tuer"
+                }:
                     platanenschule_dachprofil(pos)
                 msh.write(pos.tobytes())
                 msh.write(idx.tobytes())
