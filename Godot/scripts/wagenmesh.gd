@@ -146,24 +146,28 @@ static func rad_netz(modell := "klein", nr := 0, links := false) -> ArrayMesh:
 	var r := _radius(p, nr)
 	var s := -1.0 if links else 1.0
 	var h := RAD_BREITE * 0.5
+	# Felgengroesse (Anteil am Raddurchmesser): Sportler grosse Felge, flacher Reifen.
+	var fg := (0.77 if modell in ["sport", "super", "renn"] else 0.72) / 0.67
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	# Reifen: Profil (Radius, z) vom inneren zum aeusseren Wulst, weich schattiert.
 	st.set_smooth_group(0)
-	var reifen := [Vector2(0.66, -0.92), Vector2(0.88, -1.0), Vector2(0.98, -0.82),
-			Vector2(1.0, -0.45), Vector2(1.0, 0.45), Vector2(0.98, 0.82), Vector2(0.88, 1.0),
-			Vector2(0.66, 0.92)]
+	var wulst := 0.66 * fg
+	var flanke := lerpf(wulst, 1.0, 0.55)
+	var reifen := [Vector2(wulst, -0.92), Vector2(flanke, -1.0), Vector2(0.98, -0.82),
+			Vector2(1.0, -0.45), Vector2(1.0, 0.45), Vector2(0.98, 0.82), Vector2(flanke, 1.0),
+			Vector2(wulst, 0.92)]
 	for j in reifen.size() - 1:
 		_drehflaeche(st, Vector2(reifen[j].x * r, reifen[j].y * h * s),
 				Vector2(reifen[j + 1].x * r, reifen[j + 1].y * h * s), 24, TEIL_GUMMI, 0)
 	# Felge: hart schattiert.
 	st.set_smooth_group(-1)
 	var horn := 0.93 * h * s
-	_drehflaeche(st, Vector2(0.67 * r, horn), Vector2(0.62 * r, horn), 24, TEIL_FELGE, 2, s)
-	_drehflaeche(st, Vector2(0.62 * r, horn), Vector2(0.62 * r, 0.78 * h * s), 24, TEIL_FELGE, 1)
-	_drehflaeche(st, Vector2(0.60 * r, 0.78 * h * s), Vector2(0.60 * r, -0.7 * h * s), 24,
+	_drehflaeche(st, Vector2(0.67 * fg * r, horn), Vector2(0.62 * fg * r, horn), 24, TEIL_FELGE, 2, s)
+	_drehflaeche(st, Vector2(0.62 * fg * r, horn), Vector2(0.62 * fg * r, 0.78 * h * s), 24, TEIL_FELGE, 1)
+	_drehflaeche(st, Vector2(0.60 * fg * r, 0.78 * h * s), Vector2(0.60 * fg * r, -0.7 * h * s), 24,
 			TEIL_INNEN, 1)
-	_drehflaeche(st, Vector2(0.60 * r, -0.2 * h * s), Vector2(0.0, -0.2 * h * s), 24,
+	_drehflaeche(st, Vector2(0.60 * fg * r, -0.2 * h * s), Vector2(0.0, -0.2 * h * s), 24,
 			TEIL_INNEN, 2, s)
 	# Speichen: Sportler zehn schmale, sonst fuenf breite; vorn gewoelbt (Nabe steht vor).
 	var anzahl := 10 if modell in ["sport", "super", "renn"] else 5
@@ -171,8 +175,8 @@ static func rad_netz(modell := "klein", nr := 0, links := false) -> ArrayMesh:
 	var breit_aussen := 0.15 if anzahl == 5 else 0.06
 	for k in anzahl:
 		var w := TAU * float(k) / anzahl
-		var innen := 0.14 * r
-		var aussen := 0.615 * r
+		var innen := 0.14 * fg * r
+		var aussen := 0.615 * fg * r
 		var z_innen := 0.88 * h * s
 		var z_aussen := 0.80 * h * s
 		var tief := -0.05 * s
@@ -190,9 +194,9 @@ static func rad_netz(modell := "klein", nr := 0, links := false) -> ArrayMesh:
 				quer = -quer
 			_viereck(st, a, b, b + Vector3(0, 0, tief), a + Vector3(0, 0, tief), quer, TEIL_FELGE)
 	# Nabe mit Deckel.
-	_drehflaeche(st, Vector2(0.15 * r, 0.86 * h * s), Vector2(0.15 * r, 0.92 * h * s), 12,
+	_drehflaeche(st, Vector2(0.15 * fg * r, 0.86 * h * s), Vector2(0.15 * fg * r, 0.92 * h * s), 12,
 			TEIL_FELGE, 0)
-	_drehflaeche(st, Vector2(0.15 * r, 0.92 * h * s), Vector2(0.0, 0.92 * h * s), 12,
+	_drehflaeche(st, Vector2(0.15 * fg * r, 0.92 * h * s), Vector2(0.0, 0.92 * h * s), 12,
 			TEIL_FELGE, 2, s)
 	var netz := ArrayMesh.new()
 	_anfuegen(netz, st, _radmaterial(modell))
@@ -212,15 +216,17 @@ static func bremse_netz(modell := "klein", nr := 0, links := false) -> ArrayMesh
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	st.set_smooth_group(-1)
-	_drehflaeche(st, Vector2(0.55 * r, 0.25 * h * s), Vector2(0.20 * r, 0.25 * h * s), 20,
+	var fg := (0.77 if modell in ["sport", "super", "renn"] else 0.72) / 0.67
+	_drehflaeche(st, Vector2(0.55 * fg * r, 0.25 * h * s), Vector2(0.20 * r, 0.25 * h * s), 20,
 			TEIL_SCHEIBE, 2, s)
-	_drehflaeche(st, Vector2(0.55 * r, 0.05 * h * s), Vector2(0.55 * r, 0.25 * h * s), 20,
-			TEIL_SCHEIBE, 0)
-	# Sattel hinten oben ueber der Scheibe.
-	var w := 2.3
-	var mitte := _polar(0.50 * r, w, (0.25 * h + 0.035) * s)
-	var basis := Basis(Vector3.BACK, w)
-	_quader(st, Transform3D(basis, mitte), Vector3(0.16 * r, 0.30 * r, 0.07), TEIL_SATTEL)
+	_drehflaeche(st, Vector2(0.55 * fg * r, 0.05 * h * s), Vector2(0.55 * fg * r, 0.25 * h * s),
+			20, TEIL_SCHEIBE, 0)
+	# Sattel hinten oben ueber der Scheibe, ihrer Rundung folgend (zwei schraege Kloetze).
+	for k in 2:
+		var w := 2.15 + 0.32 * k
+		var mitte := _polar(0.50 * fg * r, w, (0.25 * h + 0.03) * s)
+		_quader(st, Transform3D(Basis(Vector3.BACK, w), mitte),
+				Vector3(0.13 * r, 0.17 * r, 0.055), TEIL_SATTEL)
 	var netz := ArrayMesh.new()
 	_anfuegen(netz, st, _radmaterial(modell))
 	_rad_cache[schluessel] = netz
@@ -251,7 +257,8 @@ static func _dreieck(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, aussen
 		b = c
 		c = t
 	for v in [a, b, c]:
-		st.set_uv2(Vector2(teil, 0))
+		if teil >= 0:   # -1: Flaeche ohne UV2 (Lack)
+			st.set_uv2(Vector2(teil, 0))
 		st.add_vertex(v)
 
 
@@ -351,7 +358,12 @@ static func _felgenfarbe(modell: String) -> Vector3:
 	if n == 0:
 		return Vector3(0.62, 0.63, 0.65)
 	# Etwas heller als gemittelt: zwischen den Speichen liegt Dunkles mit im Mittel.
-	return (summe / n * 1.35).clamp(Vector3.ZERO, Vector3.ONE)
+	var c := (summe / n * 1.35).clamp(Vector3.ZERO, Vector3.ONE)
+	# Nie ganz schwarz: auch dunkle Felgen sind lackiertes Metall mit Glanz.
+	var hell := (c.x + c.y + c.z) / 3.0
+	if hell < 0.28:
+		c += Vector3.ONE * (0.28 - hell)
+	return c
 
 
 static func _textur(modell: String, ansicht: String) -> Texture2D:
@@ -476,6 +488,15 @@ static func _karosserie(lack: Color, instanziert: bool, p: Dictionary, modell: S
 			for tri in [[a0, b0, a1], [a1, b0, b1]]:
 				for v: Vector3 in tri:
 					ziel.add_vertex(v)
+	# Aussenspiegel auf dem Lack: die Textur der Seitenansicht zeigt dort den gezeichneten
+	# Spiegel (Gehaeuse mit Fuss, von Hand, damit das Format der Lackflaeche bleibt).
+	for s in [1.0, -1.0]:
+		var w: float = halbringe[roundi(0.34 * (n - 1))][3].x
+		var ort := Vector3(laenge * 0.16, gurt + 0.04, s * (w + 0.07))
+		_quader(lackflaeche, Transform3D(Basis(Vector3.UP, s * 0.12), ort),
+				Vector3(0.10, 0.09, 0.13), -1)
+		_quader(lackflaeche, Transform3D(Basis(), ort + Vector3(0.02, -0.04, -s * 0.07)),
+				Vector3(0.05, 0.03, 0.06), -1)
 	# Bug und Heck schliessen: Faecher zum Mittelpunkt.
 	for ende in [0, n - 1]:
 		var ring: PackedVector3Array = gitter[ende]

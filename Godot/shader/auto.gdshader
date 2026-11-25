@@ -182,7 +182,7 @@ void fragment() {
 		float met = 0.3;
 		float rau = 0.6;
 		if (teil == 0) { c = vec3(0.028, 0.028, 0.03); met = 0.0; rau = 0.85; }
-		else if (teil == 1) { c = felge_farbe; met = 0.9; rau = 0.2; }
+		else if (teil == 1) { c = felge_farbe * 1.25; met = 0.55; rau = 0.22; }
 		else if (teil == 2) { c = vec3(0.34, 0.33, 0.32); met = 0.8; rau = 0.4; }
 		else if (teil == 3) { c = sattel_farbe; met = 0.1; rau = 0.3; }
 		float f = mix(0.04 + 0.5 * pow(1.0 - nv, 5.0), 0.8, met);
