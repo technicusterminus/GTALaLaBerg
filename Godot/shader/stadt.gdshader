@@ -10,6 +10,10 @@ uniform bool hat_detail = false;
 uniform sampler2D detail : hint_default_white, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform float kachel_m = 2.0;
 uniform bool ist_dach = false;
+uniform bool hat_hartmann_belag = false;
+uniform sampler2D hartmann_belag : hint_default_black, filter_linear_mipmap_anisotropic, repeat_disable;
+uniform bool hat_katharinen_belag = false;
+uniform sampler2D katharinen_belag : hint_default_black, filter_linear_mipmap, repeat_disable;
 
 varying vec3 welt;
 varying vec3 blickposition;
@@ -127,6 +131,57 @@ vec3 klinikwand(vec2 uv, inout float rau, inout float glanz) {
 	return c;
 }
 
+vec3 hartmann_fassade(vec2 uv, vec2 anker, float moden, inout float rau, inout float glanz) {
+	float haus = hash21(floor(anker / 5.0 + 0.5));
+	vec2 p = fract(uv) - vec2(0.5, 0.49);
+	float aa = clamp(max(fwidth(uv.x), fwidth(uv.y)) * 0.6, 0.004, 0.13);
+	float bruestung = mix(0.238, 0.307, moden);
+	float fenster = rechteck(p, vec2(bruestung, 0.265 + 0.09 * moden), aa);
+	float rahmen = rechteck(p, vec2(bruestung + 0.023, 0.295 + 0.09 * moden), aa);
+	float stockwerk = floor(uv.y);
+	float jalousie = step(0.79, hash21(floor(uv) + floor(anker)));
+	float lamelle = 0.82 + 0.18 * cos(welt.y * 93.0)
+			* (1.0 - smoothstep(0.012, 0.055, fwidth(welt.y)));
+	vec3 putz = mix(vec3(0.48, 0.40, 0.30), vec3(0.60, 0.58, 0.52), haus);
+	putz = mix(putz, vec3(0.56, 0.56, 0.51), moden * 0.75);
+	putz *= mix(0.93, 1.03, wert(welt.xz * 1.6 + welt.y * 1.7));
+	if (uv.y < 0.28) {
+		putz *= mix(0.67, 1.0, smoothstep(-0.08, 0.25, uv.y));
+	}
+	float sprosse = rechteck(p + vec2(0.055 - haus * 0.11, 0.0), vec2(0.017, 0.35), aa);
+	vec3 glas = mix(vec3(0.044, 0.073, 0.092), vec3(0.105, 0.156, 0.178), hash21(floor(uv)));
+	glanz = mix(0.25, 0.42, fenster * (1.0 - jalousie));
+	rau = mix(rau, 0.40, fenster * (1.0 - jalousie));
+	vec3 c = mix(putz, vec3(0.245, 0.255, 0.237), rahmen);
+	c = mix(c, mix(glas, vec3(0.29, 0.30, 0.27) * lamelle, jalousie), fenster * (1.0 - sprosse));
+	if (moden > 0.5 && stockwerk > 0.0 && fract(uv.x * 0.5) > 0.41) {
+		float balkon = rechteck(p + vec2(0.0, 0.33), vec2(0.46, 0.113), aa);
+		float stab = smoothstep(0.33, 0.44, abs(fract(uv.x * 16.0) - 0.5));
+		vec3 gelaender = mix(vec3(0.102, 0.135, 0.134), vec3(0.27, 0.36, 0.35), stab);
+		c = mix(c, gelaender, balkon * 0.83);
+	}
+	return c;
+}
+
+vec3 katharinen_schulwand(vec2 schule, inout float rau, inout float glanz) {
+	float x = abs(schule.y + 8.75) > 7.7 ? schule.x : schule.y;
+	vec2 p = vec2(mod(x + 2.0, 4.0) - 2.0,
+			welt.y - (welt.y < 28.5 ? 26.9 : 30.56));
+	float aa = clamp(fwidth(x) * 0.6, 0.012, 0.17);
+	float kopf = max(p.y - 0.48, 0.0) * 2.3;
+	float bogen = max(abs(p.x) * 1.30 + kopf * kopf, -p.y);
+	float rahmen = 1.0 - smoothstep(0.97 - aa, 0.97 + aa, bogen);
+	float scheibe = 1.0 - smoothstep(0.85 - aa, 0.85 + aa, bogen);
+	float kreuz = 1.0 - smoothstep(0.042, 0.042 + aa, min(abs(p.x), abs(p.y - 0.15)));
+	vec3 c = vec3(0.62, 0.55, 0.43) * mix(0.90, 1.06, wert(welt.xz * 1.4 + welt.y));
+	c *= mix(0.62, 1.0, smoothstep(24.88, 25.35, welt.y));
+	c = mix(c, vec3(0.68, 0.64, 0.52), rahmen);
+	c = mix(c, vec3(0.059, 0.096, 0.101), scheibe * (1.0 - kreuz));
+	rau = mix(0.83, 0.37, scheibe);
+	glanz = mix(0.25, 0.39, scheibe);
+	return c;
+}
+
 vec3 fassade(vec3 c, vec2 uv, inout float rau, inout float glanz) {
 	vec2 uv_dx = dFdx(uv);
 	vec2 uv_dy = dFdy(uv);
@@ -146,6 +201,35 @@ vec3 fassade(vec3 c, vec2 uv, inout float rau, inout float glanz) {
 		return klinikwand(uv, rau, glanz);
 	}
 	vec2 anker = (welt - u * uv.x - v * uv.y).xz;
+	if (welt.x > -1765.4 && welt.x < -1705.2 && welt.z > 135.6 && welt.z < 169.0
+			&& welt.y > 27.5 && welt.y < 35.5 && abs(v.y - 3.6376) > 0.2) {
+		vec2 p = fract(uv * vec2(1.23, 1.0)) - vec2(0.5, 0.5);
+		float aa = clamp(fwidth(uv.x) * 0.7, 0.01, 0.12);
+		float band = rechteck(p, vec2(0.39, 0.31), aa);
+		float lamelle = 0.84 + 0.16 * cos(welt.y * 83.0)
+				* (1.0 - smoothstep(0.020, 0.060, fwidth(welt.y)));
+		vec3 glas = mix(vec3(0.061, 0.115, 0.136), vec3(0.34, 0.36, 0.35) * lamelle,
+				step(0.60, hash21(floor(uv))));
+		return mix(vec3(0.53, 0.56, 0.55), glas, band);
+	}
+	if (welt.x > -752.0 && welt.x < -720.0 && welt.z > 1038.0 && welt.z < 1095.0
+			&& welt.y > 24.70 && welt.y < 32.68) {
+		vec2 offset = welt.xz - vec2(-744.20, 1068.75);
+		vec2 schule = vec2(dot(offset, vec2(0.259, 0.966)), dot(offset, vec2(-0.966, 0.259)));
+		if (abs(schule.x) < 26.5 && schule.y > -17.8 && schule.y < 0.4) {
+			return katharinen_schulwand(schule, rau, glanz);
+		}
+	}
+	bool katharinen_wohnhoefe = welt.x > -795.0 && welt.x < -476.0
+			&& welt.z > 929.0 && welt.z < 1250.0;
+	bool friedalage = welt.x > -1720.0 && welt.x < -1548.0 && welt.z > -56.0 && welt.z < 77.0;
+	bool roemerhang = welt.x > -1506.0 && welt.x < -1372.0 && welt.z > 44.0 && welt.z < 302.0;
+	bool hartmann_sued = welt.x > -1660.0 && welt.x < -1405.0 && welt.z > 318.0 && welt.z < 750.0;
+	if (friedalage || roemerhang || hartmann_sued || katharinen_wohnhoefe) {
+		float modern = roemerhang ? 0.86 : (hartmann_sued && welt.z < 470.0 ? 1.0 : 0.25);
+		modern = katharinen_wohnhoefe ? 0.77 : modern;
+		return hartmann_fassade(uv, anker, modern, rau, glanz);
+	}
 	vec2 kennung = floor(anker / 4.0 + 0.5);
 	float typ = hash21(kennung);
 	float details = hash21(kennung + 19.0);
@@ -334,6 +418,54 @@ void fragment() {
 			c = mix(vec3(0.53, 0.55, 0.51), mix(vec3(0.17, 0.19, 0.085), vec3(0.28, 0.29, 0.123), moos), rand);
 		} else if (welt.x <= -1167.5 && welt.z > -500.1 && welt.z < -480.0 && welt.y < 25.06) {
 			c = vec3(0.32, 0.33, 0.32) * (0.91 + 0.15 * wert(welt.xz * 0.71));
+		}
+	}
+	if (ist_dach) {
+		bool marktdach = welt.x > -1562.0 && welt.x < -1477.0 && welt.z > -56.0
+				&& welt.z < 23.0 && welt.y > 24.34 && welt.y < 25.56;
+		bool westliche_neubauten = welt.x > -1608.0 && welt.x < -1460.0
+				&& welt.z > 327.0 && welt.z < 467.0;
+		bool roemerhang = welt.x > -1508.0 && welt.x < -1385.0
+				&& welt.z > 114.0 && welt.z < 281.0;
+		bool kinderhaus = welt.x > -1765.4 && welt.x < -1705.2 && welt.z > 135.6
+				&& welt.z < 169.0 && abs(welt.y - 35.94) < 0.12;
+		bool klinikdach = welt.x > -1655.0 && welt.x < -1534.0 && welt.z > 78.0
+				&& welt.z < 198.0 && welt.y > 42.0;
+		if (marktdach) {
+			float sedum = wert(welt.xz * 0.38) * 0.73 + wert(welt.xz * 2.31) * 0.27;
+			c = mix(vec3(0.155, 0.128, 0.086), vec3(0.251, 0.232, 0.141), sedum);
+		} else if (kinderhaus) {
+			c = vec3(0.48, 0.50, 0.49) * (0.93 + 0.13 * wert(welt.xz * 1.84));
+		} else if (klinikdach) {
+			vec2 d = welt.xz - vec2(-1590.0, 135.0);
+			float quer = dot(d, vec2(0.319, 0.948));
+			float band = step(0.64, fract((quer + 1.70) / 9.75));
+			float kies = wert(welt.xz * 2.7);
+			c = mix(vec3(0.275, 0.280, 0.254), vec3(0.55, 0.56, 0.53), band);
+			c *= (0.90 + 0.19 * kies);
+		} else if (westliche_neubauten) {
+			float kies = wert(welt.xz * 3.4);
+			bool flach = abs(wn.y) > 0.97;
+			c = flach ? mix(vec3(0.21, 0.158, 0.102), vec3(0.37, 0.31, 0.23), kies)
+					: vec3(0.093, 0.106, 0.117) * (0.90 + kies * 0.20);
+		} else if (roemerhang) {
+			float gewellt = 0.93 + 0.07 * cos(welt.z * 14.8);
+			c = mix(c, vec3(0.12, 0.113, 0.102) * gewellt, 0.65);
+		}
+	}
+	if (hat_hartmann_belag) {
+		vec2 karte = (welt.xz - vec2(-1940.0, -148.0)) / vec2(660.0, 898.0);
+		if (all(greaterThan(karte, vec2(0.0))) && all(lessThan(karte, vec2(1.0)))) {
+			vec4 lack = texture(hartmann_belag, karte);
+			float korn = wert(welt.xz * 2.0);
+			c = mix(c, lack.rgb * (0.89 + 0.22 * korn), lack.a);
+		}
+	}
+	if (hat_katharinen_belag) {
+		vec2 karte = (welt.xz - vec2(-912.0, 836.0)) / vec2(446.0, 499.0);
+		if (all(greaterThan(karte, vec2(0.0))) && all(lessThan(karte, vec2(1.0)))) {
+			vec4 lack = texture(katharinen_belag, karte);
+			c = mix(c, lack.rgb * (0.88 + 0.24 * wert(welt.xz * 2.11)), lack.a);
 		}
 	}
 

@@ -28,6 +28,8 @@ from pathlib import Path
 
 import numpy as np
 
+from stadtfreiflaechen import ACKER, ASPHALT, INSEL, RASEN, hartmann_karte, katharinen_karte
+
 WURZEL = Path(__file__).resolve().parent.parent
 QUELLE = WURZEL / "Content" / "SourceData"
 ZIEL = WURZEL / "Godot" / "daten"
@@ -45,6 +47,10 @@ MARKIERTE_STRASSEN = {"Münchener Straße", "Weilheimer Straße", "Siemensstraß
                       "Bürgermeister-Doktor-Hartmann-Straße"}
 JVA_DACHSEKTOREN = {"S_N2_N1", "S_N2_N2"}
 PLATANENSCHULE_SEKTOREN = {"S_N3_N1", "S_N3_N2"}
+# Die sechs Flachdachhäuser sind in älteren LoD2-Daten als Doppelgiebel enthalten.
+HARTMANN_FLACHDAECHER = ((-1549.60, 404.02, 39.45), (-1513.75, 391.25, 39.26),
+                        (-1484.95, 381.22, 39.22), (-1557.75, 433.05, 39.62),
+                        (-1528.45, 422.27, 39.43), (-1473.10, 403.15, 39.00))
 
 
 def art(name: str) -> str:
@@ -82,6 +88,34 @@ def platanenschule_dachprofil(pos):
     # Das amtliche Luftbild zeigt ein weitgehend ebenes Gründach.
     hoehere_dachteile = halle & (y > 28.01)
     y[hoehere_dachteile] = 28.0 + (y[hoehere_dachteile] - 28.0) * 0.035
+
+
+def pflege_altbau_entfernen(pos, idx):
+    """Entfernt den vom Neubau überlagerten Teil des alten LoD2-Bestands."""
+    dreiecke = idx.reshape(-1, 3)
+    x, y, z = pos[dreiecke].mean(axis=1).T
+    dx, dz = x + 1711.42, z - 188.43
+    u, v = dx * 0.944 - dz * 0.331, dx * 0.331 + dz * 0.944
+    altbau = (np.abs(u) < 19.2) & (np.abs(v) < 14.8) & (y < 34.2) & (y > 25.5)
+    return np.ascontiguousarray(dreiecke[~altbau]).reshape(-1)
+
+
+def katharinenschule_altes_dach_entfernen(pos, idx):
+    dreiecke = idx.reshape(-1, 3)
+    x, y, z = pos[dreiecke].mean(axis=1).T
+    dx, dz = x + 744.20, z - 1068.75
+    u, v = dx * 0.259 + dz * 0.966, -dx * 0.966 + dz * 0.259
+    dach = (np.abs(u) < 26.80) & (v > -18.30) & (v < 0.75) & (y >= 32.63)
+    return np.ascontiguousarray(dreiecke[~dach]).reshape(-1)
+
+
+def hartmann_flachdaecher(pos):
+    x, y, z = pos.T
+    for x0, z0, traufe in HARTMANN_FLACHDAECHER:
+        dx, dz = x - x0, z - z0
+        u, v = dx * 0.941 - dz * 0.338, dx * 0.338 + dz * 0.941
+        first = (np.abs(u) < 12.3) & (np.abs(v) < 9.3) & (y > traufe + 0.40) & (y < 46.1)
+        y[first] = traufe + 0.08
 
 
 def jva_dachkanten(manifest):
@@ -344,6 +378,23 @@ def positioniere_ampeln(ampeln, fahrbahn, untergrund, gehweg):
             ampel["mast"] = [round(x, 3), round(dy, 3)]
 
 
+def stelle_parkautos(verkehr, karte, stellplaetze, untergrund):
+    """Richtet die dekorativen Autos an den neu gezeichneten Stellplätzen aus."""
+    rng = np.random.default_rng(3819)
+    for punkt, richtung in stellplaetze:
+        if rng.random() > 0.30 or karte.farbe_an(punkt)[:3] != ASPHALT:
+            continue
+        hoehe = untergrund(punkt)
+        if hoehe is None:
+            continue
+        x, z = np.rint(punkt * 100).astype(int)
+        lacks = [[0.22, 0.30, 0.40], [0.62, 0.64, 0.64], [0.49, 0.13, 0.13],
+                 [0.20, 0.23, 0.23], [0.85, 0.83, 0.78], [0.19, 0.29, 0.20]]
+        winkel = np.rad2deg(np.arctan2(richtung[1], richtung[0]))
+        verkehr["geparkt"].append({"x": int(x), "y": int(z), "z": round(hoehe * 100),
+                                  "gier": round(winkel, 1), "lack": lacks[rng.integers(len(lacks))]})
+
+
 def main() -> int:
     manifest_pfad = QUELLE / "Sectors" / "manifest.json"
     if not manifest_pfad.exists() or manifest_pfad.stat().st_size < 1000:
@@ -354,6 +405,21 @@ def main() -> int:
     dachkanten = jva_dachkanten(manifest)
     groesse = manifest["cellSizeCm"] / 100
     verkehr = json.loads((QUELLE / "Verkehr/verkehr.json").read_text(encoding="utf-8"))
+    hartmann, buchung, hartmann_baeume = hartmann_karte()
+    katharinen, katharinen_baeume = katharinen_karte()
+    (ZIEL / "texturen").mkdir(parents=True, exist_ok=True)
+    hartmann.speichern(ZIEL / "texturen" / "hartmann_freiflaechen.tga")
+    katharinen.speichern(ZIEL / "texturen" / "katharinen_freiflaechen.tga")
+    geparkt = verkehr["geparkt"]
+    verkehr["geparkt"] = [a for a in geparkt if hartmann.farbe_an(
+        np.array([a["x"], a["y"]]) / 100)[:3] != ASPHALT]
+    buchungen, pflanzungen = {}, {}
+    for punkt, richtung in buchung:
+        k = tuple(np.floor(punkt / groesse).astype(int))
+        buchungen.setdefault(k, []).append((punkt, richtung))
+    for punkt, baumgroesse in hartmann_baeume + katharinen_baeume:
+        k = tuple(np.floor(punkt / groesse).astype(int))
+        pflanzungen.setdefault(k, []).append((punkt, baumgroesse))
     achsen = markierungsachsen(groesse, verkehr)
     ampeln = {}
     for ampel in verkehr["ampeln"]:
@@ -393,6 +459,20 @@ def main() -> int:
                     "Roof", "Wall", "Gesims", "Kamin", "Sockel", "Tuer"
                 }:
                     platanenschule_dachprofil(pos)
+                if eintrag["id"] == "S_N4_P0" and abschnittsart in {
+                    "Roof", "Wall", "Gesims", "Sockel", "Kamin", "Tuer"
+                }:
+                    idx = pflege_altbau_entfernen(pos, idx)
+                    if not len(idx):
+                        continue
+                if eintrag["id"] == "S_N2_P2" and abschnittsart in {"Roof", "Kamin", "Sockel", "Tuer"}:
+                    idx = katharinenschule_altes_dach_entfernen(pos, idx)
+                    if not len(idx):
+                        continue
+                if eintrag["id"] in {"S_N3_P0", "S_N4_P0"} and abschnittsart in {
+                    "Roof", "Wall", "Kamin", "Sockel", "Tuer", "Gesims"
+                }:
+                    hartmann_flachdaecher(pos)
                 msh.write(pos.tobytes())
                 msh.write(idx.tobytes())
                 meta = {"n": a["name"], "a": abschnittsart,
@@ -418,14 +498,26 @@ def main() -> int:
                     hindernisse.append(pos[idx].reshape(-1, 3, 3))
                 if abschnittsart == "Road":
                     strassen.append(hindernisse[-1])
-                if k in ampeln and abschnittsart in {"Ground", "Road", "Plaza", "Sidewalk", "Gehweg"}:
+                if (k in ampeln or k in buchungen or k in pflanzungen) and abschnittsart in {
+                    "Ground", "Road", "Plaza", "Sidewalk", "Gehweg"
+                }:
                     flaeche = kollision[-1].reshape(-1, 3, 3)
                     untergrund.append(flaeche)
                     if abschnittsart in {"Sidewalk", "Gehweg"}:
                         gehwege.append(flaeche)
             fahrbahn = hoehenabfrage(strassen) if k in achsen or k in ampeln else None
+            bodenhoehe = hoehenabfrage(untergrund)
             if k in ampeln:
-                positioniere_ampeln(ampeln[k], fahrbahn, hoehenabfrage(untergrund), hoehenabfrage(gehwege))
+                positioniere_ampeln(ampeln[k], fahrbahn, bodenhoehe, hoehenabfrage(gehwege))
+            if k in buchungen:
+                stelle_parkautos(verkehr, hartmann, buchungen[k], bodenhoehe)
+            for punkt, baumgroesse in pflanzungen.get(k, []):
+                h = bodenhoehe(punkt)
+                if h is None or any(np.linalg.norm(punkt - np.array([krone[0], krone[2]])) < 3.5
+                                    for krone in kronen):
+                    continue
+                kronen.append([round(punkt[0], 3), round(h + baumgroesse * 0.44, 3),
+                               round(punkt[1], 3), baumgroesse * 0.86, baumgroesse, baumgroesse, False])
             pos, idx = zeichne_markierungen(achsen.get(k, []), fahrbahn)
             if idx.size:
                 msh.write(pos.tobytes())
@@ -438,10 +530,17 @@ def main() -> int:
         summe_msh += (ZIEL / "sektoren" / f"{eintrag['id']}.msh").stat().st_size
         summe_col += flaechen.nbytes
         b = eintrag["boundsCm"]
+        wiesenstreuung = []
+        for punkt in wiesenpunkte(wiesen, hindernisse, eintrag):
+            farbe = hartmann.farbe_an(np.asarray(punkt)[[0, 2]])
+            if not farbe[3]:
+                farbe = katharinen.farbe_an(np.asarray(punkt)[[0, 2]])
+            if not farbe[3] or farbe[:3] in {RASEN, ACKER, INSEL}:
+                wiesenstreuung.append(punkt)
         verzeichnis.append({"id": eintrag["id"], "index": eintrag["index"],
                             "grenzen": [b[0] / 100, b[1] / 100, b[2] / 100, b[3] / 100],
                             "kollision_ecken": int(len(flaechen)), "abschnitte": abschnitte,
-                            "wiese": wiesenpunkte(wiesen, hindernisse, eintrag), "kronen": kronen})
+                            "wiese": wiesenstreuung, "kronen": kronen})
 
     spawn = manifest["spawn"]
     (ZIEL / "sektoren.json").write_text(json.dumps({

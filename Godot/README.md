@@ -148,6 +148,12 @@ Rauch- und Filmtest schreiben nur in eine eigene Spielstanddatei.
 6. An der Platanenstraße den Rundbau, den roten Ganztagsanbau und die Turnhalle
    prüfen. Hinter der Halle folgen Sportfeld und Laufbahn. Im Schulhof sind das
    rote Spielfeld, der Teich und die verbindenden Wege sichtbar.
+7. Von der Breslauer Straße über den REWE-Parkplatz und die Klinikzufahrt zur
+   Bürgermeister-Dr.-Hartmann-Straße fahren. Marktfront, Stellplätze, Grüninseln,
+   Kinderhaus und Pflegeschule lassen sich entlang dieser Strecke ansehen.
+   Weiter südlich stehen die Flachdachhäuser neben den älteren Satteldachhäusern.
+8. An der Waldheimer Straße zur Katharinenschule fahren und vom Sportfeld auf
+   die Hofseite schauen. Steildach, Gauben und Fassadenuhr sind von dort sichtbar.
 
 Referenzen zum Bestandsbau des Klinikums sind das [Eingangsfoto des Klinikums
 von 2025](https://www.klinikum-landsberg.de/wp-content/uploads/Umwelterklaerung-2025_Klinikum-Landsberg-am-Lech.pdf)
@@ -160,6 +166,18 @@ und die Gebäude der Platanenschule. Für Dächer und Freiflächen der Schule di
 die [Schulseite](https://www.platanenschule-landsberg.de/%C3%BCber-uns/) und das
 [amtliche Orthofoto](https://geodatenonline.bayern.de/geodatenonline/seiten/wms_dop20cm)
 als Referenz. Dachaufbauten und Ausstattung sind visuell angenähert.
+
+An der Hartmannstraße und in der Katharinenvorstadt erzeugt der Konverter aus
+abgezeichneten Flächen zwei Belagstexturen. Die Stadt behält ihre Gelände-
+und Straßengeometrie. Stellplatzreihen, Plattenwege und Sportbeläge folgen
+dem [amtlichen Orthofoto](https://geodatenonline.bayern.de/geodatenonline/seiten/wms_dop20cm).
+Für Gebäude und Außenanlagen dienten die
+[Bestandsfotos im Umweltbericht der Stadt](https://www.landsberg.de/fileadmin/user_upload/download/Rathaus-Bauleitplanung/Bebauungsplanentwurf_2450_Klinikum_UMWELTBERICHT.pdf#page=23),
+die [Marktseite](https://www.rewe.de/marktseite/landsberg-am-lech/461688/rewe-markt-breslauer-str-27/),
+die [Seite des Kinderhauses](https://www.landsberg.de/rathaus/meine-stadt/kinderbetreuung/kinderhaus-an-der-roemerauterrasse/)
+und das [Hoffoto der Katharinenschule](https://www.katharinenschule-landsberg.de/).
+Fassaden und Hofausstattung sind modelliert und auf den vorhandenen
+Gebäudegrundrissen bzw. auf dem Gelände eingepasst.
 
 ## Noch offen gegenüber der Unreal-Version
 
