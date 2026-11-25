@@ -63,6 +63,21 @@ def ansichten(bild: np.ndarray) -> dict:
     return ergebnis
 
 
+def mit_hoehe(rgb: np.ndarray) -> Image.Image:
+    """RGBA: im Alpha eine Hoehenkarte fuer Relief und Parallaxe im Shader. Lack und Hintergrund
+    oben (1), Fugen, Grill, Scheiben, Lufteinlaesse tief (dunkel = tief), weich gezeichnet."""
+    # Nur was dunkler ist als seine Umgebung (Fugen, Grilloeffnungen, Einlaesse, Scheiben-
+    # raender) liegt tief; weiche Schattierung im Bild (Woelbung) gibt keine Dellen.
+    lum = rgb.astype(np.float32).mean(axis=2) / 255.0
+    umgebung = ndimage.gaussian_filter(lum, 7.0)
+    tiefe = np.clip((umgebung - lum) * 4.0, 0.0, 1.0)
+    # Grosse sehr dunkle Flaechen (Grill, Einlaesse) zusaetzlich etwas tiefer.
+    tiefe = np.maximum(tiefe, np.clip((0.22 - ndimage.gaussian_filter(lum, 2.0)) * 3.0, 0, 0.7))
+    h = 1.0 - ndimage.gaussian_filter(tiefe, 0.8)
+    a = (h * 255).astype(np.uint8)
+    return Image.fromarray(np.dstack([rgb.astype(np.uint8), a]), "RGBA")
+
+
 def laeufe(spalten: np.ndarray, luecke: int) -> list:
     """Zusammenhaengende Gruppen von Spaltennummern (Luecken bis 'luecke' werden ueberbrueckt)."""
     if len(spalten) == 0:
@@ -182,6 +197,9 @@ def baue(modell: str, laenge: float, spiegeln: bool) -> dict:
         col = np.where(o_maske[:, i])[0]
         halb[i] = (col.max() - col.min()) / 2 if len(col) else 0.0
     halb = median(halb, 41) * laenge / ow
+    # Glaetten: Treppen von Pixel zu Pixel werden sonst im gespiegelten Lack zu Wellen.
+    halb = ndimage.gaussian_filter1d(halb, ow / 90.0, mode="nearest")
+    dach_glatt = ndimage.gaussian_filter1d(dach, w / 140.0, mode="nearest")
 
     u = np.linspace(0.0, 1.0, SCHNITTE)
 
@@ -191,7 +209,7 @@ def baue(modell: str, laenge: float, spiegeln: bool) -> dict:
     seite_hoehe = h * masst
     profil = {
         "laenge": laenge, "schwelle": round(schwelle, 3), "gurt": round(gurt, 3),
-        "dach": [round(probe(dach, x), 3) for x in u],
+        "dach": [round(probe(dach_glatt, x), 3) for x in u],
         "halbe_breite": [round(probe(halb, x), 3) for x in u],
         "raeder": raeder,
         "seitenfenster": [round(x, 4) for x in seitenfenster],
@@ -204,12 +222,12 @@ def baue(modell: str, laenge: float, spiegeln: bool) -> dict:
         profil["fluegel"] = fluegel
     # Texturen: die Ansichten zugeschnitten (Seite und Draufsicht ggf. gespiegelt).
     os.makedirs(TEXTUREN, exist_ok=True)
-    Image.fromarray(s_rgb.astype(np.uint8)).save(os.path.join(TEXTUREN, f"auto_{modell}_seite.png"))
-    Image.fromarray(o_rgb.astype(np.uint8)).save(os.path.join(TEXTUREN, f"auto_{modell}_oben.png"))
+    mit_hoehe(s_rgb).save(os.path.join(TEXTUREN, f"auto_{modell}_seite.png"))
+    mit_hoehe(o_rgb).save(os.path.join(TEXTUREN, f"auto_{modell}_oben.png"))
     for name in ("front", "heck"):
         sl, _ = v[name]
         teil = bild[sl]
-        Image.fromarray(teil.astype(np.uint8)).save(os.path.join(TEXTUREN, f"auto_{modell}_{name}.png"))
+        mit_hoehe(teil).save(os.path.join(TEXTUREN, f"auto_{modell}_{name}.png"))
         # Masstab: dieselbe Hoehe wie die Seitenansicht (Boden bis Dach).
         profil[f"{name}_breite"] = round(teil.shape[1] * seite_hoehe / teil.shape[0], 3)
     with open(os.path.join(HIER, "Modelle", f"auto_profil_{modell}.json"), "w") as f:

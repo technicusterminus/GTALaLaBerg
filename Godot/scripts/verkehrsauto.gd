@@ -42,6 +42,7 @@ var _rechts := Vector3(0, 0, 1)
 var _netz := MeshInstance3D.new()
 var _aufbau := Node3D.new()      ## traegt die Karosserie; nickt beim Bremsen, neigt sich in Kurven
 var _raeder: Array[MeshInstance3D] = []
+var _bremsen: Array[MeshInstance3D] = []   ## Scheibe und Sattel: lenken mit, drehen nicht
 var _rad_radius := 0.33
 var _radstand := 2.6
 var _drehung := 0.0              ## Winkel der Raeder (rad)
@@ -51,6 +52,16 @@ var _beschl := 0.0               ## geglaettete Laengsbeschleunigung (m/s^2)
 var _gierrate := 0.0
 var _blinker := 0.0
 var _licht_stand := Vector3(-9, -9, -9)   ## zuletzt gesetzte Bremse, Blinker, Licht
+## Aufhaengung: der Aufbau schwingt als gedaempfte Feder (Eigenfrequenz FEDER_HZ, Daempfung
+## FEDER_D) um Heben, Nicken und Wanken; die Raeder folgen dem Boden (Strahl je Rad).
+const FEDER_HZ := 1.35
+const FEDER_D := 0.32
+const FEDERWEG := 0.09
+var _feder := Vector3.ZERO      ## Heben (m), Nicken (rad), Wanken (rad)
+var _feder_v := Vector3.ZERO
+var _rad_hub := PackedFloat32Array([0.0, 0.0, 0.0, 0.0])   ## Einfederung je Rad (m)
+var _boden_in := randf() * 0.1
+var _lagen: Array = []          ## Radmitten des Modells (Wagenmesh.radlagen)
 var _gier := 0.0
 var _lage := Vector3.ZERO   ## zuletzt gesetzte Position, sofort gueltig (siehe position_jetzt)
 var _geschwindigkeit := Vector3.ZERO
@@ -99,14 +110,22 @@ func _ready() -> void:
 ## damit sie beim Nicken auf der Strasse bleiben.
 func _baue_raeder() -> void:
 	var lagen := Wagenmesh.radlagen(modell)
+	_lagen = lagen
 	for k in lagen.size():
 		var l: Vector4 = lagen[k]
 		var rad := MeshInstance3D.new()
-		rad.mesh = Wagenmesh.rad_netz(modell, k / 2)
+		rad.mesh = Wagenmesh.rad_netz(modell, k / 2, k % 2 == 0)
 		rad.position = Vector3(l.x, l.y, l.z) * karosserie
 		rad.visibility_range_end = 160.0
 		add_child(rad)
 		_raeder.append(rad)
+		var bremse := MeshInstance3D.new()
+		bremse.mesh = Wagenmesh.bremse_netz(modell, k / 2, k % 2 == 0)
+		bremse.position = rad.position
+		bremse.visibility_range_end = 60.0
+		bremse.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(bremse)
+		_bremsen.append(bremse)
 		_rad_radius = l.w
 	if lagen.size() >= 4:
 		_radstand = absf((lagen[0] as Vector4).x - (lagen[2] as Vector4).x)
@@ -121,20 +140,73 @@ func _bewege_teile(delta: float) -> void:
 		lenk_soll = clampf(atan(_gierrate * _radstand / tempo), -0.6, 0.6)
 	_lenkwinkel = lerpf(_lenkwinkel, lenk_soll, minf(6.0 * delta, 1.0))
 	for k in _raeder.size():
-		_raeder[k].rotation = Vector3(0.0, _lenkwinkel if k < 2 else 0.0, -_drehung)
+		var lenk := _lenkwinkel if k < 2 else 0.0
+		_raeder[k].rotation = Vector3(0.0, lenk, -_drehung)
+		_bremsen[k].rotation = Vector3(0.0, lenk, 0.0)
 	var a := (tempo - _tempo_vorher) / maxf(delta, 0.001)
 	_tempo_vorher = tempo
 	_beschl = lerpf(_beschl, clampf(a, -9.0, 6.0), minf(4.0 * delta, 1.0))
-	var nicken := clampf(_beschl * 0.006, -0.035, 0.025)
-	var neigen := clampf(tempo * _gierrate * 0.006, -0.04, 0.04)
-	_aufbau.rotation = Vector3(neigen, 0.0, nicken)
-	_aufbau.position.y = -absf(nicken) * 0.3
+	_federung(delta, clampf(a, -10.0, 7.0), tempo)
 	var bremst := 1.0 if (_beschl < -0.8 or (absf(tempo) < 0.3 and _bremse < 0.95)) else 0.0
 	var stand := Vector3(bremst, _blinker, 0.0)
 	if stand != _licht_stand:
 		_licht_stand = stand
 		_netz.set_instance_shader_parameter("bremse", bremst)
 		_netz.set_instance_shader_parameter("blinker", _blinker)
+
+
+## Aufbau auf Federn: Ziele aus Bremsen/Beschleunigen (Nicken), Kurve (Wanken) und Boden
+## unter den Raedern (Heben, Nicken, Wanken); eine unterdaempfte Feder laeuft hin und schwingt
+## nach (nach einer Vollbremsung nickt der Wagen zurueck).
+func _federung(delta: float, a: float, tempo: float) -> void:
+	_boden_in -= delta
+	if _boden_in <= 0.0:
+		_boden_in = 0.1
+		_taste_boden()
+	var vl := _rad_hub[0]
+	var vr := _rad_hub[1]
+	var hl := _rad_hub[2]
+	var hr := _rad_hub[3]
+	var spur := 1.5
+	var ziel := Vector3(
+		(vl + vr + hl + hr) * 0.25,
+		clampf(a * 0.0055, -0.045, 0.03) + ((vl + vr) - (hl + hr)) * 0.5 / maxf(_radstand, 1.0),
+		# Rechts hoeher (Rad auf dem Bordstein) kippt den Aufbau nach links (-Drehung um X).
+		clampf(tempo * _gierrate * 0.0065, -0.05, 0.05) - ((vr + hr) - (vl + hl)) * 0.5 / spur)
+	var w0 := TAU * FEDER_HZ
+	var beschl := (ziel - _feder) * w0 * w0 - _feder_v * 2.0 * FEDER_D * w0
+	_feder_v += beschl * delta
+	_feder += _feder_v * delta
+	_feder.x = clampf(_feder.x, -FEDERWEG, FEDERWEG)
+	_aufbau.rotation = Vector3(_feder.z, 0.0, _feder.y)
+	_aufbau.position.y = _feder.x
+	# Raeder: auf dem Boden, gegen den Aufbau federnd.
+	for k in mini(_raeder.size(), _lagen.size()):
+		var l: Vector4 = _lagen[k]
+		var y := l.y * karosserie.y + _rad_hub[k]
+		_raeder[k].position.y = y
+		_bremsen[k].position.y = y
+
+
+## Boden unter den vier Raedern (nur nah an der Kamera): wie weit jedes Rad gegenueber der
+## Fahrbahnhoehe der Route ein- oder ausfedert (Bordstein, Buckel, Schlagloch).
+func _taste_boden() -> void:
+	var kamera := get_viewport().get_camera_3d() if is_inside_tree() else null
+	if kamera == null or kamera.global_position.distance_to(_lage) > 70.0:
+		for k in 4:
+			_rad_hub[k] = lerpf(_rad_hub[k], 0.0, 0.5)
+		return
+	var raum := get_world_3d().direct_space_state
+	for k in mini(4, _lagen.size()):
+		var l: Vector4 = _lagen[k]
+		var p := global_transform * Vector3(l.x, 0.0, l.z)
+		var frage := PhysicsRayQueryParameters3D.create(p + Vector3.UP * 0.6, p - Vector3.UP * 0.6)
+		frage.exclude = [get_rid()]
+		var treffer := raum.intersect_ray(frage)
+		var hub := 0.0
+		if not treffer.is_empty():
+			hub = clampf((treffer["position"] as Vector3).y - p.y, -FEDERWEG, FEDERWEG)
+		_rad_hub[k] = lerpf(_rad_hub[k], hub, 0.6)
 
 
 ## Blinker: vor einer Abbiegung auf der Route, beim Ausscheren zum Ueberholen (links), beim

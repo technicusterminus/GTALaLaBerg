@@ -9,6 +9,17 @@ const MOTOR := 7500.0
 const RUECKWAERTS := 4000.0
 const BREMSE := 45.0
 const HOECHST_MS := 48.0
+## Fahrwerk je Modell: Federhaerte, Druck- und Zugstufe, Federweg, Rollneigung. Sportler hart
+## und tief, Bus weich mit viel Weg; der Kleinwagen behaelt die erprobten Werte.
+const FAHRWERK := {
+	"klein": [45.0, 2.2, 2.6, 0.25, 0.35],
+	"limousine": [40.0, 2.4, 2.8, 0.22, 0.4],
+	"kombi": [38.0, 2.3, 2.7, 0.24, 0.4],
+	"bus": [28.0, 1.8, 2.2, 0.28, 0.5],
+	"sport": [60.0, 3.0, 3.4, 0.16, 0.25],
+	"super": [70.0, 3.2, 3.6, 0.14, 0.2],
+	"renn": [90.0, 3.6, 4.0, 0.10, 0.15],
+}
 
 @export var lack := Color(0.55, 0.06, 0.05)
 ## Fahrzeugmodell (Wagenmesh.MODELLE); bestimmt Karosserie, Raeder und Radstand.
@@ -33,6 +44,7 @@ var _lenkung := 0.0
 var _motor: AudioStreamPlayer3D
 var _karosserie: MeshInstance3D
 var _bremse_an := -1.0
+var _bremsen: Array = []   ## [VehicleWheel3D, Bremse]: die Bremse dreht nicht mit dem Rad
 
 
 func _ready() -> void:
@@ -74,15 +86,16 @@ func _ready() -> void:
 			ort = Vector3(l.z, 0.0, -l.x)
 		var rad := VehicleWheel3D.new()
 		rad.position = ort
+		var fw: Array = FAHRWERK.get(modell, FAHRWERK["klein"])
 		rad.wheel_radius = radius
-		rad.suspension_travel = 0.25
-		rad.suspension_stiffness = 45.0
+		rad.suspension_travel = fw[3]
+		rad.suspension_stiffness = fw[0]
 		rad.suspension_max_force = 9000.0
 		rad.wheel_rest_length = 0.12
-		rad.damping_compression = 2.2
-		rad.damping_relaxation = 2.6
+		rad.damping_compression = fw[1]
+		rad.damping_relaxation = fw[2]
 		rad.wheel_friction_slip = 3.2
-		rad.wheel_roll_influence = 0.35
+		rad.wheel_roll_influence = fw[4]
 		rad.use_as_steering = vorne
 		rad.use_as_traction = true
 		add_child(rad)
@@ -90,9 +103,13 @@ func _ready() -> void:
 		# den Radknoten selbst.
 		if k < lagen.size():
 			var netz := MeshInstance3D.new()
-			netz.mesh = Wagenmesh.rad_netz(modell, k / 2)
+			netz.mesh = Wagenmesh.rad_netz(modell, k / 2, links)
 			netz.rotation.y = PI / 2.0
 			rad.add_child(netz)
+			var bremse := MeshInstance3D.new()
+			bremse.mesh = Wagenmesh.bremse_netz(modell, k / 2, links)
+			rad.add_child(bremse)
+			_bremsen.append([rad, bremse])
 
 
 func ist_ausgeschaltet() -> bool:
@@ -166,6 +183,16 @@ func _motorklang() -> void:
 		_motor.play()
 	_motor.pitch_scale = 0.75 + clampf(tempo_ms / 28.0, 0.0, 1.0) * 1.1
 	_motor.volume_db = -9.0 + clampf(tempo_ms / 28.0, 0.0, 1.0) * 7.0
+
+
+## Der Radknoten dreht sich um seine Achse; Scheibe und Sattel sollen nur lenken. Ihre Lage
+## im Radknoten ist deshalb dessen Drehung rueckgaengig gemacht und nur die Lenkung behalten.
+func _process(_delta: float) -> void:
+	for paar: Array in _bremsen:
+		var rad: VehicleWheel3D = paar[0]
+		var bremse: MeshInstance3D = paar[1]
+		var soll := Basis(Vector3.UP, rad.steering) * Basis(Vector3.UP, PI / 2.0)
+		bremse.transform.basis = rad.transform.basis.inverse() * soll
 
 
 func _physics_process(delta: float) -> void:

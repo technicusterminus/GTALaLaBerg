@@ -12,6 +12,8 @@ import sys
 import numpy as np
 from PIL import Image
 
+from baue_auto_modelle import mit_hoehe   # Hoehenkarte ins Alpha (Relief im Shader)
+
 HIER = os.path.dirname(os.path.abspath(__file__))
 QUELLE = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
     HIER, "..", "Docs", "Konzept", "auto-konstruktionszeichnung.png")
@@ -141,9 +143,10 @@ def main() -> None:
     bild_rgb = Image.open(farbe_pfad if os.path.exists(farbe_pfad) else QUELLE).convert("RGB")
     texturen = os.path.join(HIER, "..", "Godot", "texturen")
     os.makedirs(texturen, exist_ok=True)
-    bild_rgb.crop((int(sx0), int(sy0), int(sx1) + 1, int(sy1) + 1)).save(
+    mit_hoehe(np.asarray(bild_rgb.crop((int(sx0), int(sy0), int(sx1) + 1, int(sy1) + 1)))).save(
         os.path.join(texturen, "auto_seite.png"))
-    bild_rgb.crop((int(ox0), int(trenn + oy.min()), int(ox1) + 1, int(trenn + oy.max()) + 1)).save(
+    mit_hoehe(np.asarray(bild_rgb.crop((int(ox0), int(trenn + oy.min()), int(ox1) + 1,
+                                        int(trenn + oy.max()) + 1)))).save(
         os.path.join(texturen, "auto_oben.png"))
     profil["seite_hoehe"] = round(float((sy1 - sy0 + 1) * masst), 3)
     profil["oben_breite"] = round(float((oy.max() - oy.min() + 1) * LAENGE_M / (ox1 - ox0 + 1)), 3)
@@ -156,7 +159,7 @@ def main() -> None:
             continue
         x0, x1 = xs2.min() + int(breite * 0.65), xs2.max() + int(breite * 0.65)
         y0, y1 = ys2.min() + zeilen_von, ys2.max() + zeilen_von
-        bild_rgb.crop((int(x0), int(y0), int(x1) + 1, int(y1) + 1)).save(
+        mit_hoehe(np.asarray(bild_rgb.crop((int(x0), int(y0), int(x1) + 1, int(y1) + 1)))).save(
             os.path.join(texturen, f"auto_{name}.png"))
         # Masstab: dieselbe Hoehe wie die Seitenansicht (Boden bis Dach).
         hoehe_m = profil["seite_hoehe"]
