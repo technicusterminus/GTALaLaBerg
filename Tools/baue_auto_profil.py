@@ -4,7 +4,12 @@
 # Dachlinie und halbe Breite je Laengsschnitt, Fensterband, Gurtlinie, Radpositionen.
 # Godot (Godot/scripts/wagenmesh.gd) baut daraus die glatte Karosserie.
 #
-#   python Tools/baue_auto_profil.py [Zeichnung.png]
+#   python Tools/baue_auto_profil.py                      (Kleinwagen, alte Pfade)
+#   python Tools/baue_auto_profil.py <modell> <Zeichnung.png> <Farbtextur.png> <Laenge_m> [spiegeln]
+#
+# Mit <modell> gehen Profil und Texturen nach Tools/Modelle/auto_profil_<modell>.json und
+# Godot/texturen/auto_<modell>_{seite,oben,front,heck}.png. "spiegeln": das Blatt zeigt die
+# Front rechts; Seiten- und Draufsicht werden gespiegelt (vorn muss links liegen).
 import json
 import os
 import sys
@@ -13,10 +18,14 @@ import numpy as np
 from PIL import Image
 
 HIER = os.path.dirname(os.path.abspath(__file__))
-QUELLE = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
+MODELL = sys.argv[1] if len(sys.argv) > 2 else ""
+QUELLE = sys.argv[2] if MODELL else os.path.join(
     HIER, "..", "Docs", "Konzept", "auto-konstruktionszeichnung.png")
-ZIEL = os.path.join(HIER, "Modelle", "auto_profil.json")
-LAENGE_M = 4.3      # so lang wird das Auto im Spiel (wie das alte Modell)
+FARBE = sys.argv[3] if MODELL else os.path.join(HIER, "..", "Docs", "Konzept", "auto-farbtextur.png")
+ZIEL = os.path.join(HIER, "Modelle", f"auto_profil_{MODELL}.json" if MODELL else "auto_profil.json")
+LAENGE_M = float(sys.argv[4]) if MODELL else 4.3   # so lang wird das Auto im Spiel
+SPIEGELN = MODELL != "" and len(sys.argv) > 5 and sys.argv[5] == "spiegeln"
+PRAEFIX = f"auto_{MODELL}_" if MODELL else "auto_"
 SCHNITTE = 72
 
 
@@ -26,8 +35,18 @@ def median(a: np.ndarray, fenster: int) -> np.ndarray:
     return np.array([np.median(pad[i:i + fenster]) for i in range(len(a))])
 
 
+def lade(pfad: str) -> Image.Image:
+    """Laedt ein Blatt; mit SPIEGELN wird der linke Teil (Seite und Draufsicht) gespiegelt."""
+    b = Image.open(pfad).convert("RGB")
+    if SPIEGELN:
+        grenze = int(b.width * 0.65)
+        links = b.crop((0, 0, grenze, b.height)).transpose(Image.FLIP_LEFT_RIGHT)
+        b.paste(links, (0, 0))
+    return b
+
+
 def main() -> None:
-    bild = np.asarray(Image.open(QUELLE).convert("RGB")).astype(np.int32)
+    bild = np.asarray(lade(QUELLE)).astype(np.int32)
     hoehe, breite = bild.shape[:2]
     grau = bild.mean(axis=2)
     farbig = bild.min(axis=2) < 225           # nicht weiss
@@ -137,14 +156,13 @@ def main() -> None:
     # Detailtextur: die vom Bildmodell farbig ausgearbeitete Fassung der Zeichnung
     # (Docs/Konzept/auto-farbtextur.png, gleiches Layout), sonst die Zeichnung selbst.
     # Zugeschnitten auf die Umrisse jeder Ansicht; u laeuft ueber die Laenge (vorn = 0).
-    farbe_pfad = os.path.join(HIER, "..", "Docs", "Konzept", "auto-farbtextur.png")
-    bild_rgb = Image.open(farbe_pfad if os.path.exists(farbe_pfad) else QUELLE).convert("RGB")
+    bild_rgb = lade(FARBE if os.path.exists(FARBE) else QUELLE)
     texturen = os.path.join(HIER, "..", "Godot", "texturen")
     os.makedirs(texturen, exist_ok=True)
     bild_rgb.crop((int(sx0), int(sy0), int(sx1) + 1, int(sy1) + 1)).save(
-        os.path.join(texturen, "auto_seite.png"))
+        os.path.join(texturen, PRAEFIX + "seite.png"))
     bild_rgb.crop((int(ox0), int(trenn + oy.min()), int(ox1) + 1, int(trenn + oy.max()) + 1)).save(
-        os.path.join(texturen, "auto_oben.png"))
+        os.path.join(texturen, PRAEFIX + "oben.png"))
     profil["seite_hoehe"] = round(float((sy1 - sy0 + 1) * masst), 3)
     profil["oben_breite"] = round(float((oy.max() - oy.min() + 1) * LAENGE_M / (ox1 - ox0 + 1)), 3)
     # Front (unten rechts) und Heck (oben rechts) stehen rechts neben den beiden Ansichten.
@@ -157,7 +175,7 @@ def main() -> None:
         x0, x1 = xs2.min() + int(breite * 0.65), xs2.max() + int(breite * 0.65)
         y0, y1 = ys2.min() + zeilen_von, ys2.max() + zeilen_von
         bild_rgb.crop((int(x0), int(y0), int(x1) + 1, int(y1) + 1)).save(
-            os.path.join(texturen, f"auto_{name}.png"))
+            os.path.join(texturen, f"{PRAEFIX}{name}.png"))
         # Masstab: dieselbe Hoehe wie die Seitenansicht (Boden bis Dach).
         hoehe_m = profil["seite_hoehe"]
         profil[f"{name}_breite"] = round(float((x1 - x0 + 1) * hoehe_m / (y1 - y0 + 1)), 3)
