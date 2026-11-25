@@ -13,7 +13,7 @@ var _sand := _material("#ccb694")
 var _solarmodul := _material("#273c55", 0.38)
 
 
-func baue(sektor: Node3D, k: Vector2i) -> void:
+func baue(sektor: Node3D, k: Vector2i, breslauer_objekte: Array) -> void:
 	match k:
 		Vector2i(-4, 0):
 			_rewe(sektor)
@@ -27,6 +27,14 @@ func baue(sektor: Node3D, k: Vector2i) -> void:
 			_haltestelle(sektor, Vector3(-1448.35, 22.03, 22.17), 2.19, "Breslauer Straße")
 			for ort in [Vector3(-1476.31, 21.00, 23.17), Vector3(-1462.34, 21.34, 50.39)]:
 				_leuchte(sektor, ort)
+	if DisplayServer.get_name() == "headless":
+		return
+	for eintrag: Array in breslauer_objekte:
+		var ort := Vector3(eintrag[0], eintrag[1], eintrag[2])
+		if eintrag[4] == "Leuchte":
+			_leuchte(sektor, ort, eintrag[3])
+		else:
+			_haltestelle(sektor, ort, eintrag[3], eintrag[4])
 
 
 func _rewe(sektor: Node3D) -> void:
@@ -132,9 +140,11 @@ func _haltestelle(eltern: Node3D, ort: Vector3, winkel: float, name: String) -> 
 	_bank(halt, Vector3(0, 0, -0.25), 0)
 
 
-func _leuchte(eltern: Node3D, ort: Vector3) -> void:
-	_quader(eltern, ort + Vector3.UP * 2.43, Vector3(0.13, 4.86, 0.13), _metall)
-	_quader(eltern, ort + Vector3(0.30, 4.85, 0), Vector3(0.77, 0.14, 0.30), _weiss)
+func _leuchte(eltern: Node3D, ort: Vector3, winkel := 0.0) -> void:
+	var mast := _gruppe(eltern, "Straßenleuchte", ort, winkel)
+	_quader(mast, Vector3(0, 2.63, 0), Vector3(0.11, 5.26, 0.11), _metall)
+	_quader(mast, Vector3(0, 5.22, 0.46), Vector3(0.18, 0.13, 1.04), _metall)
+	_quader(mast, Vector3(0, 5.16, 0.92), Vector3(0.24, 0.10, 0.28), _weiss)
 
 
 func _bank(eltern: Node3D, ort: Vector3, winkel: float) -> void:

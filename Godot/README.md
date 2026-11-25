@@ -154,6 +154,9 @@ Rauch- und Filmtest schreiben nur in eine eigene Spielstanddatei.
    Weiter südlich stehen die Flachdachhäuser neben den älteren Satteldachhäusern.
 8. An der Waldheimer Straße zur Katharinenschule fahren und vom Sportfeld auf
    die Hofseite schauen. Steildach, Gauben und Fassadenuhr sind von dort sichtbar.
+9. Vom REWE entlang der Breslauer Straße über Römerhang, Von-den-Hoff-Straße
+   und Mühlweg bis zum Danziger Platz fahren. Mittelinseln, Radweg, Haltestellen
+   und Querungsmarkierungen folgen dem Verlauf der vorhandenen Straße.
 
 Referenzen zum Bestandsbau des Klinikums sind das [Eingangsfoto des Klinikums
 von 2025](https://www.klinikum-landsberg.de/wp-content/uploads/Umwelterklaerung-2025_Klinikum-Landsberg-am-Lech.pdf)
@@ -178,6 +181,13 @@ die [Seite des Kinderhauses](https://www.landsberg.de/rathaus/meine-stadt/kinder
 und das [Hoffoto der Katharinenschule](https://www.katharinenschule-landsberg.de/).
 Fassaden und Hofausstattung sind modelliert und auf den vorhandenen
 Gebäudegrundrissen bzw. auf dem Gelände eingepasst.
+
+Für die Breslauer Straße orientieren sich Lage und Abfolge von Inseln und
+Querungen am amtlichen Orthofoto und am
+[Umbau der Stadt](https://www.landsberg.de/rathaus/aktuelles/pressemitteilungen/lob-fuer-umbau-der-breslauer-strasse/).
+Der Konverter erzeugt dafür eine schmale, entlang des Straßenzugs ausgerichtete
+Belagstextur. Das Straßennetz liefert die Fahrbahnhöhen und Verkehrsampeln für
+den Abschnitt.
 
 ## Noch offen gegenüber der Unreal-Version
 

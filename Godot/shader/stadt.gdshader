@@ -14,6 +14,8 @@ uniform bool hat_hartmann_belag = false;
 uniform sampler2D hartmann_belag : hint_default_black, filter_linear_mipmap_anisotropic, repeat_disable;
 uniform bool hat_katharinen_belag = false;
 uniform sampler2D katharinen_belag : hint_default_black, filter_linear_mipmap, repeat_disable;
+uniform bool hat_breslauer_belag = false;
+uniform sampler2D breslauer_belag : hint_default_black, filter_linear_mipmap_anisotropic, repeat_disable;
 
 varying vec3 welt;
 varying vec3 blickposition;
@@ -33,6 +35,11 @@ float wert(vec2 p) {
 float rechteck(vec2 p, vec2 halb, float aa) {
 	vec2 d = abs(p) - halb;
 	return 1.0 - smoothstep(-aa, aa, max(d.x, d.y));
+}
+
+vec2 breslauer_raster(vec2 ort) {
+	vec2 d = ort - vec2(-1456.30, 0.80);
+	return vec2(dot(d, vec2(0.868745, -0.495259)), dot(d, vec2(0.495259, 0.868745)));
 }
 
 float weg(vec2 p, vec2 a, vec2 b, float breite) {
@@ -225,9 +232,14 @@ vec3 fassade(vec3 c, vec2 uv, inout float rau, inout float glanz) {
 	bool friedalage = welt.x > -1720.0 && welt.x < -1548.0 && welt.z > -56.0 && welt.z < 77.0;
 	bool roemerhang = welt.x > -1506.0 && welt.x < -1372.0 && welt.z > 44.0 && welt.z < 302.0;
 	bool hartmann_sued = welt.x > -1660.0 && welt.x < -1405.0 && welt.z > 318.0 && welt.z < 750.0;
-	if (friedalage || roemerhang || hartmann_sued || katharinen_wohnhoefe) {
+	vec2 bres = breslauer_raster(welt.xz);
+	bool breslauer = bres.y > 275.0 && bres.y < 905.0 && bres.x > -43.0 && bres.x < 39.0;
+	if (friedalage || roemerhang || hartmann_sued || katharinen_wohnhoefe || breslauer) {
 		float modern = roemerhang ? 0.86 : (hartmann_sued && welt.z < 470.0 ? 1.0 : 0.25);
 		modern = katharinen_wohnhoefe ? 0.77 : modern;
+		if (breslauer) {
+			modern = mix(0.22, 0.85, max(step(665.0, bres.y), step(16.0, bres.x) * 0.42));
+		}
 		return hartmann_fassade(uv, anker, modern, rau, glanz);
 	}
 	vec2 kennung = floor(anker / 4.0 + 0.5);
@@ -466,6 +478,14 @@ void fragment() {
 		if (all(greaterThan(karte, vec2(0.0))) && all(lessThan(karte, vec2(1.0)))) {
 			vec4 lack = texture(katharinen_belag, karte);
 			c = mix(c, lack.rgb * (0.88 + 0.24 * wert(welt.xz * 2.11)), lack.a);
+		}
+	}
+	if (hat_breslauer_belag) {
+		vec2 karte = (breslauer_raster(welt.xz) - vec2(-47.0, -7.0)) / vec2(103.0, 926.0);
+		if (all(greaterThan(karte, vec2(0.0))) && all(lessThan(karte, vec2(1.0)))) {
+			vec4 belag = texture(breslauer_belag, karte);
+			float struktur = wert(welt.xz * 2.38) * 0.64 + wert(welt.xz * 5.7) * 0.36;
+			c = mix(c, belag.rgb * (0.93 + 0.13 * struktur), belag.a);
 		}
 	}
 

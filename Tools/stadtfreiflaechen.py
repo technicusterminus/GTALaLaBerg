@@ -40,7 +40,7 @@ class Flaechenkarte:
         self.belge = np.zeros((self.hoehe, self.breite, 4), np.uint8)
         self.schritt = (self.grenzen[2:] - self.grenzen[:2]) / [self.breite, self.hoehe]
 
-    def polygon(self, punkte, farbe):
+    def polygon(self, punkte, farbe, kreis=None):
         p = (np.asarray(punkte) - self.grenzen[:2]) / self.schritt
         x0, z0 = np.maximum(np.floor(p.min(axis=0)).astype(int), 0)
         x1, z1 = np.minimum(np.ceil(p.max(axis=0)).astype(int), [self.breite, self.hoehe])
@@ -51,6 +51,11 @@ class Flaechenkarte:
         for (ax, az), (bx, bz) in zip(p, np.roll(p, -1, axis=0)):
             if az != bz:
                 innen ^= ((az > z) != (bz > z)) & (x < ax + (z - az) * (bx - ax) / (bz - az))
+        if kreis is not None:
+            mitte, radius = kreis
+            dx = x * self.schritt[0] + self.grenzen[0] - mitte[0]
+            dz = z * self.schritt[1] + self.grenzen[1] - mitte[1]
+            innen &= dx * dx + dz * dz < radius * radius
         self.belge[z0:z1, x0:x1][innen] = (*farbe, 255)
 
     def kreis(self, mitte, radius, farbe):

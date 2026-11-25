@@ -24,6 +24,7 @@ var _materialien := {}
 var _texturen := {}
 var _hartmann_belag: Texture2D
 var _katharinen_belag: Texture2D
+var _breslauer_belag: Texture2D
 var _bepflanzung := Bepflanzung.new()
 var _hartmannviertel := Hartmannviertel.new()
 var _kopf_typ := -1     # Variant-Typkennung von PackedVector3Array, -1 = langsamer Weg
@@ -43,6 +44,9 @@ func _ready() -> void:
 	var katharinen_pfad := "res://daten/texturen/katharinen_freiflaechen.tga"
 	if ResourceLoader.exists(katharinen_pfad, "Texture2D"):
 		_katharinen_belag = load(katharinen_pfad)
+	var breslauer_pfad := "res://daten/texturen/breslauer_freiflaechen.tga"
+	if ResourceLoader.exists(breslauer_pfad, "Texture2D"):
+		_breslauer_belag = load(breslauer_pfad)
 	spawn = verz["spawn"]
 	for e in verz["sektoren"]:
 		_eintraege[Vector2i(int(e["index"][0]), int(e["index"][1]))] = e
@@ -222,7 +226,7 @@ func _baue_sektor(d: Dictionary) -> void:
 		JvaTorbau.new().baue_dachlaterne(wurzel)
 	if k == Platanenschule.SEKTOR and DisplayServer.get_name() != "headless":
 		Platanenschule.new().baue(wurzel)
-	_hartmannviertel.baue(wurzel, k)
+	_hartmannviertel.baue(wurzel, k, e.get("breslauer_objekte", []))
 	if k == Katharinenschule.SEKTOR:
 		Katharinenschule.new().baue(wurzel)
 	add_child(wurzel)
@@ -301,12 +305,16 @@ func _material(art: String, farbe: Array, hat_uv: bool) -> ShaderMaterial:
 	m.set_shader_parameter("oben", oben)
 	m.set_shader_parameter("stil", stil)
 	m.set_shader_parameter("ist_dach", art == "Roof")
-	if _hartmann_belag != null and art in ["Ground", "Road", "Sidewalk", "Gehweg", "Plaza"]:
-		m.set_shader_parameter("hat_hartmann_belag", true)
-		m.set_shader_parameter("hartmann_belag", _hartmann_belag)
-	if _katharinen_belag != null and art in ["Ground", "Road", "Sidewalk", "Gehweg", "Plaza"]:
-		m.set_shader_parameter("hat_katharinen_belag", true)
-		m.set_shader_parameter("katharinen_belag", _katharinen_belag)
+	if art in ["Ground", "Road", "Sidewalk", "Gehweg", "Plaza"]:
+		if _hartmann_belag != null:
+			m.set_shader_parameter("hat_hartmann_belag", true)
+			m.set_shader_parameter("hartmann_belag", _hartmann_belag)
+		if _katharinen_belag != null:
+			m.set_shader_parameter("hat_katharinen_belag", true)
+			m.set_shader_parameter("katharinen_belag", _katharinen_belag)
+		if _breslauer_belag != null:
+			m.set_shader_parameter("hat_breslauer_belag", true)
+			m.set_shader_parameter("breslauer_belag", _breslauer_belag)
 	if not textur.is_empty():
 		var detail := _textur(textur)
 		if detail != null:
