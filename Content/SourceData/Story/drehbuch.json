@@ -76,7 +76,7 @@
     {
      "art": "titel",
      "text": "FARBKRIEG",
-     "unter": "Ein Film in vier Akten – gedreht in Landsberg am Lech",
+     "unter": "Vier Farben, eine Stadt am Lech und ein Finale, das 1999 keiner abgepfiffen hat",
      "dauer": 5.0
     },
     {
@@ -87,11 +87,13 @@
        "zeilen": [
         {
          "wer": "lale_off",
-         "text": "Landsberg am Lech. Ein Fluss, ein Turm, der aussieht wie ein Schmalzbrot – und vier Banden, die sich seit fünfundzwanzig Jahren mit Farbe bewerfen."
+         "text": "Landsberg am Lech. Den Fluss riecht man bis ins Krankenzimmer, und die Glocken schlagen, wann sie wollen.",
+         "id": "s_p1.2"
         },
         {
          "wer": "lale_off",
-         "text": "Das ist die Geschichte, wie ich aufgewacht bin. Mit Kopfweh. Und einer Pistole, die nicht meine war."
+         "text": "Ich wachte auf mit Kopfweh und einer Jacke wie eine Malerpalette. In der Hand hielt ich eine Pistole, und die hielt ich fester als die Decke.",
+         "id": "s_p1.3"
         }
        ],
        "ort": "Klinikum",
@@ -105,39 +107,48 @@
        "zeilen": [
         {
          "wer": "marta",
-         "text": "Na, wieder da? Sie haben drei Stunden auf der Straße gelegen. Mit vier Farben auf der Jacke."
+         "text": "Liegen bleiben. Drei Stunden waren Sie draußen auf der Straße, da steht man nicht gleich auf, gell.",
+         "id": "s_p1.4"
         },
         {
          "wer": "lale",
-         "text": "Welche vier?"
+         "text": "Draußen? Wo draußen?",
+         "id": "s_p1.5"
         },
         {
          "wer": "marta",
-         "text": "Gelb, Blau, Grün, Weiß. Alle. Das schafft sonst keiner, ohne dass es wehtut."
+         "text": "Katharinenstraße. Nicht an die Jacke fassen, die Farbe ist noch a bissl frisch.",
+         "id": "s_p1.6"
         },
         {
          "wer": "lale",
-         "text": "Und die Pistole?"
+         "text": "Und die da? Die hab ich nicht losgelassen, oder?",
+         "id": "s_p1.7"
         },
         {
          "wer": "marta",
-         "text": "Steckte in Ihrer Hand. Paintball. Geliehen von jemandem, der sie zurückhaben will."
+         "text": "Zwei Pfleger haben es versucht. Paintball, keine echte. Die Kappe am Lauf ist alt, die hat einer lang gepflegt.",
+         "id": "s_p1.8"
         },
         {
          "wer": "lale",
-         "text": "Von wem?"
+         "text": "Gepflegt? Von wem?",
+         "id": "s_p1.9"
         },
         {
          "wer": "marta",
-         "text": "Das steht auf dem Zettel in Ihrer Tasche."
+         "text": "Schauen Sie in Ihre linke Jackentasche. Nicht dahin, da liegen Akten.",
+         "id": "s_p1.10"
         },
         {
          "wer": "lale_off",
-         "text": "Der Waffenstillstand endet am Samstag. Komm zum Bahnhof. – S."
+         "text": "Der Waffenstillstand endet am Samstag. Komm zum Bahnhof. – S.",
+         "id": "s_p1.11"
         },
         {
          "wer": "marta",
-         "text": "S. wie Schiedsrichter. Oder wie: Sie haben ein Problem."
+         "text": "S. steht bei uns auf jedem dritten Rezept. Lesen Sie es nicht zweimal, davon wird es nicht klarer.",
+         "id": "s_p1.12"
         }
        ],
        "ort": "spieler",
@@ -153,23 +164,28 @@
        "zeilen": [
         {
          "wer": "marta",
-         "text": "Hören Sie zu: Landsberg ist aufgeteilt. Gelb am Bahnhof, Blau am Lech, Grün rund um die Klinik, Weiß in der Altstadt."
+         "text": "Ihre Jacke kennt hier jedes Kind. Fragen Sie am Bahnhof, was Gelb heißt. Die erklären es Ihnen gern und lang.",
+         "id": "s_p1.13"
         },
         {
          "wer": "marta",
-         "text": "Seit dem Finale von 1999 herrscht Waffenstillstand. Frieden ist das nicht. Nur Pause."
+         "text": "Seit 99 hat hier keiner mehr geworfen. Am Samstag ist Schluss damit, und Sie liegen mittendrin.",
+         "id": "s_p1.14"
         },
         {
          "wer": "lale",
-         "text": "Und was habe ich damit zu tun?"
+         "text": "Mittendrin? Ich weiß nicht mal, wie ich heiße. – Doch. Lale. Das weiß ich.",
+         "id": "s_p1.15"
         },
         {
          "wer": "marta",
-         "text": "Sie sind die Erste seit Jahren, die alle vier Farben gleichzeitig trägt. Das ist entweder ein Wunder oder ein Todesurteil."
+         "text": "Lale. Gut. Ich an Ihrer Stelle würde die Jacke anlassen. Ausziehen können Sie sie immer noch.",
+         "id": "s_p1.16"
         },
         {
          "wer": "marta",
-         "text": "Der Wagen vor der Tür gehört Ihnen. Fragen Sie nicht, wem er vorher gehört hat."
+         "text": "Der Wagen vorm Haupteingang ist offen, der Schlüssel steckt. Die Pistole nehmen S' mit, die will hier keiner.",
+         "id": "s_p1.17"
         }
        ],
        "ort": "spieler",
@@ -203,12 +219,14 @@
     {
      "art": "funk",
      "wer": "funk",
-     "text": "Guten Morgen, Lale. Ja, ich kenne Ihren Namen. Ich kenne alle Namen."
+     "text": "Guten Morgen, Lale. Um sechs lag Ihr Blutdruck noch bei neunzig zu sechzig. Fahren Sie sachte an.",
+     "id": "s_p2.0"
     },
     {
      "art": "funk",
      "wer": "funk",
-     "text": "Fahren Sie zum Bahnhof. Die Gelben warten. Pünktlichkeit ist dort keine Tugend, sondern Religion."
+     "text": "Anpfiff ist am Bahnhof. Die Gelben zählen dort jede Minute. Laufen Sie nicht ins Abseits.",
+     "id": "s_p2.1"
     },
     {
      "art": "hin",
@@ -225,23 +243,28 @@
        "zeilen": [
         {
          "wer": "konrad",
-         "text": "Sieben Uhr einundvierzig. Eine Minute zu spät. Das sind sechzig Sekunden, in denen ein Zug hätte einfahren können."
+         "text": "Sieben Uhr einundvierzig, Frau Lale. Um diese Uhrzeit ist hier schon einmal jemand zu spät gekommen. Ich trage es Ihnen nicht nach, ich notiere es nur.",
+         "id": "s_p2.3"
         },
         {
          "wer": "lale",
-         "text": "Ich wusste nicht, dass ich verabredet war."
+         "text": "Zu spät? Ich wusste nicht, dass ich verabredet war.",
+         "id": "s_p2.4"
         },
         {
          "wer": "konrad",
-         "text": "Jeder ist verabredet. Mit dem Fahrplan. Konrad Weidinger, Dispatcher der Gelben. Sie tragen unsere Farbe auf der Schulter."
+         "text": "Man hat Sie mir um sechs Uhr zwölf angekündigt, mit einem Anruf ohne Nummer. Konrad Weidinger. Das Gelb an Ihrer Schulter steht Ihnen, und das sage ich ungern.",
+         "id": "s_p2.5"
         },
         {
          "wer": "lale",
-         "text": "Und drei andere auf der Jacke."
+         "text": "Ungern? Am Ärmel ist Blau, vorne Grün und hinten Weiß.",
+         "id": "s_p2.6"
         },
         {
          "wer": "konrad",
-         "text": "Das ist der Teil, der mir Sorgen macht."
+         "text": "Kruzifix. Drehen Sie sich nicht um, ich habe es gesehen.",
+         "id": "s_p2.7"
         }
        ],
        "ort": "Bahnhof",
@@ -258,11 +281,13 @@
        "zeilen": [
         {
          "wer": "konrad",
-         "text": "In Landsberg fährt nichts ohne uns. Taxis, Lieferungen, Krankenfahrten – alles läuft über unsere Säulen."
+         "text": "Jedes Taxi am Bahnhof, jede Krankenfahrt und jeder Lieferwagen zum Hauptplatz meldet sich vorher bei mir an, an Säule drei.",
+         "id": "s_p2.8"
         },
         {
          "wer": "konrad",
-         "text": "Wer hier fährt, fährt für die Gelben. Oder gar nicht."
+         "text": "Fahren Sie hier ohne Anmeldung, steht Ihr Wagen heute Abend in der Lackiererei, Frau Lale, und zwar ohne Räder.",
+         "id": "s_p2.9"
         }
        ],
        "ort": "Bahnhof",
@@ -278,16 +303,16 @@
     },
     {
      "art": "wahl",
-     "frage": "Wie antwortest du dem Dispatcher?",
+     "frage": "Was sagst du Konrad?",
      "optionen": [
       {
-       "text": "»Ich fahre für niemanden.«",
+       "text": "»Melden Sie mich doch an. Als Verspätung.«",
        "setze": {
         "ton": "frech"
        }
       },
       {
-       "text": "»Ich höre erst einmal zu.«",
+       "text": "»Säule drei. Wo genau?«",
        "setze": {
         "ton": "klug"
        }
@@ -307,11 +332,13 @@
          "zeilen": [
           {
            "wer": "konrad",
-           "text": "Mut. Bei uns nennt man das Verspätung im Kopf."
+           "text": "Als Verspätung. Diese Kategorie vergebe ich seit fünfundzwanzig Jahren nicht mehr, Frau Lale.",
+           "id": "s_p2.13"
           },
           {
            "wer": "konrad",
-           "text": "Aber gut. Frech fährt sich schneller. Drei Taxifahrten, Lale. Dann reden wir weiter."
+           "text": "Drei Taxifahrten nach meiner Uhr. Kommen Sie an, reden wir weiter. Kommen Sie nicht an, hole ich mir den Wagen.",
+           "id": "s_p2.14"
           }
          ],
          "ort": "Bahnhof",
@@ -335,11 +362,13 @@
          "zeilen": [
           {
            "wer": "konrad",
-           "text": "Zuhören. Der erste Schritt zur Pünktlichkeit. Sie gefallen mir."
+           "text": "Hinter dem Fahrkartenautomaten, neben dem Abfalleimer, den keiner leert. Sie merken sich Dinge. Das ist gefährlich und brauchbar.",
+           "id": "s_p2.15"
           },
           {
            "wer": "konrad",
-           "text": "Drei Taxifahrten, Lale. Zeigen Sie mir, dass Sie ankommen. Dann reden wir weiter."
+           "text": "Drei Taxifahrten, Frau Lale, pünktlich nach meiner Uhr, die ich eben gestellt habe. Danach reden wir darüber, was Sie wirklich wollen.",
+           "id": "s_p2.16"
           }
          ],
          "ort": "Bahnhof",
@@ -358,7 +387,8 @@
     {
      "art": "funk",
      "wer": "funk",
-     "text": "Bemerkenswert. Er hat Ihnen kein einziges Mal gedroht. Das macht er sonst bei jedem zweiten Satz."
+     "text": "Er hat Ihrem Wagen gedroht, Ihnen selbst nicht. Notieren Sie das. Gelbe Karte für ihn, keine für Sie.",
+     "id": "s_p2.17"
     }
    ]
   },
@@ -376,7 +406,7 @@
     {
      "art": "titel",
      "text": "AKT I",
-     "unter": "GELB – Die Pünktlichen",
+     "unter": "GELB – Sieben Uhr einundvierzig",
      "dauer": 4.0
     },
     {
@@ -387,19 +417,23 @@
        "zeilen": [
         {
          "wer": "konrad",
-         "text": "Landsberg läuft nach Fahrplan. Meinem. Und heute ist ein Kurier der Gelben nicht angekommen."
+         "text": "Um acht Uhr drei hätte mein Kurier an Gleis zwei stehen sollen, Frau Lale. Jetzt ist es acht Uhr neunzehn, und am Gleis steht eine Taube.",
+         "id": "s_a1_fahrplan.2"
         },
         {
          "wer": "konrad",
-         "text": "Er trug ein Päckchen. Klein, schwer, in gelbes Papier gewickelt. Wachssiegel obendrauf."
+         "text": "Er hatte ein Päckchen dabei, so groß wie eine Faust und in gelbes Papier gewickelt. Ich habe es selbst versiegelt.",
+         "id": "s_a1_fahrplan.3"
         },
         {
          "wer": "lale",
-         "text": "Was war drin?"
+         "text": "Selbst versiegelt? Was war drin?",
+         "id": "s_a1_fahrplan.4"
         },
         {
          "wer": "konrad",
-         "text": "Das geht Sie nichts an. Fahren Sie zur Stadtverwaltung. Dort wurde er zuletzt gesehen."
+         "text": "Das Päckchen geht Sie nichts an, das Siegel schon. Zuletzt hat man ihn an der Stadtverwaltung gesehen, im Hof beim Fahrradständer.",
+         "id": "s_a1_fahrplan.5"
         }
        ],
        "ort": "Bahnhof",
@@ -427,15 +461,18 @@
        "zeilen": [
         {
          "wer": "lale_off",
-         "text": "Der Kurier war weg. Nur sein Mützenband lag noch da, blau von oben bis unten."
+         "text": "Am Fahrradständer war kein Kurier, nur sein Mützenband im Kies. Es war blau gefärbt bis in die Naht und roch nach Lech.",
+         "id": "s_a1_fahrplan.7"
         },
         {
          "wer": "lale_off",
-         "text": "Blau. Wer bei den Gelben ein blaues Band hinterlässt, will, dass man es findet."
+         "text": "Ein Gelber mit blauem Band. Entweder hatte er es verloren, oder jemand wollte, dass ich es einstecke. Ich steckte es ein.",
+         "id": "s_a1_fahrplan.8"
         },
         {
          "wer": "funk",
-         "text": "Das Päckchen sitzt in einem Wagen mit rosa Heckleuchte. Er fährt nach Westen. Schnell."
+         "text": "Ein Wagen mit rosa Heckleuchte fährt nach Westen. Der Fahrer hat Gips am linken Arm und schaltet schlecht. Laufen Sie ihn auf.",
+         "id": "s_a1_fahrplan.9"
         }
        ],
        "ort": "Stadtverwaltung",
@@ -464,19 +501,23 @@
        "zeilen": [
         {
          "wer": "konrad",
-         "text": "Siegel unversehrt. Und doch – sehen Sie das? Die Prägung."
+         "text": "Das Siegel ist ganz. Sie haben es nicht aufgemacht, Frau Lale, das rechne ich Ihnen an. Schauen Sie sich die Prägung an, nicht mich.",
+         "id": "s_a1_fahrplan.12"
         },
         {
          "wer": "lale",
-         "text": "Ein Ball. Mit einem Sprung drin."
+         "text": "Ein Ball. Mit einem Sprung quer durch.",
+         "id": "s_a1_fahrplan.13"
         },
         {
          "wer": "konrad",
-         "text": "Eine von vier Hälften des Siegels von 1999. Wenn alle vier Mannschaften ihre Hälfte zusammenlegen, öffnet sich der Schmalzturm."
+         "text": "Der Sprung ist eine Kante, und an diese Kante passt etwas, das nicht bei mir liegt. Mehr schreibe ich Ihnen nicht in den Fahrplan.",
+         "id": "s_a1_fahrplan.14"
         },
         {
          "wer": "konrad",
-         "text": "Und wer hinter diesem Päckchen her ist, will nicht, dass es zusammenkommt."
+         "text": "Wer meinem Kurier ein blaues Band hinterlässt, will, dass ich zum Lech schaue. Da schaue ich heute nicht hin.",
+         "id": "s_a1_fahrplan.15"
         }
        ],
        "ort": "Bahnhof",
@@ -516,23 +557,28 @@
        "zeilen": [
         {
          "wer": "korbi",
-         "text": "Halt. Stopp. Polizei. Bitte steigen Sie nicht aus. Oder doch. Ich muss kurz im Handbuch nachsehen."
+         "text": "Halt! Gemäß, äh, Paragraf … Moment. Steigen S' nicht aus. Oder doch, ich find's grad nicht.",
+         "id": "s_a1_wache.0"
         },
         {
          "wer": "lale",
-         "text": "Wachtmeister, wir stehen vor Ihrer Wache."
+         "text": "Wachtmeister, ich stehe direkt vor Ihrer Wache.",
+         "id": "s_a1_wache.1"
         },
         {
          "wer": "korbi",
-         "text": "Eben. Das macht es einfacher. Korbinian Brandl, Polizeiinspektion Landsberg. Sie haben einen Paintball-Wagen."
+         "text": "Eben, dann ist der Weg kurz. Brandl, Polizeiinspektion Landsberg. An Ihrem Kotflügel ist Farbe, Frau Lale, und zwar Gelb.",
+         "id": "s_a1_wache.2"
         },
         {
          "wer": "lale",
-         "text": "Ich habe auch ein Recht auf eine Meinung dazu."
+         "text": "Frau Lale? Ist Gelb bei Ihnen verboten?",
+         "id": "s_a1_wache.3"
         },
         {
          "wer": "korbi",
-         "text": "Haben Sie nicht. Stillhalten bitte. Ich nehme Ihre Personalien auf. Das dauert."
+         "text": "Bei mir ist Gelb notiert. Ihre Personalien bitte. Das Handbuch liegt im Handschuhfach, glaub ich, das dauert.",
+         "id": "s_a1_wache.4"
         }
        ],
        "ort": "Polizeiinspektion",
@@ -560,15 +606,18 @@
        "zeilen": [
         {
          "wer": "korbi",
-         "text": "So. Verwarnung. Und noch etwas, vertraulich: Wenn Sie in meinem Bezirk Säulen anmalen, schreibe ich Sie auf."
+         "text": "So. Mündliche Verwarnung, schriftlich festgehalten. Wenn Sie mir die Säule da vorn anmalen, schreib ich Sie auf.",
+         "id": "s_a1_wache.6"
         },
         {
          "wer": "lale",
-         "text": "Verstanden."
+         "text": "Aufschreiben? Mehr nicht?",
+         "id": "s_a1_wache.7"
         },
         {
          "wer": "korbi",
-         "text": "Nicht dass ich es verhindern könnte. Ich bin allein. Aber schreiben, das kann ich."
+         "text": "Ich hab die Schicht allein. Aber den Block hab ich immer dabei. Den find ich, das Handbuch nie.",
+         "id": "s_a1_wache.8"
         }
        ],
        "ort": "Polizeiinspektion",
@@ -596,15 +645,18 @@
        "zeilen": [
         {
          "wer": "korbi",
-         "text": "Das war jetzt Absicht."
+         "text": "Frau Lale. Die Farbe ist auf meinem Schuh.",
+         "id": "s_a1_wache.10"
         },
         {
          "wer": "lale",
-         "text": "Sie standen im Weg."
+         "text": "Sie standen zu nah dran.",
+         "id": "s_a1_wache.11"
         },
         {
          "wer": "korbi",
-         "text": "Ich stehe immer im Weg. Das ist mein Beruf. – Ach, und Frau Lale: Im Archiv von Sankt Katharina liegen Fotos von 1999. Der Pfarrer weiß mehr, als er sagt."
+         "text": "Minute und Ort stehen jetzt drin. – Und was nicht im Block steht: Der Pfarrer von Sankt Katharina hat Fotos vom Finale 99. Ich bin da auch drauf, ganz am Rand.",
+         "id": "s_a1_wache.12"
         }
        ],
        "ort": "Polizeiinspektion",
@@ -639,15 +691,18 @@
        "zeilen": [
         {
          "wer": "pfarrer",
-         "text": "Der Herr sei mit dir. Und, wenn ich das sagen darf, die Gelben sind es nicht."
+         "text": "Grüß dich Gott, komm rein, Gott duzt auch. Klopf dir die Schuhe ab, die Gelben haben mir schon den halben Bahnhof in den Mittelgang getragen.",
+         "id": "s_a1_archiv.0"
         },
         {
          "wer": "lale",
-         "text": "Wachtmeister Brandl meinte, Sie hätten Fotos von 1999."
+         "text": "Brandl sagt, Sie haben Fotos vom Finale 1999.",
+         "id": "s_a1_archiv.1"
         },
         {
          "wer": "pfarrer",
-         "text": "Ich habe Fotos von allem. Man nennt das Pfarrchronik. Kommen Sie mit in die Sakristei."
+         "text": "Der Korbinian. Als Bub hat er mir die Kollekte verzählt. Freilich hab ich Fotos, nur liest die Chronik halt keiner. Komm mit in die Sakristei, links unten.",
+         "id": "s_a1_archiv.2"
         }
        ],
        "ort": "Sankt Katharina",
@@ -676,23 +731,28 @@
        "zeilen": [
         {
          "wer": "pfarrer",
-         "text": "Hier. Das Finale 1999. Vier Kapitäne, ein Schiedsrichter, die Goldene Kugel."
+         "text": "Da. Finale 99 am Hauptplatz. Vier Kapitäne, ein Schiedsrichter und die Kugel. Schau, wie die glänzt.",
+         "id": "s_a1_archiv.4"
         },
         {
          "wer": "lale",
-         "text": "Ein Gesicht ist durchgestrichen."
+         "text": "Glänzt? Einer ist durchgestrichen. Mit Kugelschreiber.",
+         "id": "s_a1_archiv.5"
         },
         {
          "wer": "pfarrer",
-         "text": "Franz Echter, Kapitän der Grünen. Nach dem Spiel hat man ihn des Betrugs beschuldigt. Er ist nie darüber hinweggekommen."
+         "text": "Das war net ich. Das ist der Franz Echter von den Grünen. Nach dem Spiel hieß es, er hätt beschissen. Verzeih, Herr. Betrogen.",
+         "id": "s_a1_archiv.6"
         },
         {
          "wer": "lale",
-         "text": "Echter. Wie die Schwester im Klinikum."
+         "text": "Echter? Auf dem Namensschild im Klinikum stand Echter.",
+         "id": "s_a1_archiv.7"
         },
         {
          "wer": "pfarrer",
-         "text": "Ja. Marta ist seine Schwester. Fragen Sie sie nicht danach. Noch nicht."
+         "text": "So? Auf Namensschildern steht viel. Lukas, glaub ich: Was du suchst, liegt dir manchmal vor der Nase. Mehr steht net in meiner Chronik.",
+         "id": "s_a1_archiv.8"
         }
        ],
        "ort": "Sankt Katharina",
@@ -709,11 +769,13 @@
        "zeilen": [
         {
          "wer": "lale_off",
-         "text": "Ich sah mir das Foto lange an. Vier Männer in Farben. Einer in Weiß, sehr breit, sehr zufrieden. Der Ball in seiner Hand glänzte golden."
+         "text": "Der Mann in Weiß stand in der Mitte, breit wie ein Wirtshaustisch. Er hielt die Kugel wie ein Bierfass beim Anstich.",
+         "id": "s_a1_archiv.9"
         },
         {
          "wer": "lale_off",
-         "text": "Zu golden. Auf einem Foto von 1999 glänzt nichts so frisch wie Lack von gestern."
+         "text": "Alles auf dem Foto war vergilbt, nur die Kugel nicht. Die glänzte wie Lack von gestern.",
+         "id": "s_a1_archiv.10"
         }
        ],
        "ort": "Sankt Katharina",
@@ -736,19 +798,23 @@
        "zeilen": [
         {
          "wer": "konrad",
-         "text": "Der Ball war schon vor dem Anpfiff gestrichen worden? Das heißt, jemand hat das Finale entschieden, bevor es begann."
+         "text": "Ja, für ein Foto aus dem Juli 99 hat das Gold zu viel Glanz. Das sehe ich jetzt, Frau Lale. Schreiben Sie mir das bitte nicht als Vorwurf ins Buch.",
+         "id": "s_a1_archiv.12"
         },
         {
          "wer": "lale",
-         "text": "Wer war der Mann in Weiß?"
+         "text": "Und der in Weiß? Wer ist das?",
+         "id": "s_a1_archiv.13"
         },
         {
          "wer": "konrad",
-         "text": "Xaver Gruber. Der Wirt vom Hauptplatz. Der Mann, der immer gewinnt."
+         "text": "Das ist Xaver Gruber, ihm gehört das Gasthaus am Hauptplatz. Um vierzehn Uhr acht hat er den Ball hochgehalten, und ich stand drei Meter daneben.",
+         "id": "s_a1_archiv.14"
         },
         {
          "wer": "konrad",
-         "text": "Das erklärt vieles. Und es macht mir Angst. Vor allem, dass ich es nie gesehen habe."
+         "text": "Drei Meter. Legen Sie das Foto weg, bitte. Mein Zug um neun Uhr zehn wartet nicht.",
+         "id": "s_a1_archiv.15"
         }
        ],
        "ort": "Bahnhof",
@@ -783,19 +849,23 @@
        "zeilen": [
         {
          "wer": "konrad",
-         "text": "Ich helfe Ihnen, Lale. Aber nicht aus Freundschaft. Aus Berechnung."
+         "text": "Ich mache Ihnen einen Vorschlag, Frau Lale. Sehen Sie ihn sich gut an, bevor Sie danke sagen.",
+         "id": "s_a1_dispatcher.0"
         },
         {
          "wer": "konrad",
-         "text": "Beweisen Sie, dass Sie nicht nur fahren, sondern ankommen: Zeichnen Sie die vier Wahrzeichen der Gelben, fahren Sie drei Taxifahrten – und stellen Sie mich."
+         "text": "Sie zeichnen vier Wahrzeichen der Gelben und fahren drei Taxifahrten. Danach holen Sie mich ein, wenn ich losfahre. Schaffen Sie das, gehört Vorstadt-Nord Ihnen.",
+         "id": "s_a1_dispatcher.1"
         },
         {
          "wer": "lale",
-         "text": "Sie stellen? Ich dachte, Sie helfen mir."
+         "text": "Einholen? Ich dachte, Sie helfen mir.",
+         "id": "s_a1_dispatcher.2"
         },
         {
          "wer": "konrad",
-         "text": "Eben. Ein Dispatcher, der sich nicht fangen lässt, ist kein Dispatcher. Ich fahre dann los. Pünktlich."
+         "text": "Was ich Ihnen schenke, nimmt Ihnen morgen jemand wieder weg. Ich fahre um zehn Uhr null null los, keine Minute früher.",
+         "id": "s_a1_dispatcher.3"
         }
        ],
        "ort": "Bahnhof",
@@ -811,7 +881,7 @@
     {
      "art": "warte_revier",
      "nr": 0,
-     "text": "Revier Vorstadt-Nord nehmen: vier Wahrzeichen zeichnen, drei Taxifahrten, den Dispatcher stellen"
+     "text": "Vorstadt-Nord: 4 Wahrzeichen, 3 Taxifahrten, den Dispatcher stellen"
     },
     {
      "art": "szene",
@@ -821,19 +891,23 @@
        "zeilen": [
         {
          "wer": "konrad",
-         "text": "Sieben Uhr einundvierzig. Schon wieder zu spät. Diesmal ich."
+         "text": "Meine Uhr zeigt sieben Uhr einundvierzig, und Sie haben mich eben abgedrängt. Sie geht falsch, Lale. Sie geht seit Jahren falsch.",
+         "id": "s_a1_dispatcher.5"
         },
         {
          "wer": "konrad",
-         "text": "Hier. Der Werkstattschlüssel. Die Lackiererei arbeitet ab sofort umsonst für Sie, und Ihr Wagen steckt mehr weg."
+         "text": "Nehmen Sie. Das ist der Werkstattschlüssel der Lackiererei, dort reparieren sie Ihren Wagen ab jetzt umsonst. Seit 99 hängt er an meinem Bund, ich will ihn nicht mehr spüren.",
+         "id": "s_a1_dispatcher.6"
         },
         {
          "wer": "lale",
-         "text": "Warum tun Sie das?"
+         "text": "Seit 99? Warum ausgerechnet Sie?",
+         "id": "s_a1_dispatcher.7"
         },
         {
          "wer": "konrad",
-         "text": "Weil Sie angekommen sind, Lale. Das war die Prüfung. Alles andere war Fahrplan."
+         "text": "Weil am Bahnhof nachts als Einziger jemand wach ist. Fragen Sie mich das nicht noch einmal vor Samstag, Lale.",
+         "id": "s_a1_dispatcher.8"
         }
        ],
        "ort": "spieler",
@@ -850,11 +924,13 @@
        "zeilen": [
         {
          "wer": "konrad",
-         "text": "Und noch etwas: Fragen Sie in der Lackiererei nach Schorsch. Er hat eine Farbe gemischt, die es nicht geben dürfte."
+         "text": "Fragen Sie in der Lackiererei nach Schorsch. Sagen Sie ihm, ich schicke Sie wegen der Dose, und schauen Sie, wie er dann schaut.",
+         "id": "s_a1_dispatcher.9"
         },
         {
          "wer": "konrad",
-         "text": "Ein Gold, das in der Sonne grün wird. Das war 1999 auf dem Ball."
+         "text": "Sein Vater hat 99 die Werkstatt geführt und nachts nicht abgesperrt. Kruzifix. Das habe ich jetzt nicht gesagt.",
+         "id": "s_a1_dispatcher.10"
         }
        ],
        "ort": "spieler",
@@ -893,19 +969,23 @@
        "zeilen": [
         {
          "wer": "schorsch",
-         "text": "Servus! Konrad hat angerufen. Sie sind die mit den vier Farben. Mei, das hab ich noch nie gesehen."
+         "text": "Servus! Der Konrad hat angerufen, ganz außer Atem, das war er noch nie. Mei, die Jacke! Vier Farben und keine verlaufen.",
+         "id": "s_a1_schorsch.0"
         },
         {
          "wer": "lale",
-         "text": "Er sagte, Sie hätten ein Gold gemischt, das grün wird."
+         "text": "Konrad schickt mich wegen einer Dose.",
+         "id": "s_a1_schorsch.1"
         },
         {
          "wer": "schorsch",
-         "text": "Ich hab's nicht gemischt, ich hab's gefunden. In einer Dose, hinten im Regal, Aufschrift: ›Ball, Final 99, Rückgabe unerwünscht‹."
+         "text": "A Dose? Mei, Dosen hab ich hundert. Grundierung, Klarlack, Spachtel. Suchen S' Ihnen eine aus.",
+         "id": "s_a1_schorsch.2"
         },
         {
          "wer": "schorsch",
-         "text": "Das Gold ist ein Lack mit Kupferanteil. In der Sonne wird er grün. Auf dem Foto sieht man's nicht. In echt schon."
+         "text": "Ah, die. ›Ball, Final 99, Rückgabe unerwünscht‹. Die steht hinterm Klarlack. Gefunden hab ich die, vor Jahren. Irgendwann halt.",
+         "id": "s_a1_schorsch.3"
         }
        ],
        "ort": "Lackiererei",
@@ -934,23 +1014,28 @@
        "zeilen": [
         {
          "wer": "schorsch",
-         "text": "Der echte Pokal der Goldenen Kugel ist grün geworden, als man ihn in die Sonne stellte. Man hat ihn also ausgetauscht."
+         "text": "Das Gold auf dem Foto ist Kupferpigment unterm Klarlack. Im Keller glänzt's, in der Sonn wird's grün wie a alte Dachrinne. Der Ball war also frisch lackiert, wie das Foto gemacht worden ist.",
+         "id": "s_a1_schorsch.5"
         },
         {
          "wer": "lale",
-         "text": "Gegen was?"
+         "text": "Frisch lackiert? Und wo ist der echte Ball?",
+         "id": "s_a1_schorsch.6"
         },
         {
          "wer": "schorsch",
-         "text": "Gegen einen gestrichenen. Gelb. Dann gold. Wer das gemacht hat, brauchte Zeit, Lack und eine Werkstatt wie meine."
+         "text": "Den hat wer verschwinden lassen und über Nacht an zweiten lackiert. Dafür braucht's a Spritzkabine, a ruhige Hand und kein Licht im Hof.",
+         "id": "s_a1_schorsch.7"
         },
         {
          "wer": "schorsch",
-         "text": "Mir fällt nur einer ein, der hier damals so viel Farbe bestellt hat: Xaver Gruber. Der Wirt."
+         "text": "Und Kupferpigment hat 99 in Landsberg nur einer kistenweis bestellt, für seine Wirtshausschilder. Der Gruber Xaver.",
+         "id": "s_a1_schorsch.8"
         },
         {
          "wer": "lale",
-         "text": "Wieder er."
+         "text": "Gruber? Und wer hat ihm nachts aufgesperrt?",
+         "id": "s_a1_schorsch.9"
         }
        ],
        "ort": "Lackiererei",
@@ -966,7 +1051,8 @@
     {
      "art": "funk",
      "wer": "funk",
-     "text": "Akt I ist vorbei. Einer von vier Köpfen liegt am Boden. Die Blauen am Lech wissen es bereits."
+     "text": "Gelb ist abgepfiffen. Am Lech hat man es schon gehört. Essen Sie was, Lale, Sie haben seit gestern nichts im Magen.",
+     "id": "s_a1_schorsch.10"
     }
    ]
   },
@@ -984,7 +1070,7 @@
     {
      "art": "titel",
      "text": "AKT II",
-     "unter": "BLAU – Die Schnellen",
+     "unter": "BLAU – Wer zuerst am Wehr ist",
      "dauer": 4.0
     },
     {
@@ -995,27 +1081,33 @@
        "zeilen": [
         {
          "wer": "anneliese",
-         "text": "Da ist sie ja. Die Frau mit allen vier Farben. Anneliese Lechner. Mir gehört der Fluss, und was am Fluss liegt."
+         "text": "Geh, da schau her, die mit der bunten Jacke! Ich wett mit dir um deine Pistole, dass du nicht weißt, wo das Gelb aufhört und das Blau anfängt. Anneliese.",
+         "id": "s_a2_ufer.2"
         },
         {
          "wer": "lale",
-         "text": "Konrad hat Sie erwähnt."
+         "text": "Der Konrad hat gesagt, ich soll mich vor Ihnen in Acht nehmen. Sieben Uhr einundvierzig, hat er dazugesagt. Keine Ahnung, warum.",
+         "id": "s_a2_ufer.3"
         },
         {
          "wer": "anneliese",
-         "text": "Konrad erwähnt jeden, den er für gefährlich hält. Das sind sehr wenige. Sie sind also gefährlich."
+         "text": "Mei, der Konrad. Der sagt die Uhrzeit, wenn er was nicht sagen mag. Hat er dich wenigstens pünktlich hergeschickt?",
+         "id": "s_a2_ufer.4"
         },
         {
          "wer": "anneliese",
-         "text": "Ich fahre die schnellsten Boote am Lech und die schnellsten Wagen am Ufer. Wer zu den Blauen will, muss mich überholen."
+         "text": "Hörst des? Unterm Steg, des Kehrwasser. Da hat's heuer schon zwei Kanus umgedreht. Du schaust aus, als wärst du auch schon mal irgendwo reingefallen.",
+         "id": "s_a2_ufer.5"
         },
         {
          "wer": "lale",
-         "text": "Ich überhole nur, wenn jemand vor mir fährt."
+         "text": "Reingefallen? Ich bin im Klinikum aufgewacht. Mehr weiß ich nicht. Was wollen Sie von mir?",
+         "id": "s_a2_ufer.6"
         },
         {
          "wer": "anneliese",
-         "text": "Dann fahren Sie jetzt zur Johanniskirche. Mein Vorfahrer wartet dort. Er hat etwas, das Ihnen gehört."
+         "text": "Mein Vorfahrer steht an der Johanniskirche, der Benni. Der hat was in der Tasche, das dich interessiert. Wenn du ihn kriegst, reden wir. Wenn nicht, war's a schöner Nachmittag.",
+         "id": "s_a2_ufer.7"
         }
        ],
        "ort": "Mutterturm",
@@ -1032,7 +1124,7 @@
     {
      "art": "hin",
      "ort": "Johanniskirche",
-     "text": "Ans andere Ufer zur Johanniskirche – der Vorfahrer der Blauen wartet",
+     "text": "Ans andere Ufer zur Johanniskirche – der Vorfahrer wartet",
      "zeit": 170,
      "imWagen": true
     },
@@ -1044,11 +1136,13 @@
        "zeilen": [
         {
          "wer": "lale_off",
-         "text": "Der Vorfahrer wartete nicht. Er fuhr los, kaum dass ich bremste. Ein blauer Wagen, der aussah, als würde er auf dem Wasser fahren."
+         "text": "Die Glocke von Sankt Johann schlug gerade vier, als der Benni Gas gab. Gewartet hatte er offenbar nur aufs Läuten.",
+         "id": "s_a2_ufer.9"
         },
         {
          "wer": "funk",
-         "text": "Er trägt die zweite Siegelhälfte. Bringen Sie ihn zum Stehen. Und zwar so, dass er noch weiß, wer ihn gestellt hat."
+         "text": "Er hat die zweite Siegelhälfte, Lale. Drücken Sie ihn an die Mauer, aber nicht zu fest. Der Junge hatte letzten Winter einen Schlüsselbeinbruch. Rechts.",
+         "id": "s_a2_ufer.10"
         }
        ],
        "ort": "Johanniskirche",
@@ -1077,11 +1171,13 @@
        "zeilen": [
         {
          "wer": "anneliese",
-         "text": "Nicht schlecht. Eine halbe Sekunde langsamer als ich. Aber ich bin ja auch unfair gut."
+         "text": "Der Benni hat gefunkt, du hast ihm den Spiegel abgefahren. Mei, der weint jetzt. Wetten, dass er sich morgen trotzdem ins Boot setzt?",
+         "id": "s_a2_ufer.13"
         },
         {
          "wer": "anneliese",
-         "text": "Die Siegelhälfte bleibt bei mir. Noch. Wenn Sie wirklich wollen, dass sie Ihnen gehört, dann beweisen Sie es bei der Regatta."
+         "text": "Die Hälfte hab jetzt ich, gell. Er hat sie mir zugeworfen, bevor du da warst. Willst sie haben? Dann fahr gegen mich, nicht gegen meine Buben.",
+         "id": "s_a2_ufer.14"
         }
        ],
        "ort": "Mutterturm",
@@ -1116,19 +1212,23 @@
        "zeilen": [
         {
          "wer": "anneliese",
-         "text": "Die Regatta der Blauen ist keine auf dem Wasser. Sie führt über die Brücken und Gassen am Lech. Wer als Erster wieder auf dem Holzmarkt ist, gewinnt."
+         "text": "Wir fahren hoid am Wasser entlang statt drauf, des Wasser ist heut zu hoch. Start Holzmarkt, Ziel Holzmarkt. Die Brücken zählen, die Gehsteige auch, wenn's sein muss.",
+         "id": "s_a2_regatta.0"
         },
         {
          "wer": "anneliese",
-         "text": "Infanterieplatz, Lady-Herkomer-Steg, zurück. Zwei Minuten dreißig. Ich fahre es in zwei zwanzig."
+         "text": "Infanterieplatz, Lady-Herkomer-Steg, zurück. Zwei Minuten dreißig für Leute, die bremsen. Ich bin bei zwei zwanzig, seit fünfundzwanzig Jahr.",
+         "id": "s_a2_regatta.1"
         },
         {
          "wer": "lale",
-         "text": "Dann fahre ich es in zwei zehn."
+         "text": "Zwanzig? Ich nehm zwei zehn. Und wenn ich gewinne, sagen Sie mir, wer mir die Jacke angemalt hat.",
+         "id": "s_a2_regatta.2"
         },
         {
          "wer": "anneliese",
-         "text": "Schön. Zum ersten Mal in zehn Jahren macht jemand mir das Rennen interessant."
+         "text": "Hab ich gesagt, dass ich's weiß? Geh. Wenn du gewinnst, kriegst die Hälfte. Wenn ich gewinn, kriegst a Leberkässemmel und fährst heim.",
+         "id": "s_a2_regatta.3"
         }
        ],
        "ort": "Holzmarkt",
@@ -1151,7 +1251,8 @@
     {
      "art": "funk",
      "wer": "anneliese",
-     "text": "Zehn Meter vor Ihnen, Lale. Neun. Acht – ach, ich werde langsamer, damit es spannend bleibt!"
+     "text": "Zehn Meter. Neun. Acht – mei, jetzt lass ich dich halt a bissl ran, sonst schläfst mir noch ein! Sieben!",
+     "id": "s_a2_regatta.5"
     },
     {
      "art": "hin",
@@ -1174,15 +1275,18 @@
        "zeilen": [
         {
          "wer": "anneliese",
-         "text": "Zwei Sekunden. Zwei Sekunden vor mir. Das gibt es nicht."
+         "text": "Zwei Sekunden. Vor mir. Wart, des Display spinnt. Nein. Kruzifix, des Display spinnt fei nicht.",
+         "id": "s_a2_regatta.8"
         },
         {
          "wer": "lale",
-         "text": "Ich hatte einen guten Lehrer. Er war schnell und eingebildet."
+         "text": "Sie haben am Steg vom Gas gehen müssen. Wegen der Frau mit dem Kinderwagen. Ich nicht. Ich hab sie gar nicht gesehen.",
+         "id": "s_a2_regatta.9"
         },
         {
          "wer": "anneliese",
-         "text": "Ha! Hier – die zweite Siegelhälfte. Sie haben sie sich verdient. Aber heute Abend im Stadttheater gibt's was zu holen, das Sie noch mehr interessieren wird."
+         "text": "Des sagst mir so ins Gesicht? Ha! Da, nimm's, die Hälfte, bevor ich's mir anders überleg. Heut Abend spielen s' im Stadttheater, da steht hinten was rum, wo ich mich selber nie hingetraut hab.",
+         "id": "s_a2_regatta.10"
         }
        ],
        "ort": "Holzmarkt",
@@ -1222,19 +1326,23 @@
        "zeilen": [
         {
          "wer": "anneliese",
-         "text": "Im Stadttheater gibt man heute ›Der Fischer und seine Farbe‹. Das Stück hat nur einen Zweck: Es hält die Polizei beschäftigt."
+         "text": "›Der Fischer und seine Farbe‹, Premiere. Der halbe Stadtrat sitzt drin, und die Polizei steht vorm Eingang und friert. Gut für uns.",
+         "id": "s_a2_theater.0"
         },
         {
          "wer": "anneliese",
-         "text": "Hinter der Bühne lagert ein Koffer. Gelb, Grün und Weiß haben ihn dort versteckt. Nicht aus Freundschaft. Aus Furcht."
+         "text": "Hinter der Bühne, beim Schnürboden, steht ein Koffer. Gelb, Grün und Weiß haben ihn da reingestellt, neunundneunzig. Ich war bloß zum Tragen da. Hab ich gemeint.",
+         "id": "s_a2_theater.1"
         },
         {
          "wer": "lale",
-         "text": "Wovor?"
+         "text": "Gemeint?",
+         "id": "s_a2_theater.2"
         },
         {
          "wer": "anneliese",
-         "text": "Vor dem, was darin liegt. Zeichnen Sie das Färbertor – das ist das Signal. Danach geht es los."
+         "text": "Frag net so. Mal das Färbertor an, dann wissen meine Leut, dass sie die Streifen weglocken sollen. Und mach schnell, die Pause dauert zwanzig Minuten.",
+         "id": "s_a2_theater.3"
         }
        ],
        "ort": "Stadttheater",
@@ -1275,11 +1383,13 @@
        "zeilen": [
         {
          "wer": "lale_off",
-         "text": "Hinter der Bühne roch es nach Staub und alter Farbe. Der Koffer war kleiner, als ich dachte."
+         "text": "Hinter der Bühne roch es nach Staub und alter Farbe. Von vorn kam Applaus, an der falschen Stelle. Der Koffer war kleiner, als ich dachte, und das Schloss schon aufgebrochen.",
+         "id": "s_a2_theater.7"
         },
         {
          "wer": "anneliese",
-         "text": "Machen Sie ihn auf. Ich habe ihn nie geöffnet. Ich wollte nicht wissen, wer von uns lügt."
+         "text": "Du machst ihn auf. Ich halt die Lampe. Und wenn was drin ist, was mit mir zu tun hat, liest du's leise.",
+         "id": "s_a2_theater.8"
         }
        ],
        "ort": "Stadttheater",
@@ -1296,19 +1406,23 @@
        "zeilen": [
         {
          "wer": "lale",
-         "text": "Ein Brief. Mit Franz Echters Handschrift."
+         "text": "Ein Brief. Unterschrieben mit Franz. Das F sieht aus wie auf meinem Zettel. Fast.",
+         "id": "s_a2_theater.9"
         },
         {
          "wer": "anneliese",
-         "text": "Lesen Sie vor."
+         "text": "Fast? Zeig her. Nein, lies vor. Laut ist schon recht.",
+         "id": "s_a2_theater.10"
         },
         {
          "wer": "lale",
-         "text": "›Ich habe den Ball nicht getauscht. Er lag schon so da, als ich ihn bekam. Wer das liest, soll wissen: Ich war es nicht.‹"
+         "text": "›Den Ball hab ich nicht ausgesucht, aber ich hab gespürt, dass er zu schwer war, und hab trotzdem geschossen. Die Dosen hat die Anneliese übern Lech gebracht. Ich hab sie gesehen. Sie mich auch.‹",
+         "id": "s_a2_theater.11"
         },
         {
          "wer": "anneliese",
-         "text": "Er war es nicht. Das wusste ich. Alle haben es immer gewusst, nur keiner hat es gesagt."
+         "text": "Er hat mich gesehen. Die ganze Zeit hab ich gemeint, er hat mich nicht gesehen. Gib den Brief her, Lale. Bitte. Den kriegt sonst keiner.",
+         "id": "s_a2_theater.12"
         }
        ],
        "ort": "Stadttheater",
@@ -1342,15 +1456,18 @@
        "zeilen": [
         {
          "wer": "korbi",
-         "text": "Das ist das dritte Mal diese Woche. Ich zähle mit."
+         "text": "Drittes Mal diese Woche, Frau Lale. Oder viertes. Ich hab's aufgeschrieben, irgendwo. Moment.",
+         "id": "s_a2_wache.0"
         },
         {
          "wer": "lale",
-         "text": "Ich habe nichts getan. Außer das Stadttheater zu verlassen."
+         "text": "Ich bin aus einem Theater gelaufen. Das ist nicht verboten, oder?",
+         "id": "s_a2_wache.1"
         },
         {
          "wer": "korbi",
-         "text": "Mit sieben Streifenwagen im Rücken. Nehmen Sie Platz. Ich habe Kaffee. Er ist schlecht."
+         "text": "Mit sieben Streifenwagen hinter Ihnen und Farbe am Färbertor. Setzen S' Ihnen hin. Der Kaffee ist von heut früh, der schmeckt nach Montag.",
+         "id": "s_a2_wache.2"
         }
        ],
        "ort": "Polizeiinspektion",
@@ -1379,23 +1496,28 @@
        "zeilen": [
         {
          "wer": "korbi",
-         "text": "Passen Sie auf, Frau Lale. Ich bin allein auf der Wache, aber ich habe Augen."
+         "text": "Gemäß, äh, Dienstvorschrift Abschnitt … wo hab ich jetzt das Handbuch. Egal. Was haben S' da im Mantel? Ein Brief? Nein, sagen S' nichts, sonst muss ich ihn beschlagnahmen.",
+         "id": "s_a2_wache.4"
         },
         {
          "wer": "korbi",
-         "text": "Der Förster hat Schlüssel zu meinen Zellen. Eigene. Ich kann sie ihm nicht abnehmen, weil er sie von meinem Vorgesetzten hat."
+         "text": "Der Förster, der Wald Ottmar, der hat Schlüssel zu meinen Zellen. Eigene. Gekriegt hat er die von meinem Chef, und der Chef unterschreibt meinen Urlaub.",
+         "id": "s_a2_wache.5"
         },
         {
          "wer": "lale",
-         "text": "Warum sagen Sie mir das?"
+         "text": "Schlüssel? Und das sagen Sie ausgerechnet mir. Einer Verdächtigen.",
+         "id": "s_a2_wache.6"
         },
         {
          "wer": "korbi",
-         "text": "Weil ich ein ehrlicher Polizist bin. Das ist ein einsamer Beruf."
+         "text": "Sie haben keinen Block dabei. Ich schon. Und ich hab schon einmal zugeschaut, wie was passiert ist, damals am Platz. Fragen S' nicht weiter, sonst hör ich zum Reden nimmer auf.",
+         "id": "s_a2_wache.7"
         },
         {
          "wer": "korbi",
-         "text": "Wenn Sie in den Süden fahren, zu den Grünen: Rechnen Sie damit, dass die Polizei nicht auf Ihrer Seite ist. Auch wenn ich es bin."
+         "text": "Fahren S' in den Süden, zu den Grünen, dann sind meine Kollegen gegen Sie. Ich parke dann zufällig vor der Kreuzung. Mit Warnblinker.",
+         "id": "s_a2_wache.8"
         }
        ],
        "ort": "Polizeiinspektion",
@@ -1429,19 +1551,23 @@
        "zeilen": [
         {
          "wer": "anneliese",
-         "text": "Jetzt zeigen Sie mir, dass Sie nicht nur schnell sind, sondern auch hartnäckig."
+         "text": "Den Brief hast mir nicht gegeben. Gut, dann holen wir's uns auf die alte Art. Mein Viertel gegen dein Papier.",
+         "id": "s_a2_fluss.0"
         },
         {
          "wer": "anneliese",
-         "text": "Zeichnen Sie die vier Wahrzeichen der Blauen. Drei Rennen. Und dann stellen Sie mich, Lale. Ich fahre schnell. Ich fahre sehr schnell."
+         "text": "Vier Wahrzeichen, drei Rennen, und am End fährst gegen mich, auf der Uferstraß bis zum Wehr. Wetten, dass du am Wehr bremst?",
+         "id": "s_a2_fluss.1"
         },
         {
          "wer": "lale",
-         "text": "Ich weiß."
+         "text": "Wehr? Um was wetten Sie diesmal?",
+         "id": "s_a2_fluss.2"
         },
         {
          "wer": "anneliese",
-         "text": "Dann wissen Sie, dass es ein Vergnügen wird."
+         "text": "Wenn du bremst, verbrennst den Brief. Wenn nicht, sag ich dir, was ich in der Nacht am Lech gesehen hab.",
+         "id": "s_a2_fluss.3"
         }
        ],
        "ort": "Mutterturm",
@@ -1458,7 +1584,7 @@
     {
      "art": "warte_revier",
      "nr": 1,
-     "text": "Revier Lechviertel nehmen: vier Wahrzeichen zeichnen, drei Rennen, die Fährfrau stellen"
+     "text": "Lechviertel: vier Wahrzeichen, drei Rennen, Fährfrau stellen"
     },
     {
      "art": "szene",
@@ -1468,19 +1594,23 @@
        "zeilen": [
         {
          "wer": "anneliese",
-         "text": "Au. Mein Lack. Mein schöner Lack. Das war's. Ich gebe auf."
+         "text": "Mein Kotflügel! Den hat der Schorsch erst lackiert! Geh, hör auf, hör auf, ich steh ja schon.",
+         "id": "s_a2_fluss.5"
         },
         {
          "wer": "anneliese",
-         "text": "Hier. Der Rotorschlüssel. Der Hubschrauber auf dem Klinikumsdach gehört jetzt Ihnen. Ich habe ihn nie benutzt, ich fahre lieber."
+         "text": "Da, der Rotorschlüssel. Für den Hubschrauber am Klinikumsdach. Den hat mir der Ottmar gegeben, damit ich nie wieder übern Fluss rudern muss. Ich bin nie damit geflogen.",
+         "id": "s_a2_fluss.6"
         },
         {
          "wer": "lale",
-         "text": "Sie lassen mich einfach gewinnen?"
+         "text": "Sie sind am Wehr langsamer geworden. Ich hab's gesehen. Haben Sie mich gewinnen lassen?",
+         "id": "s_a2_fluss.7"
         },
         {
          "wer": "anneliese",
-         "text": "Ich lasse niemanden gewinnen. Sie haben gewonnen. Das ist ein großer Unterschied."
+         "text": "Schau mich an. Mir zittern die Händ. Glaubst, so lass ich wen gewinnen? Das erste Mal seit neunundneunzig, dass mir eine davongefahren ist.",
+         "id": "s_a2_fluss.8"
         }
        ],
        "ort": "spieler",
@@ -1497,11 +1627,13 @@
        "zeilen": [
         {
          "wer": "anneliese",
-         "text": "Und hören Sie, Lale. Franz hat es nicht getan. Ich war dabei, als er seine Hälfte vergraben hat. Er hat geweint."
+         "text": "Die Wette. Ich bin ihm nachgegangen in der Nacht, am Lech, weil ich ihn gesucht hab, nicht wegen dem Siegel. Er hat seine Hälfte unterm Steg vergraben und geweint. Ich bin stehen geblieben und hab nichts gesagt.",
+         "id": "s_a2_fluss.9"
         },
         {
          "wer": "anneliese",
-         "text": "Der Wirt hat getauscht. Und der Förster hat es gesehen und geschwiegen. Er ist der Nächste. Passen Sie auf sich auf. Er sieht alles, was sich im Wald bewegt."
+         "text": "Getauscht hat der Wirt, die Dosen hab ich gefahren, und der Ottmar ist im Wald gestanden und hat zugeschaut. Fahr zu ihm. Aber nimm den Brief mit, der Ottmar redet nur, wenn er was in der Hand sieht.",
+         "id": "s_a2_fluss.10"
         }
        ],
        "ort": "spieler",
@@ -1546,23 +1678,28 @@
        "zeilen": [
         {
          "wer": "marta",
-         "text": "Sie sind weit gekommen. Weiter, als ich dachte. Setzen Sie sich. Nein, nicht dahin – dort liegen Akten."
+         "text": "Hocken S' sich hin. Nein, net dahin, da liegen Akten. Auf den Hocker, der wackelt a bissl, das hält Sie wach.",
+         "id": "s_a3_klinik.2"
         },
         {
          "wer": "lale",
-         "text": "Franz Echters Akten?"
+         "text": "Akten? Von wem?",
+         "id": "s_a3_klinik.3"
         },
         {
          "wer": "marta",
-         "text": "Sie wissen es also. Pfarrer Alois, nehme ich an. Er konnte noch nie schweigen."
+         "text": "Sie haben den Namen schon im Mund, ich seh's Ihnen an. War der Alois, gell? Der hat in der Sakristei immer schon lauter geredet als auf der Kanzel.",
+         "id": "s_a3_klinik.4"
         },
         {
          "wer": "marta",
-         "text": "Franz war mein Bruder. Er war Kapitän der Grünen. Und er war ein anständiger Mensch."
+         "text": "Echter, Franz. Mein Bruder. Kapitän der Grünen. Geben S' mir die Mappe da rüber, die mit dem Kaffeerand.",
+         "id": "s_a3_klinik.5"
         },
         {
          "wer": "marta",
-         "text": "Man hat ihn beschuldigt, den Ball getauscht zu haben. Er hat nie wieder gesprochen. Zwei Jahre später war er tot."
+         "text": "Nach dem Finale haben's ihm den Ball umgehängt. Danach hat er kein Wort mehr gesagt, zu niemandem, auch zu mir nicht. Zwei Jahr später lag er hier, Zimmer vierzehn.",
+         "id": "s_a3_klinik.6"
         }
        ],
        "ort": "kbo-Lech-Mangfall-Klinik",
@@ -1591,19 +1728,23 @@
        "zeilen": [
         {
          "wer": "marta",
-         "text": "In der Nacht, als Franz starb, hatte ich Dienst. Er sagte nur: ›Der Wirt hat es gewusst.‹ Dann war er still."
+         "text": "Ich hab Nachtdienst gehabt, wie heut. Er hat gesagt: ›Der Wirt hat's gewusst.‹ Dann hab ich ihm das Kissen aufgeschüttelt. Mehr war nicht zu tun.",
+         "id": "s_a3_klinik.8"
         },
         {
          "wer": "lale",
-         "text": "Wissen Sie, wer der Schiedsrichter ist?"
+         "text": "Und der Schiedsrichter? Der Mann am Funk, der weiß, wann ich blute, bevor ich's merk.",
+         "id": "s_a3_klinik.9"
         },
         {
          "wer": "marta",
-         "text": "Ich? Nein. Nicht, dass ich wüsste."
+         "text": "Ich? Nein. Nicht, dass ich wüsste. Legen S' die Mappe zurück, die gehört nach oben links.",
+         "id": "s_a3_klinik.10"
         },
         {
          "wer": "lale_off",
-         "text": "Sie hatte zu schnell geantwortet. Ich merkte es mir."
+         "text": "Sie hatte zu schnell geantwortet. Und ich hatte gar nicht gefragt, ob sie es ist. Der Flur roch nach Desinfektionsmittel. Ich kannte den Geruch von irgendwo.",
+         "id": "s_a3_klinik.11"
         }
        ],
        "ort": "kbo-Lech-Mangfall-Klinik",
@@ -1625,7 +1766,8 @@
     {
      "art": "funk",
      "wer": "marta",
-     "text": "Danke. Er lebt. Das ist selten genug, wenn Sie fahren."
+     "text": "Puls achtundachtzig, er schimpft schon wieder. Gut gemacht. Und jetzt waschen S' sich die Hände, Sie haben Blut am Ärmel. Nicht Ihres.",
+     "id": "s_a3_klinik.13"
     }
    ]
   },
@@ -1648,11 +1790,13 @@
        "zeilen": [
         {
          "wer": "lale_off",
-         "text": "Der Friedhof lag still wie ein ausgeschaltetes Radio. Franz Echters Grab hatte frische Blumen. Weiß."
+         "text": "Hinter der Friedhofskirche hörte man den Lech, sonst nichts. Auf Franz Echters Grab lagen frische Blumen, noch nass vom Gießen. Weiß.",
+         "id": "s_a3_friedhof.0"
         },
         {
          "wer": "ottmar",
-         "text": "Er hat Weiß nie gemocht."
+         "text": "Weiß hat er nie mögen.",
+         "id": "s_a3_friedhof.1"
         }
        ],
        "ort": "Friedhofskirche zur Heiligen Dreifaltigkeit",
@@ -1677,19 +1821,23 @@
        "zeilen": [
         {
          "wer": "ottmar",
-         "text": "Ottmar Wald. Förster. Wer in den Wald geht, kommt an mir vorbei. Sie sind die Frau mit den vier Farben."
+         "text": "Die Pistol'. Wo haben S' die her?",
+         "id": "s_a3_friedhof.3"
         },
         {
          "wer": "lale",
-         "text": "Sie waren dabei, damals."
+         "text": "Her? Geliehen. Sie waren dabei, damals. Neunundneunzig.",
+         "id": "s_a3_friedhof.4"
         },
         {
          "wer": "ottmar",
-         "text": "Im Wald fällt ein Baum, und keiner sieht ihn. Ich habe vieles gesehen. Ich habe nichts gesagt."
+         "text": "Gießkann' gehört zurück an'n Brunnen. Bringen S' die mit, wenn S' schon dastehen.",
+         "id": "s_a3_friedhof.5"
         },
         {
          "wer": "ottmar",
-         "text": "Gehen Sie. Sofort. Die Polizei kommt gleich. Meine Polizei."
+         "text": "Polizei kommt gleich. Meine. Hab angerufen, wie S' am Tor waren.",
+         "id": "s_a3_friedhof.6"
         }
        ],
        "ort": "Friedhofskirche zur Heiligen Dreifaltigkeit",
@@ -1737,15 +1885,18 @@
        "zeilen": [
         {
          "wer": "funk",
-         "text": "Der Förster schickt einen Boten in den Wald. Er trägt den Schlüsselbund. Wenn Sie den Boten stellen, hat der Förster nichts mehr in der Hand."
+         "text": "Anpfiff zweite Halbzeit, Lale. Der Förster gibt einen Schlüsselbund weiter, an einen jungen Burschen, Knie lädiert, rechts. Der läuft nicht weit.",
+         "id": "s_a3_wald.0"
         },
         {
          "wer": "lale",
-         "text": "Wo ist der Wald?"
+         "text": "Woher wissen Sie das mit dem Knie?",
+         "id": "s_a3_wald.1"
         },
         {
          "wer": "funk",
-         "text": "Überall. Aber heute nur dort, wo ein Panzer als Hochsitz dient. Ja, ein Panzer. Ich mache keine Scherze."
+         "text": "Nehmen Sie den Forstweg hinterm Klinikum, bis zum Panzer. Ja, Panzer. Der Förster sitzt da drauf wie auf einem Hochsitz. Kein Abseits, fahren Sie.",
+         "id": "s_a3_wald.2"
         }
        ],
        "ort": "Christuskirche",
@@ -1773,15 +1924,18 @@
        "zeilen": [
         {
          "wer": "marta",
-         "text": "Diese Schlüssel … ich kenne sie. Der große passt in die Tür zum Schmalzturm. Der kleine zu Franz' Spind."
+         "text": "Geben S' her. Der große ist vom Schmalzturm. Der kleine … den hat der Franz an einer Schnur getragen, da ist noch der Knoten dran.",
+         "id": "s_a3_wald.5"
         },
         {
          "wer": "lale",
-         "text": "Der Förster wollte ihn behalten."
+         "text": "Dran? Der Förster hat geschrien, als ich ihn dem Jungen abgenommen hab.",
+         "id": "s_a3_wald.6"
         },
         {
          "wer": "marta",
-         "text": "Natürlich. Wer das Schloss hat, hat die Wahrheit."
+         "text": "Den kleinen behalt ich. Nein, lassen S' die Hand weg. Den großen kriegen Sie, wenn der Ottmar geredet hat.",
+         "id": "s_a3_wald.7"
         }
        ],
        "ort": "Klinikum",
@@ -1816,19 +1970,23 @@
        "zeilen": [
         {
          "wer": "marta",
-         "text": "Der Förster hat zu viel gesehen. Er hat meinen Bruder untergehen lassen. Er muss reden."
+         "text": "Fünfundzwanzig Jahr legt der Blumen hin und schaut weg. Heut schaut er nicht weg. Sie holen ihn mir.",
+         "id": "s_a3_foerster.0"
         },
         {
          "wer": "lale",
-         "text": "Er hat die Polizei auf seiner Seite."
+         "text": "Holen? Der hat die Polizei in der Tasche. Und Sie haben meinen Schlüssel.",
+         "id": "s_a3_foerster.1"
         },
         {
          "wer": "marta",
-         "text": "Dann sorgen Sie dafür, dass sie ihn nicht erreichen. Zeichnen Sie das Revier, fahren Sie drei Verfolgungen, und stellen Sie ihn."
+         "text": "Dann nehmen S' ihm erst das Revier. Klinikum, Süd, alles, wo er Leute hat. Wenn er allein ist, redet er.",
+         "id": "s_a3_foerster.2"
         },
         {
          "wer": "marta",
-         "text": "Ich verlasse mich auf Sie, Lale."
+         "text": "Und ziehen S' die Jacke wieder an. Die Farbe soll man fei sehen.",
+         "id": "s_a3_foerster.3"
         }
        ],
        "ort": "Klinikum",
@@ -1845,7 +2003,7 @@
     {
      "art": "warte_revier",
      "nr": 2,
-     "text": "Revier Klinikum und Süd nehmen: vier Wahrzeichen zeichnen, drei Verfolgungen, den Förster stellen"
+     "text": "Klinikum/Süd: vier Wahrzeichen, drei Verfolgungen, Förster stellen"
     },
     {
      "art": "szene",
@@ -1855,23 +2013,28 @@
        "zeilen": [
         {
          "wer": "ottmar",
-         "text": "Ich habe mein ganzes Leben lang nichts gesagt. Jetzt sage ich es."
+         "text": "Hast mich. Gut.",
+         "id": "s_a3_foerster.5"
         },
         {
          "wer": "ottmar",
-         "text": "Der Wirt hat den Ball getauscht. Mit Hilfe der Gelben, der Blauen und mir. Wir haben alle mitgemacht."
+         "text": "Der Wirt hat getauscht. Gelb hat den Zug verschoben, Blau hat die Dosen gefahren. Ich hab Schmiere gestanden. Am Waldrand.",
+         "id": "s_a3_foerster.6"
         },
         {
          "wer": "ottmar",
-         "text": "Franz hat es herausgefunden. Er wollte reden. Wir haben ihn zum Schweigen gebracht – nicht mit Gewalt. Mit Schuldzuweisung."
+         "text": "Franz ist draufgekommen. Wir haben's ihm angehängt, alle vier, beim Stammtisch, bis's die ganze Stadt geglaubt hat. Hat keiner Hand anlegen müssen.",
+         "id": "s_a3_foerster.7"
         },
         {
          "wer": "lale",
-         "text": "Das Einzige, was ein ehrlicher Mensch nicht überlebt."
+         "text": "Und die weißen Blumen? Damit's Ihnen besser geht?",
+         "id": "s_a3_foerster.8"
         },
         {
          "wer": "ottmar",
-         "text": "Hier. Der Zündschlüssel. Der Panzer im Wald gehört Ihnen. Er ist alt, aber er fährt. Und der kleine, hier – der Spindschlüssel. Franz' Beweise liegen im Turm."
+         "text": "Zündschlüssel. Panzer. Springt schlecht an, Choke ziehen. Und die Pistol' da behalt. Gehört eh nimmer mir zum Zurückgeben.",
+         "id": "s_a3_foerster.9"
         }
        ],
        "ort": "spieler",
@@ -1888,7 +2051,8 @@
        "zeilen": [
         {
          "wer": "ottmar",
-         "text": "Sagen Sie Marta, dass es mir leidtut. Und sagen Sie ihr: Sie soll das nicht für Rache tun. Rache macht einsam."
+         "text": "Der Marta sagst nix von mir. Die weiß, wo ich bin. Jeden Sonntag, mit Weiß.",
+         "id": "s_a3_foerster.10"
         }
        ],
        "ort": "spieler",
@@ -1922,7 +2086,7 @@
     {
      "art": "titel",
      "text": "AKT IV",
-     "unter": "WEISS – Die Sieger",
+     "unter": "WEISS – Wer zuletzt zahlt",
      "dauer": 4.0
     },
     {
@@ -1933,27 +2097,33 @@
        "zeilen": [
         {
          "wer": "xaver",
-         "text": "Da kommt sie! Die Frau mit allen vier Farben! Setzen Sie sich, essen Sie, trinken Sie – der Wirt lädt ein!"
+         "text": "Ja da schau her, die mit de vier Farben! Hock di her, mei Liebe. Nein, net da, da sitzt der Konrad, auch wenn er nimmer kommt.",
+         "id": "s_a4_hauptplatz.2"
         },
         {
          "wer": "lale",
-         "text": "Xaver Gruber."
+         "text": "Sie sind der Gruber. Der vom Stammtisch.",
+         "id": "s_a4_hauptplatz.3"
         },
         {
          "wer": "xaver",
-         "text": "Der Einzige und Letzte. Ich habe ein Gasthaus am schönsten Platz Bayerns, einen Keller voller Bier und einen Ruf wie Donnerhall."
+         "text": "Der Xaver. Für dich der Xaver. Mogst a Weißbier? Geht aufs Haus. Alles geht aufs Haus, bis einer anfängt zu rechnen.",
+         "id": "s_a4_hauptplatz.4"
         },
         {
          "wer": "xaver",
-         "text": "Und Sie haben in den letzten Tagen drei meiner Freunde besiegt. Das ist beeindruckend. Das ist auch unhöflich."
+         "text": "Der Konrad stellt seine Uhr nimmer, d'Anneliese fahrt allein auf'm Lech, und der Ottmar geht ans Telefon. Des warst du, gell? Drei Freund in einer Woche. Respekt. Und a bissl frech.",
+         "id": "s_a4_hauptplatz.5"
         },
         {
          "wer": "lale",
-         "text": "Ich hätte gern über den Ball von 1999 geredet."
+         "text": "Ich will über den Ball reden. Neunundneunzig.",
+         "id": "s_a4_hauptplatz.6"
         },
         {
          "wer": "xaver",
-         "text": "Der Ball. Immer der Ball. Ein hübscher Ball. Aus Gold, wie jeder weiß."
+         "text": "Den Ball. Freilich. Den erzähl ich jeden Freitag, da musst halt um achte kommen, dann gibt's ihn mit Schweinsbraten. Und so wie ich ihn erzähl, glänzt er.",
+         "id": "s_a4_hauptplatz.7"
         }
        ],
        "ort": "Hauptplatz",
@@ -1982,23 +2152,28 @@
        "zeilen": [
         {
          "wer": "xaver",
-         "text": "Hören Sie, Lale. Ich mache Ihnen ein Angebot. Alle vier Farben auf einer Jacke – das ist keine Verletzung, das ist eine Krone."
+         "text": "Jetzt pass auf. Vier Farben auf einer Jackn, des hat in Landsberg noch keiner tragen dürfen. Des is a Kron, mei Liebe. Und a Kron braucht a Haus.",
+         "id": "s_a4_hauptplatz.9"
         },
         {
          "wer": "xaver",
-         "text": "Werden Sie meine Nachfolgerin. Der Wirt von morgen. Ein Haus, ein Platz, eine Stadt, die einem zu Füßen liegt."
+         "text": "Ich hab koane Kinder, nur an Keller und an Stammtisch. Unterschreib mir, dass du's übernimmst, und die ganze Altstadt grüßt dich beim Bäcker zuerst.",
+         "id": "s_a4_hauptplatz.10"
         },
         {
          "wer": "lale",
-         "text": "Und Franz Echter?"
+         "text": "Und wer grüßt dann den Franz Echter?",
+         "id": "s_a4_hauptplatz.11"
         },
         {
          "wer": "xaver",
-         "text": "Wer? – Ach der. Ein Mann, der nicht verlieren konnte."
+         "text": "Den Franz. Mei. Der Franz hat Weiß nie mögen. Trink aus, bevor's warm wird.",
+         "id": "s_a4_hauptplatz.12"
         },
         {
          "wer": "lale_off",
-         "text": "Ich sah ihn an. Er lächelte wie jemand, der sich seit fünfundzwanzig Jahren nicht mehr daran erinnern will, wie man aufhört zu lächeln."
+         "text": "Er wischte den Brunnenrand ab. Dreimal an derselben Stelle. Da war nichts.",
+         "id": "s_a4_hauptplatz.13"
         }
        ],
        "ort": "Hauptplatz",
@@ -2032,11 +2207,13 @@
        "zeilen": [
         {
          "wer": "funk",
-         "text": "Der Wirt hat seine Leute auf den Holzmarkt geschickt. Sie sollen verhindern, dass Sie zum Turm kommen. Man nennt das Marktnacht."
+         "text": "Anpfiff zur zweiten Halbzeit, Lale. Gruber hat seine Weißen auf den Holzmarkt geschickt, sie stehen vor dem Weg zum Turm.",
+         "id": "s_a4_marktnacht.0"
         },
         {
          "wer": "funk",
-         "text": "Es ist die gefährlichste Nacht des Jahres. Und die lauteste."
+         "text": "Ihr Knie ist seit Dienstag geschwollen, schonen Sie das linke Bein. Und wer am Boden liegt, den lassen Sie liegen. Das ist Abseits, kein Sieg.",
+         "id": "s_a4_marktnacht.1"
         }
        ],
        "ort": "Holzmarkt",
@@ -2078,11 +2255,13 @@
        "zeilen": [
         {
          "wer": "lale_off",
-         "text": "Als der Morgen kam, war der Holzmarkt leer. Nur Farbe auf dem Pflaster. Gelb, Blau, Grün – und ein bisschen Weiß."
+         "text": "Gegen fünf läutete Sankt Mariä Himmelfahrt, und der Holzmarkt war leer. Auf dem Pflaster Gelb, Blau, Grün. Das bisschen Weiß hatte ich an den Schuhen.",
+         "id": "s_a4_marktnacht.6"
         },
         {
          "wer": "funk",
-         "text": "Der Weg zum Schmalzturm ist frei. Gehen Sie. Bevor er sich besinnt."
+         "text": "Nachspielzeit läuft. Der Schmalzturm ist frei, bis Gruber wieder nüchtern ist. Gehen Sie jetzt, Sie haben seit zwanzig Stunden nichts getrunken.",
+         "id": "s_a4_marktnacht.7"
         }
        ],
        "ort": "Historisches Rathaus",
@@ -2113,7 +2292,8 @@
        "zeilen": [
         {
          "wer": "lale_off",
-         "text": "Der Schmalzturm. Unten ein Tor, oben ein Dach, das aussieht wie ein Schmalzbrot. Und in der Mitte ein Geheimnis."
+         "text": "Durchs Tor zog es nach Lech und kaltem Mörtel. Ich hatte vier Schlüssel in der Hand und keine Ahnung, welcher zuerst.",
+         "id": "s_a4_turm.0"
         }
        ],
        "ort": "Schmalzturm",
@@ -2144,11 +2324,13 @@
        "zeilen": [
         {
          "wer": "lale_off",
-         "text": "Die vier Siegelhälften passten zusammen wie ein Puzzle. Das Tor ging auf mit einem Seufzer, als hätte es fünfundzwanzig Jahre die Luft angehalten."
+         "text": "Gelb, Blau, Grün, Weiß. Die Farbe lief in die Rillen der Säule, dann klickte es. Meine Jacke hatte dieselben vier Flecken an denselben Stellen. Ich wollte das nicht sehen.",
+         "id": "s_a4_turm.3"
         },
         {
          "wer": "lale_off",
-         "text": "Im Turm stand ein Sockel. Darauf eine Kugel. Nicht golden. Grün."
+         "text": "Oben auf dem Sockel lag eine Kugel. Sie war fleckig, grün wie ein altes Kirchendach.",
+         "id": "s_a4_turm.4"
         }
        ],
        "ort": "Schmalzturm",
@@ -2164,19 +2346,23 @@
        "zeilen": [
         {
          "wer": "lale",
-         "text": "Das Original. Sie ist grün geworden. Die Goldene Kugel war nie golden."
+         "text": "Grün. Schorsch hat's gesagt, das Gold wird in der Sonne grün. Das ist die echte. Die im Gasthaus ist nachlackiert.",
+         "id": "s_a4_turm.5"
         },
         {
          "wer": "lale_off",
-         "text": "Unter der Kugel lag ein Brief. Franz Echters Handschrift. Datiert auf die Nacht nach dem Finale."
+         "text": "Darunter ein Umschlag, die Ecken weich vom Feuchten. Franz Echters Schrift, krakelig, als hätte er im Stehen geschrieben. Datum: die Nacht nach dem Finale.",
+         "id": "s_a4_turm.6"
         },
         {
          "wer": "lale_off",
-         "text": "›Ich habe gesehen, wer den Ball getauscht hat. Xaver, Konrad, Anneliese, Ottmar. Wir alle haben es getan. Ich wollte es gestehen. Man hat mich daran gehindert.‹"
+         "text": "›Xaver hat die Kugel getauscht. Konrad hat ihm den Zug verschoben, Anneliese das Boot geliehen, Ottmar hat Schmiere gestanden. Und ich hab gewusst, dass wir sonst verlieren, und nichts gesagt. Morgen geh ich zur Polizei.‹",
+         "id": "s_a4_turm.7"
         },
         {
          "wer": "lale_off",
-         "text": "›Wenn jemand das liest: Erzähl es der Stadt. Aber erzähl es mit Mitleid.‹"
+         "text": "›Falls ich nicht hinkomm: Sagt's der Marta zuerst. Und sagt's dem Xaver ins Gesicht, nicht hinterm Rücken.‹",
+         "id": "s_a4_turm.8"
         }
        ],
        "ort": "Schmalzturm",
@@ -2196,23 +2382,28 @@
        "zeilen": [
         {
          "wer": "funk",
-         "text": "Gut gemacht, Lale. Jetzt nehmen Sie die Kugel und den Brief. Und kommen zum Hauptplatz."
+         "text": "Abpfiff in diesem Abschnitt, Lale. Nehmen Sie Kugel und Brief. Langsam, der Boden ist nass, und Sie haben kein Gefühl mehr im linken Fuß.",
+         "id": "s_a4_turm.9"
         },
         {
          "wer": "lale",
-         "text": "Sie klingen anders als sonst."
+         "text": "Woher wissen Sie das? Mein Fuß. Mein Knie. Seit dem ersten Tag wissen Sie das.",
+         "id": "s_a4_turm.10"
         },
         {
          "wer": "funk",
-         "text": "Ich weiß. Die Stimme hat jetzt einen Namen. Marta Echter. Ich war der Schiedsrichter. Ich war immer der Schiedsrichter."
+         "text": "Weil ich Ihnen den Verband gewickelt hab. Rechts herum, Sie haben sich beschwert. Die Frauenstimme in der Nacht, an die Sie sich erinnern, das war auch ich.",
+         "id": "s_a4_turm.11"
         },
         {
          "wer": "lale",
-         "text": "Sie haben mich benutzt."
+         "text": "Sie haben mich auf die Straße gelegt. Mit seiner Pistole. Ich hab gedacht, ich hätte das alles selber gewollt.",
+         "id": "s_a4_turm.12"
         },
         {
          "wer": "marta",
-         "text": "Ich habe Sie geführt. Das ist ein Unterschied – und manchmal auch nicht. Jetzt kommen Sie. Es geht um alles."
+         "text": "Legen Sie die Kugel nicht auf den Boden, da ist Taubendreck. Kommen Sie zum Hauptplatz, Lale. Die Pistole will ich danach zurück. Die gehört nicht Ihnen.",
+         "id": "s_a4_turm.13"
         }
        ],
        "ort": "Schmalzturm",
@@ -2246,27 +2437,33 @@
        "zeilen": [
         {
          "wer": "marta",
-         "text": "Der Wirt hat von der Kugel erfahren. Er weiß, dass es zu Ende ist. Er wird um sein Gasthaus kämpfen, um seinen Namen, um alles."
+         "text": "Der Xaver hat's erfahren, der Turm war offen und halb Landsberg hat zugeschaut. Er hat die Weißen wieder eingesammelt. Er sperrt nicht zu, er schenkt aus.",
+         "id": "s_a4_wirt.0"
         },
         {
          "wer": "marta",
-         "text": "Zeichnen Sie das Revier der Weißen, stellen Sie ihn. Und kommen Sie dann zu mir. Ich warte am Hauptplatz."
+         "text": "Nehmen Sie ihm die Altstadt, vorher redet er nicht. Und trinken Sie nichts, was er hinstellt. Ich warte am Brunnen.",
+         "id": "s_a4_wirt.1"
         },
         {
          "wer": "lale",
-         "text": "Marta."
+         "text": "Marta.",
+         "id": "s_a4_wirt.2"
         },
         {
          "wer": "marta",
-         "text": "Ja?"
+         "text": "Was denn? Ihre Jacke ist offen.",
+         "id": "s_a4_wirt.3"
         },
         {
          "wer": "lale",
-         "text": "Ich bin noch nicht fertig mit Ihnen."
+         "text": "Die Pistole kriegen Sie, wenn ich weiß, was in der Nacht noch war. Alles.",
+         "id": "s_a4_wirt.4"
         },
         {
          "wer": "marta",
-         "text": "Das hoffe ich. Ich wäre sonst enttäuscht."
+         "text": "Dann behalten Sie sie halt noch a bissl. Gesichert, gell.",
+         "id": "s_a4_wirt.5"
         }
        ],
        "ort": "Bayertor",
@@ -2282,7 +2479,7 @@
     {
      "art": "warte_revier",
      "nr": 3,
-     "text": "Revier Altstadt nehmen: vier Wahrzeichen zeichnen, acht Lieferungen, den Wirt vom Hauptplatz stellen"
+     "text": "Altstadt: vier Wahrzeichen, acht Lieferungen, Wirt am Hauptplatz"
     },
     {
      "art": "szene",
@@ -2292,23 +2489,28 @@
        "zeilen": [
         {
          "wer": "xaver",
-         "text": "Gut. Gut. Sie haben gewonnen. Ich habe immer gewonnen. Ich habe vergessen, wie man verliert."
+         "text": "Jetzt hockst du auf meinem Platz und ich am Boden. Moment, des Pflaster is dreckig, ich wisch's dir noch –",
+         "id": "s_a4_wirt.7"
         },
         {
          "wer": "xaver",
-         "text": "Ich wollte nur, dass die Stadt nicht zerbricht. Ein Sieger braucht ein Ende. Ein Ende braucht einen Ball. Einen goldenen."
+         "text": "Mir hätten die Altstadt hergeben müssen, Madl. Mei Vater, mei Haus, alles an die Grünen. Ich hab Angst ghabt. Und dann hab ich halt ausgschenkt, bis keiner mehr gfragt hat.",
+         "id": "s_a4_wirt.8"
         },
         {
          "wer": "lale",
-         "text": "Sie haben einen Mann dafür kaputtgemacht."
+         "text": "Den Franz haben Sie gefragt. Und dann?",
+         "id": "s_a4_wirt.9"
         },
         {
          "wer": "xaver",
-         "text": "Ja. Das habe ich. Und ich habe jeden Tag daran gedacht. Ich habe nur nie wieder darüber gesprochen."
+         "text": "Der wollt zum Brandl seinem Chef. Ich hab ihm a Bier hingstellt und gsagt, er soll's überschlafen. Die Dose mit dem echten Gold hab ich beschriftet, weil ich's net wegschmeißen hab können. Mehr sag ich dir net, solang die Leut zuschaun.",
+         "id": "s_a4_wirt.10"
         },
         {
          "wer": "lale_off",
-         "text": "Er saß auf dem Pflaster, in seiner weißen Jacke, und sah plötzlich sehr klein aus."
+         "text": "Er wischte mit dem Ärmel über das Pflaster neben sich. Die weiße Jacke war danach grau. Er hörte nicht auf.",
+         "id": "s_a4_wirt.11"
         }
        ],
        "ort": "spieler",
@@ -2343,7 +2545,7 @@
     {
      "art": "titel",
      "text": "FINALE",
-     "unter": "Samstag, kurz vor Sonnenaufgang",
+     "unter": "Samstag, kurz vor Sonnenaufgang. Nachspielzeit.",
      "dauer": 4.0
     },
     {
@@ -2354,7 +2556,8 @@
        "zeilen": [
         {
          "wer": "lale_off",
-         "text": "Der Hauptplatz im Morgengrauen. Auf dem Marienbrunnen: vier Dosen. Gelb, Blau, Grün, Weiß. Davor ein Dutzend Leute, die so taten, als wären sie zufällig da."
+         "text": "Vier Dosen auf dem Rand vom Marienbrunnen: Gelb, Blau, Grün, Weiß. Der Bäcker hatte noch nicht aufgesperrt und stand trotzdem schon da, Mehl an der Schürze.",
+         "id": "s_f_hauptplatz.2"
         }
        ],
        "ort": "Hauptplatz",
@@ -2380,19 +2583,23 @@
        "zeilen": [
         {
          "wer": "konrad",
-         "text": "Pünktlich. Auf die Minute. Das ist ein Kompliment."
+         "text": "Fünf Uhr achtundfünfzig, Lale. Ich habe die Uhr heute früh nicht gestellt, zum ersten Mal seit fünfundzwanzig Jahren, und sie geht trotzdem.",
+         "id": "s_f_hauptplatz.4"
         },
         {
          "wer": "anneliese",
-         "text": "Und zwei Sekunden schneller als erwartet."
+         "text": "Mei, wetten, dass der Wirt als Erster redet? Geh, um nix. Um die Ehre, die hab ich eh nimmer.",
+         "id": "s_f_hauptplatz.5"
         },
         {
          "wer": "ottmar",
-         "text": "Ich habe geschwiegen. Jetzt stehe ich hier. Das muss reichen."
+         "text": "Bin da. (Pause) Fragst halt.",
+         "id": "s_f_hauptplatz.6"
         },
         {
          "wer": "korbi",
-         "text": "Ich bin offiziell nicht hier. Ich habe nur zufällig Dienstschluss."
+         "text": "Gemäß Dienstplan bin ich, äh, seit sechs Minuten nicht im Dienst. Den Block hab ich trotzdem dabei.",
+         "id": "s_f_hauptplatz.7"
         }
        ],
        "ort": "Hauptplatz",
@@ -2413,19 +2620,23 @@
        "zeilen": [
         {
          "wer": "marta",
-         "text": "Lale. Sie haben die Kugel. Sie haben den Brief. Jetzt gehört die Stadt Ihnen."
+         "text": "Den Brief geben Sie nicht aus der Hand, gell. Und richten S' den Kragen, der steht.",
+         "id": "s_f_hauptplatz.8"
         },
         {
          "wer": "xaver",
-         "text": "Es ist nicht zu spät. Sie müssen es nicht lesen."
+         "text": "Mei Liebe, trink erst an Kaffee, geht aufs Haus. Einen Brief liest man doch net nüchtern vor.",
+         "id": "s_f_hauptplatz.9"
         },
         {
          "wer": "marta",
-         "text": "Doch. Das müssen Sie. Mein Bruder hat dafür bezahlt."
+         "text": "Lassen S' den Brunnen, Xaver, der ist sauber. Franz hat lang genug gewartet.",
+         "id": "s_f_hauptplatz.10"
         },
         {
          "wer": "lale_off",
-         "text": "Zehn Gesichter. Zwanzig Augen. Und ich hatte einen Brief in der Hand, der fünfundzwanzig Jahre alt war."
+         "text": "Der Brief war weich vom vielen Falten. In der Jackentasche drückte die Pistole, die ich immer noch niemandem zurückgegeben hatte.",
+         "id": "s_f_hauptplatz.11"
         }
        ],
        "ort": "Hauptplatz",
@@ -2446,22 +2657,22 @@
     },
     {
      "art": "wahl",
-     "frage": "Was tust du mit der Wahrheit?",
+     "frage": "Was tust du mit dem Brief?",
      "optionen": [
       {
-       "text": "Den Brief vorlesen – die ganze Stadt soll es hören.",
+       "text": "Vorlesen. Laut.",
        "setze": {
         "ende": "wahrheit"
        }
       },
       {
-       "text": "Die Farben mischen – ein Fest statt eines Prozesses.",
+       "text": "Die Farben in den Brunnen kippen.",
        "setze": {
         "ende": "frieden"
        }
       },
       {
-       "text": "Die Kugel behalten – die Stadt gehört jetzt dir.",
+       "text": "Die Kugel behalten.",
        "setze": {
         "ende": "macht"
        }
@@ -2481,15 +2692,18 @@
          "zeilen": [
           {
            "wer": "lale",
-           "text": "›Ich habe den Ball nicht getauscht. Wer das liest, soll wissen: Ich war es nicht.‹"
+           "text": "›Den Ball hab ich nicht getauscht, aber gesehen hab ich's. Wir alle haben es getan: der Wirt, der Bahnhof, der Fluss, der Wald. Und ich.‹",
+           "id": "s_f_hauptplatz.16"
           },
           {
            "wer": "lale",
-           "text": "›Aber erzähl es mit Mitleid.‹"
+           "text": "›Wer das liest: Erzähl es so, dass man uns hinterher noch grüßen kann.‹",
+           "id": "s_f_hauptplatz.17"
           },
           {
            "wer": "chor",
-           "text": "…"
+           "text": "TAXLER: Gwusst hamma's doch alle, seit neunundneunzig. – BÄCKER: Halt die Goschn, Sepp. – TAXLER: Ja eh. Fünfundzwanzig Jahr lang.",
+           "id": "s_f_hauptplatz.18"
           }
          ],
          "ort": "Hauptplatz",
@@ -2511,27 +2725,33 @@
          "zeilen": [
           {
            "wer": "xaver",
-           "text": "Das war ich. Ich habe den Ball getauscht. Es tut mir leid."
+           "text": "Getauscht hab ich. Verloren hätten wir, und dann wär die Altstadt weg gewesen, und mei Wirtschaft gleich mit.",
+           "id": "s_f_hauptplatz.19"
           },
           {
            "wer": "konrad",
-           "text": "Und ich habe den Fahrplan verschoben, damit niemand es merkt."
+           "text": "Sieben Minuten habe ich den Fahrplan verschoben, Kruzifix, sieben Minuten. Um sieben Uhr einundvierzig stand Franz allein auf Gleis zwei.",
+           "id": "s_f_hauptplatz.20"
           },
           {
            "wer": "anneliese",
-           "text": "Ich habe die Boote bereitgestellt. Es tut mir leid."
+           "text": "Die Dosen hab ich übern Lech gfahren, nachts. Und ihm beim Graben zugschaut und nix gsagt, weil … geh, weil halt.",
+           "id": "s_f_hauptplatz.21"
           },
           {
            "wer": "ottmar",
-           "text": "Ich habe geschwiegen. Es tut mir mehr leid als alles andere."
+           "text": "Schlüssel hab ich gnommen. (Pause) Fürs Maulhalten.",
+           "id": "s_f_hauptplatz.22"
           },
           {
            "wer": "marta",
-           "text": "Danke. Das war alles, was ich wollte. Dass jemand es laut sagt."
+           "text": "Sich selber hat er auch mitgezählt. Typisch. – Xaver, hören S' auf zu wischen, Sie tropfen auf den Brief.",
+           "id": "s_f_hauptplatz.23"
           },
           {
            "wer": "korbi",
-           "text": "Nach Paragraph 14 des Handbuchs muss ich Sie jetzt festnehmen. Alle. Das wird eine lange Schicht."
+           "text": "Paragraf … ist wurscht. Ich schreib's auf, alles, mit Namen. Dich auch, Marta. Wer den Schiedsrichter spielt, kommt ins Protokoll.",
+           "id": "s_f_hauptplatz.24"
           }
          ],
          "ort": "Hauptplatz",
@@ -2564,19 +2784,23 @@
            "zeilen": [
             {
              "wer": "lale",
-             "text": "Hier. Gelb, Blau, Grün, Weiß. Alle vier Farben. Wir kippen sie zusammen."
+             "text": "Gelb, Blau, Grün, Weiß. Halt mal, Konrad. Wir kippen's alle zusammen rein.",
+             "id": "s_f_hauptplatz.25"
             },
             {
              "wer": "xaver",
-             "text": "Das wird braun."
+             "text": "Des wird braun, mei Liebe. Mit der Farb hab ich Lehrgeld zahlt.",
+             "id": "s_f_hauptplatz.26"
             },
             {
              "wer": "lale",
-             "text": "Probieren wir's."
+             "text": "Braun? Dann halt braun.",
+             "id": "s_f_hauptplatz.27"
             },
             {
              "wer": "lale_off",
-             "text": "Ich nahm die vier Dosen, eine nach der anderen. Das Wasser im Marienbrunnen färbte sich zuerst gelb, dann grün, dann blau – und am Ende wurde es doch kein Braun. Es wurde bunt."
+             "text": "Das Wasser zog die Farben in Schlieren, eine nach der anderen, und keine wollte sich mit der nächsten vertragen. Ein Kind hielt die Hand rein und zog sie grün wieder raus.",
+             "id": "s_f_hauptplatz.28"
             }
            ],
            "ort": "Hauptplatz",
@@ -2598,27 +2822,33 @@
            "zeilen": [
             {
              "wer": "marta",
-             "text": "Das ist nicht, was ich wollte."
+             "text": "Das stand in keinem Plan von mir.",
+             "id": "s_f_hauptplatz.29"
             },
             {
              "wer": "lale",
-             "text": "Das weiß ich. Aber Franz wollte es mit Mitleid. Das hier ist Mitleid."
+             "text": "Der Brief bleibt bei mir. Den les ich vor, sobald einer von denen vergisst, warum wir heut hier stehen.",
+             "id": "s_f_hauptplatz.30"
             },
             {
              "wer": "marta",
-             "text": "…Vielleicht hatte er recht."
+             "text": "… Die Hand von dem Kind waschen S' nachher ab, gell. Die Farbe geht schlecht runter.",
+             "id": "s_f_hauptplatz.31"
             },
             {
              "wer": "anneliese",
-             "text": "Ich fahre Sie alle ans Ufer. Zum ersten Farbfest."
+             "text": "Ich fahr euch rüber ans Ufer. Wetten, dass ich den Konrad nass mach? Um nix.",
+             "id": "s_f_hauptplatz.32"
             },
             {
              "wer": "konrad",
-             "text": "Pünktlich um zehn."
+             "text": "Zehn Uhr. Ungefähr, Anneliese. Ungefähr zehn.",
+             "id": "s_f_hauptplatz.33"
             },
             {
              "wer": "korbi",
-             "text": "Ich schreibe nur die Falschparker auf. Alles andere ist heute nicht mein Beruf."
+             "text": "Ich schreib heut nur Falschparker auf. Und den Brunnen, äh … der ist jetzt auch irgendwie falsch.",
+             "id": "s_f_hauptplatz.34"
             }
            ],
            "ort": "Hauptplatz",
@@ -2646,23 +2876,28 @@
            "zeilen": [
             {
              "wer": "lale",
-             "text": "Ich behalte die Kugel."
+             "text": "Die Kugel bleibt bei mir.",
+             "id": "s_f_hauptplatz.35"
             },
             {
              "wer": "marta",
-             "text": "Was?"
+             "text": "Wie bitte?",
+             "id": "s_f_hauptplatz.36"
             },
             {
              "wer": "lale",
-             "text": "Wenn die Stadt eine Farbe haben will, dann bin ich sie. Vier Farben auf einer Jacke. Mehr als jeder von euch."
+             "text": "Ihr habt mir die Farben draufgschmiert. Alle vier. Dann sind's jetzt halt meine.",
+             "id": "s_f_hauptplatz.37"
             },
             {
              "wer": "xaver",
-             "text": "Das hätte ich sagen können."
+             "text": "Mei Liebe. Genau so hab ich mir das vorgestellt. Nur mit Schürze.",
+             "id": "s_f_hauptplatz.38"
             },
             {
              "wer": "konrad",
-             "text": "Das hat er gesagt. Nur schlechter."
+             "text": "Das hat er neunundneunzig auch gesagt, Lale, fast wörtlich. Um acht Uhr zehn.",
+             "id": "s_f_hauptplatz.39"
             }
            ],
            "ort": "Hauptplatz",
@@ -2684,19 +2919,23 @@
            "zeilen": [
             {
              "wer": "marta",
-             "text": "Ich habe Sie gebaut, Lale. Ich habe Sie gebaut, damit Sie die Wahrheit sagen. Nicht, damit Sie die Krone aufsetzen."
+             "text": "Ich hab Sie auf die Straße gelegt. Ich hab Ihnen die Farbe aufgetragen und alle zehn Minuten den Puls gefühlt. Für die Wahrheit, Lale.",
+             "id": "s_f_hauptplatz.40"
             },
             {
              "wer": "lale",
-             "text": "Man baut nie nur eine Sache."
+             "text": "Die Pistole von Ihrem Bruder? Die behalt ich auch.",
+             "id": "s_f_hauptplatz.41"
             },
             {
              "wer": "lale_off",
-             "text": "Sie sah mich an wie jemand, der eine Maschine gebaut hat und merkt, dass sie schneller wird als er selbst."
+             "text": "Marta griff nach meinem Kragen, um ihn zu richten. Dann ließ sie die Hand sinken.",
+             "id": "s_f_hauptplatz.42"
             },
             {
              "wer": "korbi",
-             "text": "Ich … ich glaube, ich muss mir das Handbuch noch einmal ansehen."
+             "text": "Ich … das Handbuch. Da steht irgendwo, was man macht, wenn alle zuschauen und keiner was tut. Ich find's gleich.",
+             "id": "s_f_hauptplatz.43"
             }
            ],
            "ort": "Hauptplatz",
@@ -2744,15 +2983,18 @@
          "zeilen": [
           {
            "wer": "lale_off",
-           "text": "Es dauerte drei Wochen, bis die Zeitungen aufhörten. Der Wirt bekam ein Jahr auf Bewährung. Die anderen kamen mit Sozialstunden davon."
+           "text": "Drei Wochen lang stand Landsberg in der Zeitung. Der Wirt bekam ein Jahr auf Bewährung, die anderen Sozialstunden. Konrad leistet seine am Bahnhof ab, darum hat er gebeten.",
+           "id": "s_f_epilog.0"
           },
           {
            "wer": "lale_off",
-           "text": "Franz Echters Name steht jetzt auf einer Tafel im Schmalzturm. Marta hat sie selbst angebracht."
+           "text": "Im Schmalzturm hängt jetzt eine Tafel mit Franz' Namen. Marta hat sie selbst angeschraubt und mir die vierte Schraube in die Hand gedrückt.",
+           "id": "s_f_epilog.1"
           },
           {
            "wer": "lale_off",
-           "text": "Sie sagt, sie hat keinen Hass mehr. Ich glaube ihr zur Hälfte. Das ist mehr, als ich erwartet hatte."
+           "text": "Die Pistole hab ich ihr zurückgegeben. Sie hat sie eingesteckt, ohne nachzuschauen, ob sie geladen war.",
+           "id": "s_f_epilog.2"
           }
          ],
          "ort": "Schmalzturm",
@@ -2777,11 +3019,13 @@
            "zeilen": [
             {
              "wer": "lale_off",
-             "text": "Das erste Farbfest war ein Chaos. Der Lech wurde an einer Stelle blau, an einer anderen grün. Die Fische sahen sehr überrascht aus."
+             "text": "Das erste Farbfest ging bis Mitternacht. Unterm Wehr war der Lech blau, am Mutterturm grün, und Anneliese hat jede Wette verloren. Absichtlich, sagt sie.",
+             "id": "s_f_epilog.3"
             },
             {
              "wer": "lale_off",
-             "text": "Die Goldene Kugel liegt jetzt im Rathaus. Neben einem Zettel: ›Hier ist nie etwas gewesen.‹ Alle wissen, dass das gelogen ist. Alle sind sehr höflich."
+             "text": "Die Kugel liegt im Rathaus unter Glas, grün, wie sie ist. Daneben ein Zettel in Xavers Schrift: ›Rückgabe erwünscht.‹",
+             "id": "s_f_epilog.4"
             }
            ],
            "ort": "Hauptplatz",
@@ -2801,15 +3045,18 @@
            "zeilen": [
             {
              "wer": "lale_off",
-             "text": "Landsberg hatte eine neue Farbe. Ich trug sie jeden Tag. Sie stand mir nicht schlecht."
+             "text": "Die Jacke trag ich jeden Tag. Beim Gruber am Stammtisch hab ich jetzt einen Platz, und keiner setzt sich drauf.",
+             "id": "s_f_epilog.5"
             },
             {
              "wer": "lale_off",
-             "text": "Marta verließ die Stadt in der ersten Woche. Sie hat nichts mitgenommen außer ein Foto von ihrem Bruder."
+             "text": "Marta war in der ersten Woche weg. Mitgenommen hat sie ein Foto von Franz. Den Zettel mit dem ›S.‹ hat sie mir aufs Kopfkissen gelegt.",
+             "id": "s_f_epilog.6"
             },
             {
              "wer": "lale_off",
-             "text": "Manchmal, spät nachts, kommt über Funk eine Stimme: ›Gut gemacht, Lale.‹ Und ich weiß nicht mehr, ob ich sie gehört habe oder erfunden."
+             "text": "Manchmal, kurz nach Nachtdienstende, rauscht das Funkgerät. ›Ihr Puls ist zu hoch, Lale.‹ Dann schalt ich ab. Meistens.",
+             "id": "s_f_epilog.7"
             }
            ],
            "ort": "Hauptplatz",
@@ -2831,7 +3078,7 @@
     },
     {
      "art": "titel",
-     "text": "Kein echter Ball wurde bei diesem Film verletzt.",
+     "text": "Bei diesem Spiel wurde kein echter Ball verletzt. Getauscht schon.",
      "unter": "Alle Namen und Handlungen sind frei erfunden. Nur Landsberg ist echt.",
      "dauer": 5.0
     },
@@ -2843,15 +3090,18 @@
        "zeilen": [
         {
          "wer": "korbi",
-         "text": "Frau Lale. Hier. Ein Strafzettel. Wegen falsch geparktem Paintball-Wagen. Hauptplatz. Sonntag, elf Uhr."
+         "text": "Frau Lale. Strafzettel. Paintball-Wagen, Hauptplatz, am Marienbrunnen, Samstag, elf Uhr. Und, äh … ist Lale jetzt der Vor- oder der Nachname?",
+         "id": "s_f_epilog.12"
         },
         {
          "wer": "lale",
-         "text": "Das war mitten im Farbfest."
+         "text": "Vorname. Den Nachnamen hab ich noch nicht wieder.",
+         "id": "s_f_epilog.13"
         },
         {
          "wer": "korbi",
-         "text": "Eben. Falsch ist falsch, auch wenn alle lachen."
+         "text": "Dann lass ich das Feld offen. Ich hab Zeit, Lale. Ich schreib's dazu, wenn's Ihnen einfällt.",
+         "id": "s_f_epilog.14"
         }
        ],
        "ort": "Hauptplatz",

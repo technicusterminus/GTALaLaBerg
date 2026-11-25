@@ -284,6 +284,9 @@ func _pruefe_anprall() -> void:
 		return
 	for gruppe in ["verkehrsauto", "auto"]:
 		for n: Node3D in get_tree().get_nodes_in_group(gruppe):
+			# Streifenwagen nehmen fest, sie fahren niemanden um.
+			if n is Verkehrsauto and (n as Verkehrsauto).polizei:
+				continue
 			var weg := global_position - n.global_position
 			if Vector2(weg.x, weg.z).length_squared() > 3.2 * 3.2 or absf(weg.y) > 2.6:
 				continue

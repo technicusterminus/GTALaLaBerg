@@ -20,12 +20,16 @@ Je Sektor entstehen zwei Dateien in Godot/daten/sektoren/:
 sowie Godot/daten/sektoren.json als Verzeichnis dazu.
 """
 import json
+import os
 import re
 import shutil
 import sys
 from pathlib import Path
 
 import numpy as np
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from hoehen import Relief  # noqa: E402
 
 WURZEL = Path(__file__).resolve().parent.parent
 QUELLE = WURZEL / "Content" / "SourceData"
@@ -45,6 +49,298 @@ def nach_godot(p: np.ndarray) -> np.ndarray:
     return v[:, [0, 2, 1]].astype(np.float32)
 
 
+# Diese Abschnitte folgen dem Gelaende Punkt fuer Punkt; alles andere (Haeuser, Baeume ...) wird
+# je zusammenhaengendem Teil um denselben Betrag am Standort verschoben.
+VERTEXWEISE = {"Ground", "Road", "Sidewalk", "Gehweg", "Plaza", "Rail", "Stone", "Water"}
+RELIEF_ALPHA = float(os.environ.get("LALABERG_RELIEF", "0.4"))   # 1.0 = Gelaende unveraendert
+
+
+def baue_relief(manifest) -> "Relief | None":
+    """Liest einmal alle Bodenpunkte der Stadt und baut daraus das Reliefmodell (hoehen.py)."""
+    if RELIEF_ALPHA >= 0.999:
+        return None
+    teile = []
+    for eintrag in manifest["sectors"]:
+        daten = json.loads((QUELLE / "Sectors" / eintrag["file"]).read_text())
+        for a in daten["sections"]:
+            if art(a["name"]) in VERTEXWEISE:
+                teile.append(nach_godot(np.asarray(a["positions"], dtype=np.float64))[::2])
+    relief = Relief(np.concatenate(teile), alpha=RELIEF_ALPHA)
+    print("Relief: Gelaende %.0f bis %.0f m, auf %.0f %% gestaucht um %.0f m" % (
+        relief.hoehe_vorher[0], relief.hoehe_vorher[1], RELIEF_ALPHA * 100, relief.referenz))
+    return relief
+
+
+def relief_anwenden(relief, name: str, pos: np.ndarray, idx: np.ndarray) -> None:
+    """Verschiebt pos (n, 3; Godot-Achsen, Meter) in der Hoehe um die Reliefverschiebung."""
+    if relief is None:
+        return
+    if art(name) in VERTEXWEISE:
+        pos[:, 1] += relief.delta_punkt(pos[:, 1]).astype(np.float32)
+        return
+    for g in komponenten(pos, idx.reshape(-1, 3)):
+        p = pos[g]
+        pos[g, 1] += float(relief.delta((p[:, 0].min() + p[:, 0].max()) / 2,
+                                        (p[:, 2].min() + p[:, 2].max()) / 2))
+
+
+def verschiebe_flach(relief, zahlen: list) -> list:
+    """Flache Liste x, y, z, x, y, z ... in Zentimetern (Unreal-Achsen): z um die Verschiebung."""
+    if relief is None:
+        return zahlen
+    a = np.asarray(zahlen, dtype=np.float64).reshape(-1, 3)
+    a[:, 2] += relief.delta(a[:, 0] / 100.0, a[:, 1] / 100.0) * 100.0
+    return np.rint(a).astype(int).reshape(-1).tolist()
+
+
+class Flaechenraster:
+    """Schnelle Abfrage, ob ein Punkt (x, z) auf einer der gegebenen Flaechen liegt (2D)."""
+
+    def __init__(self, teile: list, zelle: float = 4.0):
+        self.zelle = zelle
+        self.tris = []
+        self.raster: dict = {}
+        for pos, idx in teile:
+            for t in idx.reshape(-1, 3):
+                a, b, c = pos[t[0]][[0, 2]], pos[t[1]][[0, 2]], pos[t[2]][[0, 2]]
+                n = len(self.tris)
+                self.tris.append((a, b, c))
+                lo = np.floor(np.minimum(np.minimum(a, b), c) / zelle).astype(int)
+                hi = np.floor(np.maximum(np.maximum(a, b), c) / zelle).astype(int)
+                for i in range(lo[0], hi[0] + 1):
+                    for j in range(lo[1], hi[1] + 1):
+                        self.raster.setdefault((i, j), []).append(n)
+
+    def enthaelt(self, x: float, z: float) -> bool:
+        p = np.array([x, z])
+        for n in self.raster.get((int(np.floor(x / self.zelle)), int(np.floor(z / self.zelle))), ()):
+            a, b, c = self.tris[n]
+            d1 = (p[0] - b[0]) * (a[1] - b[1]) - (a[0] - b[0]) * (p[1] - b[1])
+            d2 = (p[0] - c[0]) * (b[1] - c[1]) - (b[0] - c[0]) * (p[1] - c[1])
+            d3 = (p[0] - a[0]) * (c[1] - a[1]) - (c[0] - a[0]) * (p[1] - a[1])
+            if not ((d1 < 0 or d2 < 0 or d3 < 0) and (d1 > 0 or d2 > 0 or d3 > 0)):
+                return True
+        return False
+
+
+def bordsteine(teile: list, grenzen_m, ohne=None, hoehe: float = 0.14, breite: float = 0.22,
+               raster=None):
+    """Bordsteine an den Raendern der Strassenflaechen eines Sektors. teile: Liste (pos, idx) der
+    Strassenabschnitte (Godot-Achsen, Meter, idx in Quellwicklung). Eine Kante, die nur zu einem
+    Strassendreieck gehoert, ist ein Rand; dort entsteht ein Steinstreifen nach aussen (eine
+    senkrechte Stirn und eine Oberseite). Kanten auf der Sektorgrenze sind Nahtstellen, keine Raender.
+    Liefert (pos, idx) in Godot-Wicklung oder None."""
+    if not teile:
+        return None
+    alle_p = np.concatenate([p for p, _ in teile])
+    alle_i = []
+    versatz = 0
+    for p, i in teile:
+        alle_i.append(i.reshape(-1, 3) + versatz)
+        versatz += len(p)
+    tris = np.concatenate(alle_i)
+    # Gleiche Ecken verschiedener Abschnitte zusammenfuehren (auf 1 cm gerundet).
+    schluessel = np.round(alle_p[:, [0, 2]] * 100).astype(np.int64)
+    _, eindeutig = np.unique(schluessel[:, 0] * 10_000_000 + schluessel[:, 1], return_inverse=True)
+    t = eindeutig[tris]
+    kanten = np.concatenate([t[:, [0, 1]], t[:, [1, 2]], t[:, [2, 0]]])
+    gegen = np.concatenate([t[:, 2], t[:, 0], t[:, 1]])
+    roh = np.concatenate([tris[:, [0, 1]], tris[:, [1, 2]], tris[:, [2, 0]]])
+    roh_gegen = np.concatenate([tris[:, 2], tris[:, 0], tris[:, 1]])
+    sortiert = np.sort(kanten, axis=1)
+    code = sortiert[:, 0] * 10_000_000 + sortiert[:, 1]
+    werte, anzahl = np.unique(code, return_counts=True)
+    rand = np.isin(code, werte[anzahl == 1])
+    x0, z0, x1, z1 = grenzen_m
+    ecken, flaechen = [], []
+    for (ia, ib), ic in zip(roh[rand], roh_gegen[rand]):
+        a, b, c = alle_p[ia], alle_p[ib], alle_p[ic]
+        auf_grenze = any(abs(a[k] - g) < 0.05 and abs(b[k] - g) < 0.05
+                         for k, g in ((0, x0), (0, x1), (2, z0), (2, z1)))
+        richtung = np.array([b[0] - a[0], b[2] - a[2]])
+        laenge = float(np.linalg.norm(richtung))
+        # In der Altstadt (ohne: x0, z0, x1, z1) liegen Gassen und Plaetze ebenerdig.
+        in_altstadt = ohne is not None and ohne[0] < a[0] < ohne[2] and ohne[1] < a[2] < ohne[3]
+        if auf_grenze or laenge < 0.3 or in_altstadt:
+            continue
+        aussen = np.array([richtung[1], -richtung[0]]) / laenge
+        if np.dot(aussen, [c[0] - a[0], c[2] - a[2]]) > 0:
+            aussen = -aussen
+        # Liegt jenseits der Kante wieder Strasse (Naht zwischen zwei Strassenstuecken), ist das
+        # kein Rand: sonst laege ein Bordstein quer ueber der Fahrbahn.
+        mitte = (a + b) / 2
+        if raster is not None and raster.enthaelt(mitte[0] + aussen[0] * 0.6, mitte[2] + aussen[1] * 0.6):
+            continue
+        n = np.array([aussen[0], 0.0, aussen[1]]) * breite
+        h = np.array([0.0, hoehe, 0.0])
+        s = len(ecken)
+        ecken += [a, b, a + h, b + h, a + h + n, b + h + n]
+        flaechen += [[s, s + 1, s + 3], [s, s + 3, s + 2],          # Stirn zur Strasse
+                     [s + 2, s + 3, s + 5], [s + 2, s + 5, s + 4]]  # Oberseite
+    if not ecken:
+        return None
+    pos = np.asarray(ecken, dtype=np.float32)
+    idx = np.asarray(flaechen, dtype=np.int32)
+    # Beide Seiten zeichnen (der Shader kehrt die Normale ohnehin zur Kamera).
+    return pos, np.ascontiguousarray(idx[:, [0, 2, 1]]).reshape(-1)
+
+
+def komponenten(pos: np.ndarray, idx: np.ndarray) -> list:
+    """Zusammenhaengende Teile eines Netzes: Liste von Eckenindex-Arrays."""
+    eltern = np.arange(len(pos))
+
+    def wurzel(a: int) -> int:
+        while eltern[a] != a:
+            eltern[a] = eltern[eltern[a]]
+            a = eltern[a]
+        return a
+
+    for a, b, c in idx.reshape(-1, 3):
+        ra, rb = wurzel(a), wurzel(b)
+        eltern[ra] = rb
+        eltern[wurzel(c)] = rb
+    gruppen: dict = {}
+    for v in range(len(pos)):
+        gruppen.setdefault(wurzel(v), []).append(v)
+    return [np.asarray(g) for g in gruppen.values()]
+
+
+def baeume_aus(abschnitte: list) -> np.ndarray:
+    """Jeder Baum der Quelldaten (ein Kronen-Netz plus ein Stamm-Netz) wird zu einer Zeile
+    [x, y_fuss, z, krone_mitte_ueber_fuss, krone_radius, krone_halbe_hoehe, r, g, b]
+    in Godot-Achsen. Godot setzt daraus Instanzen (Kugelkrone, Stamm) statt der Kegelnetze."""
+    staemme = []
+    kronen = []
+    for name, pos, idx, farbe in abschnitte:
+        if art(name) not in ("Tree", "Trunk"):
+            continue
+        for g in komponenten(pos, idx):
+            p = pos[g]
+            lo, hi = p.min(axis=0), p.max(axis=0)
+            eintrag = ((lo[0] + hi[0]) / 2, (lo[2] + hi[2]) / 2, lo[1], hi[1],
+                       max(hi[0] - lo[0], hi[2] - lo[2]) / 2, farbe)
+            (kronen if art(name) == "Tree" else staemme).append(eintrag)
+    zeilen = []
+    for kx, kz, ky0, ky1, radius, farbe in kronen:
+        boden = ky0 - 2.2
+        beste = 16.0
+        for sx, sz, sy0, _sy1, _r, _f in staemme:
+            d = (sx - kx) ** 2 + (sz - kz) ** 2
+            if d < beste:
+                beste, boden = d, sy0
+        zeilen.append([kx, boden, kz, (ky0 + ky1) / 2 - boden, max(radius, 0.6),
+                       max((ky1 - ky0) / 2, 0.6), *farbe[:3]])
+    return np.asarray(zeilen, dtype=np.float32).reshape(-1, 9)
+
+
+def giebel_aus(pos: np.ndarray, idx: np.ndarray, altstadt) -> list:
+    """Giebel der Satteldaecher in der Altstadt, aus der Dachform: First = hoechste Ecken,
+    Traufe = tiefste Ecken; an jedem Firstende liegt ein Giebel, dessen Grundkante die zwei
+    Traufecken an diesem Ende bilden. Walmdaecher (First endet weit vor der Traufkante) bleiben
+    aus. Je Giebel eine Zeile [x, y_traufe, z, normale_x, normale_z, breite, hoehe]; Godot setzt
+    dort einen geschwungenen Barockgiebel (giebel.gd)."""
+    if altstadt is None:
+        return []
+    zeilen = []
+    # Die Dachflaechen sind einzelne Vierecke mit eigenen Ecken: erst gleiche Positionen
+    # zusammenfuehren (auf 5 cm), dann zusammenhaengende Daecher bilden.
+    schluessel = np.round(pos / 0.05).astype(np.int64)
+    _, gleich = np.unique(schluessel, axis=0, return_inverse=True)
+    gleich = gleich.reshape(-1)
+    for g0 in komponenten(np.zeros((gleich.max() + 1, 3)), gleich[idx]):
+        g = np.where(np.isin(gleich, g0))[0]
+        p = pos[g]
+        mitte = p.mean(axis=0)
+        if not (altstadt[0] < mitte[0] < altstadt[2] and altstadt[1] < mitte[2] < altstadt[3]):
+            continue
+        unten_y, oben_y = p[:, 1].min(), p[:, 1].max()
+        hoehe = float(oben_y - unten_y)
+        if hoehe < 1.8 or hoehe > 12.0:
+            continue
+        first = p[p[:, 1] > oben_y - 0.25][:, [0, 2]]
+        traufe = p[p[:, 1] < unten_y + 0.25][:, [0, 2]]
+        if len(first) < 2 or len(traufe) < 4:
+            continue
+        d = first[:, None, :] - first[None, :, :]
+        i, j = np.unravel_index(np.argmax((d ** 2).sum(-1)), (len(first), len(first)))
+        a_end, b_end = first[i], first[j]
+        achse = b_end - a_end
+        flen = float(np.linalg.norm(achse))
+        if flen < 2.0:
+            continue
+        achse /= flen
+        quer = np.array([-achse[1], achse[0]])
+        lage = (traufe - a_end) @ achse          # Lage der Traufecken entlang des Firsts
+        for ende, richtung, grenze in ((a_end, -1.0, lage.min()), (b_end, 1.0, lage.max())):
+            am_ende = traufe[np.abs(lage - grenze) < 0.6]
+            if len(am_ende) < 2:
+                continue
+            s_quer = (am_ende - ende) @ quer
+            l, r = am_ende[np.argmin(s_quer)], am_ende[np.argmax(s_quer)]
+            breite = float(np.linalg.norm(r - l))
+            fuss = (l + r) / 2
+            # Walmdach: Firstende liegt weit hinter der Traufkante.
+            if breite < 3.0 or abs(float((ende - fuss) @ achse)) > 0.9:
+                continue
+            zeilen.append([fuss[0], unten_y, fuss[1], achse[0] * richtung, achse[1] * richtung,
+                           breite, hoehe])
+    return zeilen
+
+
+def dach_details(pos: np.ndarray, idx: np.ndarray) -> list:
+    """Dachueberstand und Gauben. pos wird veraendert: die tiefsten Ecken jedes Dachteils
+    (die Traufe) ruecken 45 cm nach aussen und 6 cm nach unten, so steht das Dach ueber die
+    Wand. Zurueck kommen Gauben als Zeilen [x, y, z, richtung_x, richtung_z]: auf geneigten
+    Flaechen (33 bis 52 Grad) hoeher als 1 m ueber der Traufe, mindestens 5 m Abstand,
+    hoechstens zwei je Dachteil, nur bei Daechern mit mehr als 40 m2 geneigter Flaeche."""
+    gauben = []
+    for g in komponenten(pos, idx):
+        p = pos[g]
+        unten, oben = p[:, 1].min(), p[:, 1].max()
+        if oben - unten < 1.5:
+            continue
+        # Dreiecke dieses Teils: ueber die Ecken zuordnen.
+        menge = set(g.tolist())
+        tris = [t for t in idx if int(t[0]) in menge]
+        tri_pos = pos[np.asarray(tris)]
+        n = np.cross(tri_pos[:, 1] - tri_pos[:, 0], tri_pos[:, 2] - tri_pos[:, 0])
+        flaeche = np.linalg.norm(n, axis=1) / 2
+        n = n / np.maximum(np.linalg.norm(n, axis=1)[:, None], 1e-9)
+        n[n[:, 1] < 0] *= -1                       # nach oben zeigen lassen
+        neigung = np.degrees(np.arccos(np.clip(n[:, 1], 0, 1)))
+        geneigt = (neigung > 33) & (neigung < 52)
+        if flaeche[geneigt].sum() < 40.0:
+            continue
+        mitte = p[:, [0, 2]].mean(axis=0)
+        # Gauben vor dem Verschieben der Traufe waehlen.
+        gewaehlt = []
+        for k in np.argsort(-flaeche):
+            if not geneigt[k] or flaeche[k] < 1.5 or len(gewaehlt) >= 2:
+                continue
+            c = tri_pos[k].mean(axis=0)
+            if c[1] < unten + 1.0 or c[1] > oben - 0.8:
+                continue
+            if any((c[0] - o[0]) ** 2 + (c[2] - o[2]) ** 2 < 25.0 for o in gewaehlt):
+                continue
+            gewaehlt.append(c)
+            richtung = n[k][[0, 2]]
+            laenge = float(np.linalg.norm(richtung))
+            if laenge < 1e-6:
+                gewaehlt.pop()
+                continue
+            gauben.append([c[0], c[1], c[2], richtung[0] / laenge, richtung[1] / laenge])
+        # Traufe: die tiefsten Ecken nach aussen.
+        for v in g:
+            if pos[v, 1] < unten + 0.2:
+                aussen = pos[v, [0, 2]] - mitte
+                lg = float(np.linalg.norm(aussen))
+                if lg > 1e-6:
+                    pos[v, 0] += aussen[0] / lg * 0.45
+                    pos[v, 2] += aussen[1] / lg * 0.45
+                pos[v, 1] -= 0.06
+    return gauben
+
+
 def main() -> int:
     manifest_pfad = QUELLE / "Sectors" / "manifest.json"
     if not manifest_pfad.exists() or manifest_pfad.stat().st_size < 1000:
@@ -52,6 +348,11 @@ def main() -> int:
         return 1
     manifest = json.loads(manifest_pfad.read_text())
     (ZIEL / "sektoren").mkdir(parents=True, exist_ok=True)
+    relief = baue_relief(manifest)
+    orte = json.loads((QUELLE / "Orte" / "orte.json").read_text())
+    a = orte.get("altstadt")
+    altstadt = (min(a[0], a[2]) / 100, min(a[1], a[3]) / 100, max(a[0], a[2]) / 100,
+                max(a[1], a[3]) / 100) if a else None
 
     verzeichnis = []
     summe_msh = summe_col = dreiecke = 0
@@ -59,12 +360,44 @@ def main() -> int:
         daten = json.loads((QUELLE / "Sectors" / eintrag["file"]).read_text())
         abschnitte = []
         kollision = []
+        baumquellen = []
+        strassen = []
+        gauben_zeilen = []
+        giebel_zeilen = []
+        # Strassenflaechen des Sektors vorab: fuer Bordsteine und um Gehwege auf der Fahrbahn
+        # zu entfernen (die Quelldaten legen Gehwegstreifen teils quer ueber die Strasse).
+        vorab = []
+        for a in daten["sections"]:
+            if art(a["name"]) == "Road":
+                vp = nach_godot(np.asarray(a["positions"], dtype=np.float64))
+                vorab.append((vp, np.asarray(a["indices"], dtype=np.int32)))
+        strassenraster = Flaechenraster(vorab)
         with open(ZIEL / "sektoren" / f"{eintrag['id']}.msh", "wb") as msh:
             for a in daten["sections"]:
                 pos = nach_godot(np.asarray(a["positions"], dtype=np.float64))
                 idx = np.asarray(a["indices"], dtype=np.int32)
                 if len(idx) % 3 or idx.max(initial=-1) >= len(pos):
                     raise ValueError(f"{eintrag['id']}/{a['name']}: Indizes passen nicht zu den Ecken")
+                if art(a["name"]) in ("Gehweg", "Sidewalk") and vorab:
+                    tri = idx.reshape(-1, 3)
+                    mitten = pos[tri].mean(axis=1)
+                    behalten = [i for i, m in enumerate(mitten)
+                                if not strassenraster.enthaelt(m[0], m[2])]
+                    if not behalten:
+                        continue
+                    idx = tri[behalten].reshape(-1)
+                relief_anwenden(relief, a["name"], pos, idx)
+                if art(a["name"]) == "Roof":
+                    giebel_zeilen.extend(giebel_aus(pos, idx.reshape(-1, 3), altstadt))
+                    gauben_zeilen.extend(dach_details(pos, idx.reshape(-1, 3)))
+                if art(a["name"]) in ("Stone", "Figure"):
+                    continue   # Platzhalter fuer Denkmaeler; die Wahrzeichen baut Godot nach
+                if art(a["name"]) in ("Tree", "Trunk"):
+                    # Baeume werden als Instanzen gestellt (siehe baeume_aus), nicht als Netz.
+                    baumquellen.append((a["name"], pos, idx.reshape(-1, 3), a["color"][:3]))
+                    continue
+                if art(a["name"]) == "Road":
+                    strassen.append((pos.copy(), idx.copy()))
                 idx = np.ascontiguousarray(idx.reshape(-1, 3)[:, [0, 2, 1]]).reshape(-1)
                 msh.write(pos.tobytes())
                 msh.write(idx.tobytes())
@@ -74,6 +407,22 @@ def main() -> int:
                 dreiecke += len(idx) // 3
                 if art(a["name"]) in KOLLISION:
                     kollision.append(pos[idx])
+            b = eintrag["boundsCm"]
+            kanten = bordsteine(strassen, (b[0] / 100, b[1] / 100, b[2] / 100, b[3] / 100), altstadt,
+                                raster=strassenraster)
+            if kanten is not None:
+                bpos, bidx = kanten
+                msh.write(bpos.tobytes())
+                msh.write(bidx.tobytes())
+                abschnitte.append({"n": "Bordstein_0", "a": "Bordstein", "c": [0.42, 0.42, 0.40],
+                                   "v": len(bpos), "i": len(bidx)})
+                dreiecke += len(bidx) // 3
+        gauben = np.asarray(gauben_zeilen, dtype=np.float32).reshape(-1, 5)
+        (ZIEL / "sektoren" / f"{eintrag['id']}.gauben").write_bytes(gauben.tobytes())
+        giebel = np.asarray(giebel_zeilen, dtype=np.float32).reshape(-1, 7)
+        (ZIEL / "sektoren" / f"{eintrag['id']}.giebel").write_bytes(giebel.tobytes())
+        baeume = baeume_aus(baumquellen)
+        (ZIEL / "sektoren" / f"{eintrag['id']}.baeume").write_bytes(baeume.tobytes())
         flaechen = np.concatenate(kollision) if kollision else np.zeros((0, 3), np.float32)
         (ZIEL / "sektoren" / f"{eintrag['id']}.col").write_bytes(flaechen.tobytes())
         summe_msh += (ZIEL / "sektoren" / f"{eintrag['id']}.msh").stat().st_size
@@ -81,19 +430,36 @@ def main() -> int:
         b = eintrag["boundsCm"]
         verzeichnis.append({"id": eintrag["id"], "index": eintrag["index"],
                             "grenzen": [b[0] / 100, b[1] / 100, b[2] / 100, b[3] / 100],
-                            "kollision_ecken": int(len(flaechen)), "abschnitte": abschnitte})
+                            "kollision_ecken": int(len(flaechen)), "baeume": int(len(baeume)), "gauben": int(len(gauben)),
+                            "giebel": int(len(giebel)),
+                            "abschnitte": abschnitte})
 
     spawn = manifest["spawn"]
     (ZIEL / "sektoren.json").write_text(json.dumps({
         "sektorgroesse": manifest["cellSizeCm"] / 100,
-        "spawn": {"name": spawn["name"], "x": spawn["x"] / 100, "y": spawn["z"] / 100,
+        "spawn": {"name": spawn["name"], "x": spawn["x"] / 100,
+                  "y": spawn["z"] / 100 + (float(relief.delta(spawn["x"] / 100, spawn["y"] / 100))
+                                           if relief is not None else 0.0),
                   "z": spawn["y"] / 100, "blick": spawn.get("blick", 0)},
         "sektoren": verzeichnis}, separators=(",", ":")))
 
     # Kleine Datensaetze unveraendert mitnehmen; die Skripte lesen sie aus res://daten.
-    for datei in ("Orte/orte.json", "Fahrzeug/wagen.json", "Verkehr/verkehr.json", "Verkehr/netz.json",
-                  "Story/drehbuch.json", "Story/missionen.json"):
+    for datei in ("Orte/orte.json", "Fahrzeug/wagen.json", "Story/drehbuch.json",
+                  "Story/missionen.json"):
         shutil.copy(QUELLE / datei, ZIEL / Path(datei).name)
+    # Routen, Ampeln, geparkte Autos und das Strassennetz folgen dem gestauchten Relief.
+    verkehr = json.loads((QUELLE / "Verkehr" / "verkehr.json").read_text())
+    for gruppe in ("autos", "passanten"):
+        for eintrag in verkehr[gruppe]:
+            eintrag["p"] = verschiebe_flach(relief, eintrag["p"])
+    for gruppe in ("ampeln", "geparkt"):
+        for eintrag in verkehr[gruppe]:
+            z = verschiebe_flach(relief, [eintrag["x"], eintrag["y"], eintrag["z"]])
+            eintrag["z"] = z[2]
+    (ZIEL / "verkehr.json").write_text(json.dumps(verkehr, separators=(",", ":")))
+    netz = json.loads((QUELLE / "Verkehr" / "netz.json").read_text())
+    netz["p"] = verschiebe_flach(relief, netz["p"])
+    (ZIEL / "netz.json").write_text(json.dumps(netz, separators=(",", ":")))
 
     # Karte: die kleine Vorlage (3 m je Pixel) reicht fuer Mini- und Vollkarte.
     karte = QUELLE / "Karte" / "karte-klein.png"
@@ -117,6 +483,11 @@ def main() -> int:
             fehlend.append(fbx.name)
             continue
         shutil.copy(fbx, ZIEL / "modelle" / fbx.name)
+    # Umrisse des neuen Autos (aus der Konstruktionszeichnung, Tools/baue_auto_profil.py).
+    # Dazu die weiteren Modelle (Tools/baue_auto_modelle.py): auto_profil_<modell>.json.
+    for profil in sorted((WURZEL / "Tools" / "Modelle").glob("auto_profil*.json")):
+        shutil.copy(profil, ZIEL / profil.name)
+
     # Menschenfiguren (Quaternius, CC0) mit allen Animationen im Rig.
     for rel in ("People/Casual/Casual.fbx", "People/Worker/Worker.fbx", "Waffen/Pistol.glb",
                 "Waffen/Smg.glb", "Waffen/Shotgun.glb", "Waffen/RocketLauncher.glb"):

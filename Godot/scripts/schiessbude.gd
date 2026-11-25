@@ -14,6 +14,7 @@ const ORANGE := Color(1.0, 0.5, 0.1)
 
 var fokus: Node3D
 var laeuft := false
+var test_oben := false   ## nur Tests: hochgeklappte Scheiben bleiben stehen (langsame Laeufe)
 var treffer_runde := 0
 var runden := 0
 
@@ -158,7 +159,7 @@ func _process(delta: float) -> void:
 		var oben := hochstehende().size()
 		for s in _scheiben:
 			var k := s["knoten"] as Node3D
-			if k.visible and jetzt > s["oben_bis"]:
+			if k.visible and jetzt > s["oben_bis"] and not test_oben:
 				_klappe(s, false)
 				s["naechste"] = jetzt + randf_range(0.5, 1.6)
 			elif not k.visible and jetzt > s["naechste"] and oben < 3:

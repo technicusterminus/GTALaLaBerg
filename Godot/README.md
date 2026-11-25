@@ -70,6 +70,46 @@ laufen die gerechneten Schleifen.
 von 30 Sekunden. Sechs Scheiben klappen hoch (höchstens drei zugleich); jede Paintball-Kugel,
 die eine trifft, zählt 20 €. Die Bestleistung steht im Konto.
 
+**Aussehen (mit OpenRouter).** Die Konzeptbilder und mehrere Assets entstanden mit Bildmodellen
+über OpenRouter (`Tools/ueberarbeite_bild.py`, Ergebnisse in `Docs/Konzept/`):
+- *Texturen* für Dachziegel, Putz, Pflaster, Wiese und Laub (`Godot/texturen/*.jpg`), nahtlos
+  gemacht und im Shader `flach.gdshader` (Stile Fassade, Dach, Pflaster, Gelände) benutzt.
+- *Fassaden*: drei vom Bildmodell erzeugte Fensterfelder (Sprossenfenster mit Läden, Rundbogen,
+  Blumenkasten; `texturen/fenster_*.jpg`) wiederholen sich je Zelle von 2,15 × 3,2 m auf allen
+  Wänden; der neutrale Putz nimmt eine Hausfarbe an (Creme, Ocker, Gelb, Lachs, Graugrün). Ohne
+  die Texturen zeichnet der Shader die Fenster selbst.
+- *Bäume* (`baeume.gd`): Der Konverter ersetzt die Kegelnetze durch Instanzen; Laubbäume haben
+  runde Kronen aus mehreren Kugeln, Nadelbäume gestapelte Kegel.
+- *Straßenmöbel* (`strassenmoebel.gd`): Laternen, Straßenbäume und Sträucher entlang des
+  Straßennetzes, per Bodenstrahl nur dort, wo wirklich Boden ist.
+- *Autos* (`wagenmesh.gd`): Karosserie mit glatten Normalen aus den Umrissen einer vom Bildmodell
+  gezeichneten Konstruktionszeichnung (`Tools/baue_auto_profil.py`, Daten in
+  `Tools/Modelle/auto_profil.json`), mit Glas, Rädern, Leuchten und Spiegeln.
+
+**Relief.** Die Geländedaten sind echtes Höhenrelief (2 bis 66 m) und wirkten im Spiel viel zu steil.
+`Tools/hoehen.py` staucht es beim Umrechnen (`LALABERG_RELIEF`, Standard 0,4, 1,0 schaltet es
+aus): Bodenpunkte (Boden, Straßen, Plätze, Wasser) werden um diesen Faktor gestaucht, alles, was am
+Ort steht (Häuser, Bäume, Routen, Ampeln, Netz, Startpunkt), um dieselbe Verschiebung. Straßen
+über 20° Neigung: 0,8 % → 0 %, Plätze 7,7 % → 0,4 %.
+
+**Sprache und Musik (OpenRouter).** `Tools/erzeuge_sprache.py` vertont alle 250 Dialog- und
+Funkzeilen mit `gpt-audio-mini` (je Figur eine Stimme), `Tools/erzeuge_musik.py` erzeugt vier
+Stücke mit Lyria (Menü, Fahrt, Hubschrauber, Verfolgung). Das Kino (`kino.gd`) spielt die Zeilen,
+`musik.gd` wählt das Stück nach Lage. Die Dateien liegen in `Godot/daten/sprache` und
+`Godot/daten/musik` (nicht im Repo; ohne sie bleibt es stumm).
+
+**Leistung.** Der Bildlauf misst je Screenshot Zeichenaufrufe und Dreiecke (`LALABERG_LAST`).
+Baumkronen haben eine Nah- (bis 140 m, mit Schatten) und eine Fernstufe, geparkte Autos sind
+vereinfacht und bis 380 m sichtbar, Schatten reichen 180 m. Am Bayertor: rund 2 Mio. statt
+12 Mio. Dreiecke, 1000 statt 1800 Aufrufe.
+
+**Straßenraum.** Der Konverter setzt Bordsteine an die Ränder der Fahrbahn (nicht an Nähte
+zwischen Straßenstücken und nicht in der Altstadt) und entfernt Gehwegstreifen, die in den
+Quelldaten über der Fahrbahn liegen. Läden haben Schaufenster, Sockel Naturstein, Türen Holz.
+
+**Altstadt.** Innerhalb des Altstadt-Rechtecks tragen die Wände Fachwerk (vier Module vom
+Bildmodell, kräftige Hausfarben) und die Straßen Kopfsteinpflaster (`flach.gdshader`).
+
 **Farbdosen.** `farbdosen.gd` stellt fünfzig Dosen mit festem Zufall in das Straßennetz
 (mindestens 90 m auseinander); Einsammeln bringt 25 €, jede zehnte einen Staffelpreis.
 
@@ -108,7 +148,7 @@ godot --path Godot --headless -- --rauchtest
 Er prüft unter anderem: Boden und Kollision, Konto, Treffer auf Passanten und Autos,
 Krankenhaus, Fahndung bis zur Festnahme, Straßensperre, Ampelplan und Bremsen, Aufträge,
 Laden und Lackiererei, Verfolgung, Reviernahme und die ganze Hauptgeschichte im
-Zeitraffer mit allen drei Enden (knapp 60 Prüfungen, `LALABERG_PRUEFUNG ... ok=`).
+Zeitraffer mit allen drei Enden (über 70 Prüfungen (`welt_rauchtest.gd`), `LALABERG_PRUEFUNG ... ok=`).
 
 Bilder (nicht headless; ohne GPU mit Software-OpenGL unter Xvfb):
 

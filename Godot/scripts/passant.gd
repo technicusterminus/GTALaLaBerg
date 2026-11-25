@@ -25,6 +25,11 @@ var farbe := 0
 var leben := 100.0
 
 var _gier := 0.0
+var _panik_bis := 0.0       ## bis dahin rennt die Figur vor Schuessen davon
+var _pause_bis := 0.0       ## bis dahin bleibt sie stehen (schaut, telefoniert ...)
+var _naechste_pause := randf_range(15.0, 50.0)
+var _versatz := Vector3.ZERO   ## seitliches Ausweichen vor Autos
+var _versatz_ziel := Vector3.ZERO
 var _stolpert_bis := 0.0
 var _liegt_bis := 0.0
 var _instanz := MeshInstance3D.new()
@@ -35,6 +40,7 @@ var _lod_takt := randf() * 0.6
 func _ready() -> void:
 	sync_to_physics = true
 	add_to_group("verletzbar")
+	add_to_group("passanten")
 	if _mesh == null:
 		_mesh = CapsuleMesh.new()
 		_mesh.height = 1.75
@@ -77,6 +83,7 @@ func _pruefe_figur(delta: float) -> void:
 		_figur = Figur.neu(farbe)
 		add_child(_figur)
 		_figur.passe_an()
+		_figur.einkleiden(get_instance_id() % 100003)
 		_figuren_zahl += 1
 		_instanz.visible = false
 	elif _figur != null and abstand > FIGUR_FERN:
@@ -99,8 +106,50 @@ func _animiere(jetzt: float) -> void:
 		_figur.spiele("Death")
 	elif jetzt < _stolpert_bis:
 		_figur.spiele("HitRecieve")
+	elif in_panik():
+		_figur.spiele("Run", 1.1)
+	elif jetzt < _pause_bis:
+		_figur.spiele("Idle")
 	else:
 		_figur.spiele("Walk", clampf(tempo_ms / 1.3, 0.6, 1.3))
+
+
+## Ein Schuss bei ort: wer naeher als 32 m steht, rennt davon, weg vom Knall.
+func hoere_schuss(ort: Vector3) -> void:
+	if ist_ausgeschaltet():
+		return
+	var weg_vom_knall := global_position - ort
+	if weg_vom_knall.length() > 32.0:
+		return
+	_panik_bis = _jetzt() + randf_range(6.0, 10.0)
+	_pause_bis = 0.0
+	# Auf der Route in die Richtung laufen, die vom Knall wegfuehrt.
+	if weg.blick != Vector3.ZERO and weg.blick.dot(weg_vom_knall) < 0.0:
+		weg.richtung = -weg.richtung
+
+
+func in_panik() -> bool:
+	return _jetzt() < _panik_bis
+
+
+## Naht ein Auto schnell, tritt die Figur zur Seite (weg von seiner Fahrlinie).
+func _weiche_aus() -> void:
+	_versatz_ziel = Vector3.ZERO
+	for gruppe in ["verkehrsauto", "auto"]:
+		for a: Node3D in get_tree().get_nodes_in_group(gruppe):
+			var v: Vector3 = a.geschwindigkeit_ms()
+			if v.length() < 3.0:
+				continue
+			var zu_mir := global_position - a.global_position
+			var flach := Vector3(zu_mir.x, 0, zu_mir.z)
+			if flach.length() > 9.0 or absf(zu_mir.y) > 3.0:
+				continue
+			var fahrt := Vector3(v.x, 0, v.z).normalized()
+			if fahrt.dot(flach.normalized()) < 0.3:
+				continue   # faehrt nicht auf mich zu
+			var quer := Vector3(-fahrt.z, 0, fahrt.x)
+			_versatz_ziel = quer * (1.8 if quer.dot(flach) >= 0.0 else -1.8)
+			return
 
 
 func ist_ausgeschaltet() -> bool:
@@ -165,8 +214,19 @@ func _physics_process(delta: float) -> void:
 	if not weg.gueltig():
 		return
 	var faktor := 0.15 if jetzt < _stolpert_bis else 1.0
+	if in_panik():
+		faktor = 3.2   # rennen
+	elif jetzt < _pause_bis:
+		faktor = 0.0
+	else:
+		_naechste_pause -= delta
+		if _naechste_pause <= 0.0:
+			_naechste_pause = randf_range(20.0, 60.0)
+			_pause_bis = jetzt + randf_range(2.5, 7.0)
+	_weiche_aus()
+	_versatz = _versatz.lerp(_versatz_ziel, minf(4.0 * delta, 1.0))
 	weg.bewege(tempo_ms * faktor * delta)
-	_setze_lage(weg.ort)
+	_setze_lage(weg.ort + _versatz)
 
 
 ## Angefahren: der Spieler sitzt in einem Wagen und ist schneller als Schritttempo

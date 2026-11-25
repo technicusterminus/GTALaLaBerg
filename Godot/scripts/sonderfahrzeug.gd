@@ -32,6 +32,7 @@ const TURM_HOEHE := 1.9
 const OLIV := Color(0.10, 0.13, 0.07)
 const HELI_LACK := Color(0.80, 0.82, 0.84)
 const AUSGEBRANNT := Color(0.05, 0.045, 0.04)
+const HELI_SHADER := preload("res://shader/heli.gdshader")
 
 var art := Art.PANZER
 var fahrer: Node3D
@@ -114,6 +115,9 @@ func _modell(eltern: Node3D, name: String) -> void:
 
 
 func _faerbe(farbe: Color) -> void:
+	if art == Art.HUBSCHRAUBER:
+		_lackiere_heli(farbe == AUSGEBRANNT)
+		return
 	var stoff := ShaderMaterial.new()
 	stoff.shader = SHADER
 	stoff.set_shader_parameter("farbe", Vector3(farbe.r, farbe.g, farbe.b))
@@ -121,6 +125,25 @@ func _faerbe(farbe: Color) -> void:
 	for m in _modelle:
 		for t: MeshInstance3D in m.find_children("*", "MeshInstance3D", true, false):
 			t.material_override = stoff
+
+
+## Rumpf mit Rettungslackierung (heli.gdshader), Rotoren dunkelgrau, Heckrotor mit hellen Spitzen.
+func _lackiere_heli(ausgebrannt: bool) -> void:
+	var rotor := StandardMaterial3D.new()
+	rotor.albedo_color = Color(0.06, 0.06, 0.07) if not ausgebrannt else AUSGEBRANNT
+	rotor.roughness = 0.6
+	for m in _modelle:
+		for t: MeshInstance3D in m.find_children("*", "MeshInstance3D", true, false):
+			if t.name.contains("Rumpf"):
+				var stoff := ShaderMaterial.new()
+				stoff.shader = HELI_SHADER
+				var box := t.mesh.get_aabb()
+				stoff.set_shader_parameter("rumpf_lage", box.position)
+				stoff.set_shader_parameter("rumpf_groesse", box.size)
+				stoff.set_shader_parameter("ausgebrannt", ausgebrannt)
+				t.material_override = stoff
+			else:
+				t.material_override = rotor
 
 
 # --- Auskunft ----------------------------------------------------------------

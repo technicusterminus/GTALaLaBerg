@@ -9,8 +9,23 @@ const MOTOR := 7500.0
 const RUECKWAERTS := 4000.0
 const BREMSE := 45.0
 const HOECHST_MS := 48.0
+## Fahrwerk je Modell: Federhaerte, Druck- und Zugstufe, Federweg, Rollneigung. Sportler hart
+## und tief, Bus weich mit viel Weg; der Kleinwagen behaelt die erprobten Werte.
+const FAHRWERK := {
+	"klein": [45.0, 2.2, 2.6, 0.25, 0.35],
+	"limousine": [40.0, 2.4, 2.8, 0.22, 0.4],
+	"kombi": [38.0, 2.3, 2.7, 0.24, 0.4],
+	"bus": [28.0, 1.8, 2.2, 0.28, 0.5],
+	"sport": [60.0, 3.0, 3.4, 0.16, 0.25],
+	"super": [70.0, 3.2, 3.6, 0.14, 0.2],
+	"renn": [90.0, 3.6, 4.0, 0.10, 0.15],
+	"motorrad": [55.0, 2.8, 3.2, 0.14, 0.1],
+	"fahrrad": [40.0, 2.4, 2.8, 0.05, 0.1],
+}
 
 @export var lack := Color(0.55, 0.06, 0.05)
+## Fahrzeugmodell (Wagenmesh.MODELLE); bestimmt Karosserie, Raeder und Radstand.
+@export var modell := "klein"
 ## Ein gestohlenes KI-Auto behaelt seinen Lack statt den des eigenen Wagens.
 var uebernommen := false
 
@@ -30,6 +45,8 @@ var _letzter_stoss := -10.0
 var _lenkung := 0.0
 var _motor: AudioStreamPlayer3D
 var _karosserie: MeshInstance3D
+var _bremse_an := -1.0
+var _bremsen: Array = []   ## [VehicleWheel3D, Bremse]: die Bremse dreht nicht mit dem Rad
 
 
 func _ready() -> void:
@@ -38,7 +55,8 @@ func _ready() -> void:
 	if Konto.hat_lack() and not uebernommen:
 		lack = Konto.lack()
 	mass = 1300.0
-	_motor = Ton.schleife(self, "SFX_Motor", -4.0)
+	if modell != "fahrrad":
+		_motor = Ton.schleife(self, "SFX_Motor", -4.0)
 	center_of_mass_mode = RigidBody3D.CENTER_OF_MASS_MODE_CUSTOM
 	center_of_mass = Vector3(0, -0.15, 0)
 	linear_damp = 0.05
@@ -46,34 +64,66 @@ func _ready() -> void:
 
 	var form := CollisionShape3D.new()
 	var box := BoxShape3D.new()
-	box.size = Vector3(1.8, 0.9, 4.3)
+	var masse := Wagenmesh.masse(modell)
+	var einspurig := Wagenmesh.ist_einspurig(modell)
+	box.size = Vector3(maxf(masse.y, 0.5), 0.9, masse.x) if modell != "klein" else Vector3(1.8, 0.9, 4.3)
 	form.shape = box
 	form.position = Vector3(0, 0.45, 0)
 	add_child(form)
 
+	# Das Netz schaut nach +X, rechts ist +Z; um 90 Grad gedreht schaut es nach -Z (vorn)
+	# und +Z wird +X (rechts). Die Radmitten liegen auf y = 0 des Wagens.
+	var lagen := Wagenmesh.radlagen(modell)
+	var radius := 0.315 if lagen.is_empty() else (lagen[0] as Vector4).w
 	var huelle := Node3D.new()
 	huelle.rotation.y = PI / 2.0
-	huelle.position.y = -0.315  # Boden der Quelldaten liegt auf z = 0, Radmitte 31,5 cm
+	huelle.position.y = -radius
 	huelle.add_child(_baue_karosserie())
 	add_child(huelle)
 
-	# Radstand und Spur aus den Quelldaten: achsen +-131 cm, spur 76 cm
-	for vorne in [true, false]:
-		for links in [true, false]:
-			var rad := VehicleWheel3D.new()
-			rad.position = Vector3(-0.76 if links else 0.76, 0.0, -1.31 if vorne else 1.31)
-			rad.wheel_radius = 0.315
-			rad.suspension_travel = 0.25
-			rad.suspension_stiffness = 45.0
-			rad.suspension_max_force = 9000.0
-			rad.wheel_rest_length = 0.12
-			rad.damping_compression = 2.2
-			rad.damping_relaxation = 2.6
-			rad.wheel_friction_slip = 3.2
-			rad.wheel_roll_influence = 0.35
-			rad.use_as_steering = vorne
-			rad.use_as_traction = true
-			add_child(rad)
+	# Radstand und Spur aus dem Profil des Modells (sonst die alten Werte: +-131 cm, 76 cm).
+	for k in 4:
+		var vorne := k < 2
+		var links := k % 2 == 0
+		var ort := Vector3(-0.76 if links else 0.76, 0.0, -1.31 if vorne else 1.31)
+		# Zweirad: zwei Radlagen; die Physik faehrt auf vier eng stehenden Raedern (stabil),
+		# zu sehen ist je Achse ein Rad in der Mitte.
+		var lage_nr := k / 2 if einspurig else k
+		var sichtbar := lage_nr < lagen.size() and (not einspurig or links)
+		if lage_nr < lagen.size():
+			var l: Vector4 = lagen[lage_nr]
+			ort = Vector3(l.z, 0.0, -l.x)
+			if einspurig:
+				ort.x = -0.14 if links else 0.14
+		var rad := VehicleWheel3D.new()
+		rad.position = ort
+		var fw: Array = FAHRWERK.get(modell, FAHRWERK["klein"])
+		rad.wheel_radius = radius
+		rad.suspension_travel = fw[3]
+		rad.suspension_stiffness = fw[0]
+		rad.suspension_max_force = 9000.0
+		rad.wheel_rest_length = 0.12
+		rad.damping_compression = fw[1]
+		rad.damping_relaxation = fw[2]
+		rad.wheel_friction_slip = 3.2
+		rad.wheel_roll_influence = fw[4]
+		rad.use_as_steering = vorne
+		rad.use_as_traction = true
+		add_child(rad)
+		# Das Radnetz (Achse entlang Z) dreht sich mit dem Rad; Godot dreht und lenkt
+		# den Radknoten selbst.
+		if sichtbar:
+			var nr := lage_nr if einspurig else k / 2
+			var netz := MeshInstance3D.new()
+			netz.mesh = Wagenmesh.rad_netz(modell, nr, links and not einspurig)
+			netz.rotation.y = PI / 2.0
+			netz.position.x = -ort.x if einspurig else 0.0
+			rad.add_child(netz)
+			var bremse := MeshInstance3D.new()
+			bremse.mesh = Wagenmesh.bremse_netz(modell, nr, links and not einspurig)
+			bremse.position.x = netz.position.x
+			rad.add_child(bremse)
+			_bremsen.append([rad, bremse])
 
 
 func ist_ausgeschaltet() -> bool:
@@ -149,6 +199,16 @@ func _motorklang() -> void:
 	_motor.volume_db = -9.0 + clampf(tempo_ms / 28.0, 0.0, 1.0) * 7.0
 
 
+## Der Radknoten dreht sich um seine Achse; Scheibe und Sattel sollen nur lenken. Ihre Lage
+## im Radknoten ist deshalb dessen Drehung rueckgaengig gemacht und nur die Lenkung behalten.
+func _process(_delta: float) -> void:
+	for paar: Array in _bremsen:
+		var rad: VehicleWheel3D = paar[0]
+		var bremse: MeshInstance3D = paar[1]
+		var soll := Basis(Vector3.UP, rad.steering) * Basis(Vector3.UP, PI / 2.0)
+		bremse.transform.basis = rad.transform.basis.inverse() * soll
+
+
 func _physics_process(delta: float) -> void:
 	tempo_ms = linear_velocity.length()
 	_motorklang()
@@ -157,6 +217,7 @@ func _physics_process(delta: float) -> void:
 	if fahrer == null:
 		engine_force = 0.0
 		brake = BREMSE * 0.2
+		_bremslicht(0.0)
 		steering = move_toward(steering, 0.0, delta)
 		return
 	var gas := 0.0 if gesperrt else Input.get_axis("rueckwaerts", "vorwaerts")
@@ -178,9 +239,16 @@ func _physics_process(delta: float) -> void:
 		kraft = 0.0
 	engine_force = kraft
 	brake = bremse
+	_bremslicht(1.0 if bremse > 0.0 else 0.0)
 	var maximal := lerpf(0.5, 0.1, clampf(tempo_ms / 30.0, 0.0, 1.0))
 	_lenkung = move_toward(_lenkung, lenk * maximal, 2.5 * delta)
 	steering = _lenkung
+
+
+func _bremslicht(an: float) -> void:
+	if _karosserie != null and an != _bremse_an:
+		_bremse_an = an
+		_karosserie.set_instance_shader_parameter("bremse", an)
 
 
 func geschwindigkeit_ms() -> Vector3:
@@ -195,10 +263,11 @@ func erhalte_farbe(farbe: Color, _richtung: Vector3) -> void:
 func setze_lack(farbe: Color) -> void:
 	lack = farbe
 	if _karosserie != null:
-		_karosserie.mesh = Wagenmesh.netz(lack)
+		_karosserie.mesh = Wagenmesh.netz(lack, false, modell, false)
 
 
 func _baue_karosserie() -> MeshInstance3D:
 	_karosserie = MeshInstance3D.new()
-	_karosserie.mesh = Wagenmesh.netz(lack)
+	_karosserie.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_DOUBLE_SIDED
+	_karosserie.mesh = Wagenmesh.netz(lack, false, modell, false)
 	return _karosserie
