@@ -8,20 +8,24 @@ extends Node3D
 ## zeigen. Der Zustand wird aus der Uhrzeit berechnet statt gezaehlt: alle
 ## Ampeln einer Kreuzung bleiben so im Takt, ohne einander zu kennen.
 
-enum Zustand { ROT, GRUEN, GELB }
+enum Zustand { ROT, GRUEN, GELB, ROT_GELB }
 
-const GRUEN_S := 6.0
-const GELB_S := 1.6
+const ROT_GELB_S := 0.8
+const GRUEN_S := 10.0
+const GELB_S := 2.0
+const ALLE_ROT_S := 1.1
 ## Ein Zeitfenster genau einer Phase; der Zyklus ist so viele Fenster lang, wie
 ## die Kreuzung Phasen hat.
-const PHASENFENSTER_S := GRUEN_S + GELB_S
+const PHASENFENSTER_S := ROT_GELB_S + GRUEN_S + GELB_S + ALLE_ROT_S
 
 const DUNKEL := Color(0.12, 0.12, 0.13)
 const FARBEN := [Color(0.95, 0.08, 0.05), Color(0.10, 0.85, 0.20), Color(0.95, 0.75, 0.05)]
+const LINSEN_HOEHE := [3.59, 3.13, 3.36] # Rot oben, Gelb mittig, Grün unten.
 
 var gruppe := 0
 var phase := 0
 var anzahl_phasen := 2
+var mast_versatz := Vector2(4.25, 0.0)
 
 var _zustand := Zustand.ROT
 var _erzwungen := -1       ## Rauchtest: fester Zustand, -1 = nach der Uhr
@@ -37,9 +41,11 @@ var _linsen_gesetzt := false
 static func zustand_bei(t: float, meine: int, phasen: int) -> Zustand:
 	var zyklus := PHASENFENSTER_S * phasen
 	var rel := fposmod(fposmod(t, zyklus) - meine * PHASENFENSTER_S, zyklus)
-	if rel < GRUEN_S:
+	if rel < ROT_GELB_S:
+		return Zustand.ROT_GELB
+	if rel < ROT_GELB_S + GRUEN_S:
 		return Zustand.GRUEN
-	if rel < PHASENFENSTER_S:
+	if rel < PHASENFENSTER_S - ALLE_ROT_S:
 		return Zustand.GELB
 	return Zustand.ROT
 
@@ -83,44 +89,65 @@ func _aktualisiere() -> void:
 func _setze_linsen() -> void:
 	for i in 3:
 		var m := _linsen[i].material_override as StandardMaterial3D
-		var an := i == _zustand
+		var an := i == _zustand or (_zustand == Zustand.ROT_GELB and i != Zustand.GRUEN)
 		var f: Color = FARBEN[i]
-		m.albedo_color = f if an else DUNKEL
+		m.albedo_color = f if an else DUNKEL.lerp(f, 0.08)
 		m.emission_enabled = an
 		m.emission = f * 2.0
 	_linsen_gesetzt = true
 
 
-## Mast, Kasten und drei Linsen; die aktive Linse leuchtet.
+## OSM liefert den Signalknoten auf der Fahrbahn. Der sichtbare Mast steht
+## seitlich davon, während die Bremslogik weiter den OSM-Knoten verwendet.
 func _baue_kopf() -> void:
-	var mast := MeshInstance3D.new()
-	var zyl := CylinderMesh.new()
-	zyl.top_radius = 0.06
-	zyl.bottom_radius = 0.06
-	zyl.height = 3.0
-	mast.mesh = zyl
-	mast.position.y = 1.5
-	var grau := StandardMaterial3D.new()
-	grau.albedo_color = Color(0.30, 0.30, 0.32)
-	mast.material_override = grau
+	var mast := Node3D.new()
+	mast.position = Vector3(mast_versatz.x, mast_versatz.y, 0)
 	add_child(mast)
-	var kasten := MeshInstance3D.new()
-	var box := BoxMesh.new()
-	box.size = Vector3(0.18, 0.64, 0.18)
-	kasten.mesh = box
-	kasten.position.y = 3.3
+	var grau := StandardMaterial3D.new()
+	grau.albedo_color = Color("#646c6b")
+	grau.metallic = 0.45
+	_modell(mast, _zylinder(0.062, 3.05), grau, Vector3(0, 1.51, 0))
+	_modell(mast, _zylinder(0.115, 0.12), grau, Vector3(0, 0.035, 0))
+
+	var kopf := Node3D.new()
+	kopf.position.x = -signf(mast_versatz.x) * 0.11
+	kopf.rotation.y = signf(mast_versatz.x) * PI * 0.5
+	mast.add_child(kopf)
 	var dunkel := StandardMaterial3D.new()
-	dunkel.albedo_color = Color(0.08, 0.08, 0.09)
-	kasten.material_override = dunkel
-	add_child(kasten)
-	# Das Modell schaut nach +X wie die Autos; die Linsen sitzen auf dieser Seite.
+	dunkel.albedo_color = Color("#242926")
+	dunkel.roughness = 0.82
+	var box := BoxMesh.new()
+	box.size = Vector3(0.22, 0.77, 0.29)
+	_modell(kopf, box, dunkel, Vector3(0, 3.36, 0))
 	for i in 3:
-		var linse := MeshInstance3D.new()
-		var lb := BoxMesh.new()
-		lb.size = Vector3(0.012, 0.12, 0.12)
-		linse.mesh = lb
-		linse.position = Vector3(0.092, [3.52, 3.30, 3.08][i], 0)
-		linse.material_override = StandardMaterial3D.new()
+		var y: float = LINSEN_HOEHE[i]
+		var rahmen := _modell(kopf, _zylinder(0.106, 0.078), dunkel, Vector3(0.12, y, 0))
+		rahmen.rotation.z = PI * 0.5
+		var blende := BoxMesh.new()
+		blende.size = Vector3(0.19, 0.029, 0.215)
+		_modell(kopf, blende, dunkel, Vector3(0.18, y + 0.107, 0))
+		var linse := _modell(kopf, _zylinder(0.088, 0.015), StandardMaterial3D.new(),
+				Vector3(0.163, y, 0))
+		linse.rotation.z = PI * 0.5
 		linse.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		add_child(linse)
 		_linsen.append(linse)
+
+
+func _zylinder(radius: float, hoehe: float) -> CylinderMesh:
+	var netz := CylinderMesh.new()
+	netz.top_radius = radius
+	netz.bottom_radius = radius
+	netz.height = hoehe
+	netz.radial_segments = 12
+	netz.rings = 0
+	return netz
+
+
+func _modell(eltern: Node3D, mesh: Mesh, material: Material, ort: Vector3) -> MeshInstance3D:
+	var instanz := MeshInstance3D.new()
+	instanz.mesh = mesh
+	instanz.material_override = material
+	instanz.position = ort
+	instanz.visibility_range_end = 320.0
+	eltern.add_child(instanz)
+	return instanz

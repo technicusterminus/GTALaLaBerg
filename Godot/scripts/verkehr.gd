@@ -6,6 +6,12 @@ extends Node3D
 
 const SEKTOR_M := 500.0
 const PARKSICHT := 700.0
+const PLATZWEGE := [
+	[Vector3(-25, 7.685, 31), Vector3(-24, 7.658, 20), Vector3(-15, 8.201, 11),
+		Vector3(-9, 8.601, 3), Vector3(-8, 8.709, -10)],
+	[Vector3(-20, 8.125, -18), Vector3(-22, 7.797, -28), Vector3(-15, 7.864, -39),
+		Vector3(-4, 8.599, -34), Vector3(10, 9.722, -30), Vector3(19, 10.453, -23)],
+]
 const LACKE := [
 	Color(0.55, 0.06, 0.05), Color(0.08, 0.12, 0.30), Color(0.75, 0.75, 0.77),
 	Color(0.10, 0.10, 0.11), Color(0.80, 0.78, 0.70), Color(0.12, 0.30, 0.18),
@@ -55,20 +61,22 @@ func _ready() -> void:
 		autos.append(auto)
 		add_child(auto)
 	for p: Dictionary in d["passanten"]:
-		var route := _route(p["p"])
-		if route.size() < 2:
-			continue
-		var passant := Passant.new()
-		passant.tempo_ms = randf_range(4.2, 5.6) / 3.6
-		passant.farbe = passanten.size()
-		passant.weg.setze(route, false)
-		passanten.append(passant)
-		add_child(passant)
+		_stelle_passant(_route(p["p"]))
+	for weg: Array in PLATZWEGE:
+		var route := PackedVector3Array(weg)
+		for i in 3:
+			_stelle_passant(route, i * 8.0 + 1.0)
+		var gegenrichtung := route.duplicate()
+		gegenrichtung.reverse()
+		for i in 2:
+			_stelle_passant(gegenrichtung, i * 9.0 + 4.5)
 	for a: Dictionary in d["ampeln"]:
 		var ampel := Ampel.new()
 		ampel.gruppe = int(a["gruppe"])
 		ampel.phase = int(a["phase"])
 		ampel.anzahl_phasen = int(a.get("phasen", 2))
+		if a.has("mast"):
+			ampel.mast_versatz = Vector2(a["mast"][0], a["mast"][1])
 		add_child(ampel)
 		ampel.global_position = Vector3(a["x"], a["z"], a["y"]) / 100.0
 		# Das Modell schaut nach +X; die Gier (Grad) dreht in Unreal +X Richtung +Y.
@@ -80,6 +88,19 @@ func _ready() -> void:
 	print("LALABERG_VERKEHR autos=%d passanten=%d geparkt=%d ampeln=%d kreuzungen=%d"
 			% [autos.size(), passanten.size(), geparkt, ampeln.size(),
 			Verkehrsauto.kreuzung_orte.size()])
+
+
+func _stelle_passant(route: PackedVector3Array, start_m := 0.0) -> void:
+	if route.size() < 2:
+		return
+	var passant := Passant.new()
+	passant.tempo_ms = randf_range(4.2, 5.6) / 3.6
+	passant.farbe = passanten.size()
+	passant.weg.setze(route, false)
+	if start_m > 0:
+		passant.weg.bewege(start_m)
+	passanten.append(passant)
+	add_child(passant)
 
 
 func _lade_kreuzungen(liste: Array) -> void:

@@ -1,22 +1,25 @@
 class_name Passant
 extends AnimatableBody3D
-## Ein Fussgaenger auf einer festen Route, hin und zurueck. Vorerst eine Kapsel
-## als Platzhalter; echte Figuren folgen mit dem Modellimport. Treffer lassen ihn
+## Ein Fussgaenger auf einer festen Route, hin und zurueck. Nahe der Kamera
+## läuft eine animierte Figur, in der Ferne eine einfachere Darstellung. Treffer lassen ihn
 ## stolpern, zehn Paintballs oder ein Anprall legen ihn um, nach einer Weile
 ## steht er wieder auf. Gemeldet wird jede Tat an die Polizei.
 
 const KLEIDER := [
-	Color(0.62, 0.15, 0.12), Color(0.15, 0.30, 0.55), Color(0.20, 0.45, 0.25),
-	Color(0.75, 0.62, 0.20), Color(0.30, 0.30, 0.34), Color(0.55, 0.35, 0.60),
+	Color("#a45049"), Color("#465c7b"), Color("#3f664e"), Color("#bd9a53"),
+	Color("#53545e"), Color("#806288"), Color("#6e7f77"), Color("#ad7053"),
+	Color("#435f66"), Color("#b69286"), Color("#5c5844"), Color("#7f504e"),
 ]
+const HOSEN := [Color("#3c424a"), Color("#53566a"), Color("#665d50"), Color("#3f5759")]
+const HAAR := [Color("#473527"), Color("#332a29"), Color("#795d40"), Color("#9a8070")]
 ## Wie viele Passanten gleichzeitig eine ausmodellierte, animierte Figur tragen (nahe
-## am Betrachter); alle anderen bleiben Kapseln. Haelt die Zeichenaufrufe klein.
+## am Betrachter); alle anderen bleiben eine Silhouette in einem Zeichenaufruf.
 const FIGUR_NAH := 55.0
 const FIGUR_FERN := 80.0
 const FIGUR_MAX := 30
 
 static var _figuren_zahl := 0
-static var _mesh: CapsuleMesh
+static var _mesh: ArrayMesh
 static var _materialien: Array[StandardMaterial3D] = []
 
 var weg := Wegfolger.new()
@@ -36,9 +39,7 @@ func _ready() -> void:
 	sync_to_physics = true
 	add_to_group("verletzbar")
 	if _mesh == null:
-		_mesh = CapsuleMesh.new()
-		_mesh.height = 1.75
-		_mesh.radius = 0.3
+		_mesh = _baue_silhouette()
 		for c: Color in KLEIDER:
 			var m := StandardMaterial3D.new()
 			m.albedo_color = c
@@ -63,7 +64,29 @@ func hat_figur() -> bool:
 	return _figur != null
 
 
-## Nahe an der Kamera tritt die Kapsel zugunsten der animierten Figur zurueck.
+func _baue_silhouette() -> ArrayMesh:
+	var kugel := SphereMesh.new()
+	kugel.radial_segments = 6
+	kugel.rings = 2
+	kugel.radius = 0.5
+	kugel.height = 1.0
+	var teile := [
+		[Vector3(0, 0.676, 0), Vector3(0.25, 0.295, 0.25)],
+		[Vector3(0, 0.24, 0), Vector3(0.45, 0.65, 0.27)],
+		[Vector3(-0.24, 0.13, 0.015), Vector3(0.18, 0.59, 0.17)],
+		[Vector3(0.24, 0.13, -0.015), Vector3(0.18, 0.59, 0.17)],
+		[Vector3(-0.103, -0.41, -0.042), Vector3(0.197, 0.94, 0.21)],
+		[Vector3(0.103, -0.41, 0.042), Vector3(0.197, 0.94, 0.21)],
+	]
+	var netz := SurfaceTool.new()
+	netz.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for teil: Array in teile:
+		netz.append_from(kugel, 0, Transform3D(Basis.from_scale(teil[1]), teil[0]))
+	netz.set_material(StandardMaterial3D.new())
+	return netz.commit()
+
+
+## Nahe an der Kamera tritt die Silhouette zugunsten der animierten Figur zurueck.
 func _pruefe_figur(delta: float) -> void:
 	_lod_takt -= delta
 	if _lod_takt > 0.0 or not Figur.verfuegbar():
@@ -74,9 +97,19 @@ func _pruefe_figur(delta: float) -> void:
 		return
 	var abstand := global_position.distance_to(kam.global_position)
 	if _figur == null and abstand < FIGUR_NAH and _figuren_zahl < FIGUR_MAX:
-		_figur = Figur.neu(farbe)
+		_figur = Figur.neu(1 if farbe % 7 == 5 else 0)
+		if _figur == null:
+			return
 		add_child(_figur)
 		_figur.passe_an()
+		_figur.scale = Vector3.ONE * (0.92 + float(farbe * 13 % 17) * 0.011)
+		var jacke: Color = KLEIDER[farbe % KLEIDER.size()]
+		_figur.faerbe({
+			"LightBrown": jacke,
+			"LightBlue": HOSEN[farbe * 3 % HOSEN.size()],
+			"Worker_Vest": jacke.lightened(0.15),
+			"Hair": HAAR[floori(farbe / 3.0) % HAAR.size()],
+		})
 		_figuren_zahl += 1
 		_instanz.visible = false
 	elif _figur != null and abstand > FIGUR_FERN:
@@ -166,6 +199,9 @@ func _physics_process(delta: float) -> void:
 		return
 	var faktor := 0.15 if jetzt < _stolpert_bis else 1.0
 	weg.bewege(tempo_ms * faktor * delta)
+	if weg.blick.length_squared() > 0.0:
+		var richtung := atan2(-weg.blick.x, -weg.blick.z)
+		_gier = lerp_angle(_gier, richtung, 1.0 - exp(-9.0 * delta))
 	_setze_lage(weg.ort)
 
 

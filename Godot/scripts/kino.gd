@@ -269,22 +269,22 @@ func _baue_figuren(sch: Dictionary, zeilen: Array, ziel: Dictionary, db: Drehbuc
 		var winkel := TAU * i / n + deg_to_rad(float(sch.get("winkel", 30.0)) + 90.0)
 		var pos: Vector3 = _ziel + Vector3(cos(winkel), 0, sin(winkel)) * radius
 		pos.y = db.boden_y(pos, _ziel.y)
-		var gestalt := _gestalt(f)
+		var gestalt := Node3D.new()
 		get_tree().current_scene.add_child(gestalt)
+		_baue_gestalt(gestalt, f)
 		gestalt.global_position = pos
 		gestalt.look_at(Vector3(_ziel.x, pos.y, _ziel.z))
 		_figuren.append(gestalt)
 
 
-func _gestalt(f: Dictionary) -> Node3D:
-	var wurzel := Node3D.new()
+func _baue_gestalt(wurzel: Node3D, f: Dictionary) -> void:
 	var figur: Figur = Figur.neu(hash(String(f.get("name", "")))) if Figur.verfuegbar() else null
 	if figur != null:
 		wurzel.add_child(figur)
 		figur.passe_an()
 		figur.spiele("Idle_Neutral")
 		_name_schild(wurzel, f)
-		return wurzel
+		return
 	var mesh := MeshInstance3D.new()
 	var kapsel := CapsuleMesh.new()
 	kapsel.height = 1.75
@@ -304,7 +304,6 @@ func _gestalt(f: Dictionary) -> Node3D:
 	nase.material_override = m
 	wurzel.add_child(nase)
 	_name_schild(wurzel, f)
-	return wurzel
 
 
 func _name_schild(wurzel: Node3D, f: Dictionary) -> void:

@@ -8,9 +8,13 @@ Landsberg am Lech als begeh- und befahrbare Stadt mit einer Geschichte: dem
 
 ```bash
 git lfs pull --include="Content/SourceData/**"
-python3 Tools/konvertiere_sektoren.py      # braucht numpy, erzeugt Godot/daten (~106 MB)
+python3 Tools/konvertiere_sektoren.py      # braucht numpy, erzeugt Godot/daten
+godot --headless --editor --path Godot --import
 godot --path Godot                         # oder den Ordner Godot/ im Editor öffnen
 ```
+
+Mit bereits erzeugten Stadtdaten den Konverter und den Import erneut ausführen, damit Godot
+Fassaden-UVs, Stadttexturen, Pflanzen und Leitlinien lädt.
 
 Die Hauptgeschichte beginnt von selbst: Du wachst im Klinikum auf.
 
@@ -30,11 +34,13 @@ Die Hauptgeschichte beginnt von selbst: Du wachst im Klinikum auf.
 
 ## Was drin ist
 
-**Stadt.** 90 Sektoren mit 2,4 Mio. Dreiecken, nach Entfernung nachgeladen, mit
-Kollision (`stadt.gd`). Spieler zu Fuß, fahrbares Auto, Kamera, HUD mit Ortsanzeige.
+**Stadt.** 90 Sektoren, nach Entfernung nachgeladen, mit Kollision (`stadt.gd`).
+Fassaden mit Fensterläden, Schaufenstern und gemauerten Sockeln. Am Hauptplatz, am Klinikum
+und am Lech stehen eigene Pflanzungen. Die Wiesen und Baumkronen folgen den
+Stadtsektoren. Über der Stadt fliegen Vogelschwärme und ein Passagierflugzeug.
 
-**Verkehr.** 70 KI-Autos auf Rundkursen, 204 Passanten (Kapseln), 1078 geparkte Autos
-je Sektor als MultiMesh, 44 Ampeln mit Phasenplan. KI-Autos bremsen vor Autos,
+**Verkehr.** 70 KI-Autos auf Rundkursen, 214 Passanten, 1078 geparkte Autos
+je Sektor als MultiMesh, 44 Ampeln mit Rot-Gelb und Räumzeit. KI-Autos bremsen vor Autos,
 Rot, Kurven, dem Spieler und wartepflichtigen Kreuzungen (`verkehrsbremse.gd`).
 
 **Kampf und Folgen.** Vier Paintball-Waffen, Farbkugeln mit Klecks und Wirkung im
@@ -122,13 +128,46 @@ xvfb-run godot --rendering-method gl_compatibility --rendering-driver opengl3 \
 `--ohneschatten` schaltet die Sonnenschatten ab (zum Eingrenzen von Bildfehlern).
 Rauch- und Filmtest schreiben nur in eine eigene Spielstanddatei.
 
+### Grafik manuell prüfen
+
+1. Nach Konvertierung und Import den Prolog starten. Beim Kameraflug am Klinikum
+   den vorspringenden Glaseingang, die gelb-blauen Fensterbänder und den
+   Karl-Mohrenweis-Platz prüfen. Aus der Nähe werden Äste und einzelne Blattgruppen
+   der Laubbäume sichtbar.
+2. Zum Hauptplatz fahren und vom Marienbrunnen in Richtung Historisches Rathaus
+   blicken. Die Platzfront hat fünf Fensterachsen, drei Torbögen und helle Stuckdetails.
+   An den Nachbarhäusern sind Fensterläden, Schaufenster und Steinsockel sichtbar.
+3. Auf einer Hauptstraße prüfen, ob Leitlinien der Fahrbahn folgen und vor
+   Kreuzungen aussetzen. Eine Ampel soll abseits der Fahrbahn stehen und von
+   Rot über Rot-Gelb zu Grün und anschließend Gelb wechseln.
+4. Am Lech die Uferpflanzung und die Wasseroberfläche aus der Nähe ansehen.
+   Für einen zweiten Durchlauf `--rendering-method gl_compatibility` ergänzen.
+5. Am Hindenburgring die Straßenfassade des historischen JVA-Torbaus ansehen.
+   Rundtürme, Kupferhauben, Walmdach und die beiden Fensterreihen müssen aus
+   Straßenperspektive als zusammenhängender Bau wirken.
+6. An der Platanenstraße den Rundbau, den roten Ganztagsanbau und die Turnhalle
+   prüfen. Hinter der Halle folgen Sportfeld und Laufbahn. Im Schulhof sind das
+   rote Spielfeld, der Teich und die verbindenden Wege sichtbar.
+
+Referenzen zum Bestandsbau des Klinikums sind das [Eingangsfoto des Klinikums
+von 2025](https://www.klinikum-landsberg.de/wp-content/uploads/Umwelterklaerung-2025_Klinikum-Landsberg-am-Lech.pdf)
+und das [Luftbild des Karl-Mohrenweis-Platzes](https://www.kreisbote.de/lokales/landsberg/klinikum-landsberg-benennt-vorplatz-nach-spd-stadtrat-seinen-standort-verdankt-11131899.html).
+Beim JVA-Torbau stammen Standort und Fassadenachse aus den Stadtdaten.
+Die Form der öffentlich sichtbaren Details folgt dem
+[Foto des Eingangsgebäudes](https://commons.wikimedia.org/wiki/File:JVA_Landsberg_Lech_-_Eingangsgeb%C3%A4ude.JPG).
+Die Stadtdaten liefern auch die Umrisse für das Dach des historischen Hauptbaus
+und die Gebäude der Platanenschule. Für Dächer und Freiflächen der Schule dienten
+die [Schulseite](https://www.platanenschule-landsberg.de/%C3%BCber-uns/) und das
+[amtliche Orthofoto](https://geodatenonline.bayern.de/geodatenonline/seiten/wms_dop20cm)
+als Referenz. Dachaufbauten und Ausstattung sind visuell angenähert.
+
 ## Noch offen gegenüber der Unreal-Version
 
 Stand der Unreal-Version: Git-Historie, Commit `dea4cec`; ihre Dokumentation steht
 in `Docs/Unreal-Archiv/README-Unreal-Archiv.md`.
 
 - Insassen in den Autos (die Scheiben sind im Flachstil undurchsichtig, ein Fahrer wäre unsichtbar)
-- Kapseln statt Figuren bei fernen Passanten (Absicht: spart Zeichenaufrufe)
+- Vereinfachte Silhouetten bei fernen Passanten
 - Keine Bildraten- oder Größenmessung gegenüber Unreal
 
 ## Hinweise

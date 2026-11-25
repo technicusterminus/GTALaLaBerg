@@ -96,11 +96,14 @@ func _welt_box(m: MeshInstance3D) -> AABB:
 ## Polizeiuniform aus dem Arbeiter-Modell: Helm und Weste werden Marineblau, die Hose dunkel,
 ## das Hemd hellblau. Greift ueber die Materialnamen des Modells.
 func uniformiere() -> void:
-	var farben := {
+	faerbe({
 		"Worker_Yellow": Color(0.05, 0.08, 0.20), "Worker_Vest": Color(0.06, 0.10, 0.28),
 		"Brown": Color(0.04, 0.06, 0.14), "Brown2": Color(0.04, 0.06, 0.14),
 		"LightBrown": Color(0.45, 0.58, 0.78), "Grey": Color(0.05, 0.05, 0.06),
-	}
+	})
+
+
+func faerbe(farben: Dictionary) -> void:
 	for m: MeshInstance3D in _innen.find_children("*", "MeshInstance3D", true, false):
 		for i in m.mesh.get_surface_count():
 			var mat := m.mesh.surface_get_material(i)

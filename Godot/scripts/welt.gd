@@ -45,6 +45,8 @@ func _ready() -> void:
 	add_to_group("welt")
 	_eingaben()
 	_umgebung()
+	if DisplayServer.get_name() != "headless":
+		add_child(Himmelsverkehr.new())
 	_rauchtest = "--rauchtest" in OS.get_cmdline_user_args()
 	_filmtest = "--filmtest" in OS.get_cmdline_user_args()
 	for arg in OS.get_cmdline_user_args():
@@ -901,29 +903,39 @@ func _pruefe_fahndung() -> bool:
 # --- Aufbau -----------------------------------------------------------------
 
 func _umgebung() -> void:
+	var kompatibel := RenderingServer.get_current_rendering_method() == "gl_compatibility"
 	var himmel := ProceduralSkyMaterial.new()
-	himmel.sky_top_color = Color(0.25, 0.45, 0.78)
-	himmel.sky_horizon_color = Color(0.65, 0.76, 0.88)
-	himmel.ground_horizon_color = Color(0.6, 0.64, 0.68)
+	himmel.sky_top_color = Color(0.23, 0.46, 0.74)
+	himmel.sky_horizon_color = Color(0.72, 0.82, 0.91)
+	himmel.ground_horizon_color = himmel.sky_horizon_color
+	himmel.ground_bottom_color = Color(0.25, 0.27, 0.24)
 	var sky := Sky.new()
 	sky.sky_material = himmel
 	var env := Environment.new()
 	env.background_mode = Environment.BG_SKY
 	env.sky = sky
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	env.ambient_light_color = Color(0.83, 0.88, 0.94)
+	env.ambient_light_energy = 0.52 if kompatibel else 0.72
+	env.ambient_light_sky_contribution = 0.0
+	env.tonemap_mode = Environment.TONE_MAPPER_LINEAR if kompatibel else Environment.TONE_MAPPER_AGX
+	env.tonemap_exposure = 0.94 if kompatibel else 1.35
 	env.fog_enabled = true
-	env.fog_light_color = Color(0.7, 0.78, 0.88)
-	env.fog_density = 0.0004
+	env.fog_light_color = Color(0.64, 0.72, 0.76)
+	env.fog_density = 0.00048
+	env.fog_sky_affect = 0.18
 	var we := WorldEnvironment.new()
 	we.environment = env
 	add_child(we)
 
 	var sonne := DirectionalLight3D.new()
-	sonne.rotation_degrees = Vector3(-50, 152, 0)
+	sonne.rotation_degrees = Vector3(-44, -49, 0)
 	sonne.shadow_enabled = not "--ohneschatten" in OS.get_cmdline_user_args()
-	sonne.directional_shadow_max_distance = 250.0
-	sonne.light_energy = 1.2
+	sonne.directional_shadow_max_distance = 300.0
+	sonne.directional_shadow_blend_splits = true
+	sonne.light_color = Color(1.0, 0.95, 0.86)
+	# Ohne AgX komprimiert der Kompatibilitätsrenderer die Glanzlichter nicht.
+	sonne.light_energy = 0.77 if kompatibel else 1.44
 	add_child(sonne)
 
 

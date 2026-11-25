@@ -11,7 +11,7 @@ der Unreal-Stand in der Git-Historie (Commit `dea4cec`).
 |---|---|
 | Projekt | `Godot/project.godot` |
 | Engine | Godot 4.5 |
-| Stadt | 90 Sektoren à 500 × 500 m, 2,4 Mio. Dreiecke |
+| Stadt | 90 Sektoren à 500 × 500 m |
 | Geschichte | „Farbkrieg“: 22 Hauptmissionen, 3 Enden |
 | Quelldaten | `Content/SourceData` (Git LFS) |
 | Lizenz für Code/Tools | MIT |
@@ -21,7 +21,8 @@ der Unreal-Stand in der Git-Historie (Commit `dea4cec`).
 
 ```bash
 git lfs pull --include="Content/SourceData/**"
-python3 Tools/konvertiere_sektoren.py      # braucht numpy, erzeugt Godot/daten (~106 MB)
+python3 Tools/konvertiere_sektoren.py      # braucht numpy, erzeugt Godot/daten
+godot --headless --editor --path Godot --import
 godot --path Godot
 ```
 
@@ -32,7 +33,7 @@ Steuerung, Stand und Rauchtest stehen in [`Godot/README.md`](Godot/README.md).
 Umgesetzt (alles mit einem Rauchtest geprüft, siehe [`Godot/README.md`](Godot/README.md)):
 
 - **Stadt und Verkehr:** Sektor-Streaming mit Kollision, Spieler und Auto, 70 KI-Autos,
-  204 Passanten, 1078 geparkte Autos, 44 Ampeln, bremsendes Verkehrsverhalten
+  214 Passanten, 1078 geparkte Autos, 44 Ampeln, bremsendes Verkehrsverhalten
 - **Kampf und Polizei:** vier Paintball-Waffen, Schaden und Krankenhaus, Fahndung mit
   bis zu fünf Sternen, Streifen, Straßensperre, Festnahme
 - **Wirtschaft und Reviere:** sechs Auftragsarten, Paintball-Laden, Lackiererei,
@@ -45,7 +46,7 @@ Umgesetzt (alles mit einem Rauchtest geprüft, siehe [`Godot/README.md`](Godot/R
   zum Einsteigen
 
 - **Aussehen:** animierte Menschenfiguren und Waffenmodelle (Quaternius, CC0), Autos in vier Karosserieformen
-  und zwölf Lacken, Wiesenflecken und Erde am Hang im Gelände, bewegtes Wasser
+  und zwölf Lacken, abwechslungsreiche Fassaden, Pflanzungen, Wiesen und bewegtes Wasser
 - **Schießbude:** Runde zu 30 Sekunden mit sechs Scheiben, Lohn je Treffer, Bestleistung
 - **Farbdosen:** 50 versteckte Dosen im Straßennetz, Staffelpreis alle zehn
 - **Ton und Radio:** Motor, Schüsse, Sirene, Rotor, Schritte; Autoradio mit drei Sendern
