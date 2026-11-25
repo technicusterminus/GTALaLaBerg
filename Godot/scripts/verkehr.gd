@@ -12,11 +12,16 @@ const LACKE := [
 	Color(0.92, 0.92, 0.90), Color(0.45, 0.47, 0.50), Color(0.62, 0.34, 0.10),
 	Color(0.20, 0.38, 0.55), Color(0.70, 0.55, 0.12), Color(0.35, 0.06, 0.20),
 ]
-## Karosserieformen: Laenge, Breite, Hoehe gegenueber dem Grundmodell (Kleinwagen,
-## Limousine, Kombi, Gelaendewagen).
-const FORMEN := [
-	Vector3(0.88, 0.94, 0.96), Vector3(1.0, 1.0, 1.0), Vector3(1.07, 1.0, 1.04),
-	Vector3(1.03, 1.08, 1.22),
+## Fahrzeugmodelle im Verkehr mit Gewicht: meist Alltagsautos, seltener Sportwagen und
+## Supercars, ganz selten ein Rennwagen. Geparkt stehen keine Rennwagen.
+const MISCHUNG := {
+	"klein": 24, "limousine": 22, "kombi": 22, "bus": 9, "sport": 12, "super": 7, "renn": 4,
+}
+## Lack fuer die Sportler: kraeftiger als der Alltagslack.
+const SPORTLACKE := [
+	Color(0.85, 0.08, 0.04), Color(0.95, 0.75, 0.05), Color(0.05, 0.25, 0.75),
+	Color(0.92, 0.92, 0.92), Color(0.06, 0.06, 0.07), Color(0.20, 0.65, 0.25),
+	Color(0.95, 0.40, 0.05),
 ]
 
 var autos: Array[Verkehrsauto] = []
@@ -38,7 +43,11 @@ func _ready() -> void:
 			continue
 		var auto := Verkehrsauto.new()
 		auto.tempo_ms = randf_range(28.0, 46.0) / 3.6
+		auto.modell = waehle_modell(autos.size() * 7919 + 17, true)
 		auto.lack = LACKE[autos.size() % LACKE.size()]
+		if auto.modell in ["sport", "super", "renn"]:
+			auto.lack = SPORTLACKE[autos.size() % SPORTLACKE.size()]
+			auto.tempo_ms *= 1.12
 		auto.breiten = PackedFloat32Array(a.get("bp", []))
 		auto.klasse = int(a.get("klasse", 3))
 		auto.klassen = PackedInt32Array(a.get("kp", []))
@@ -82,6 +91,23 @@ func _ready() -> void:
 			Verkehrsauto.kreuzung_orte.size()])
 
 
+## Ein Modell nach MISCHUNG, fest aus einer Zahl (gleiche Zahl, gleiches Modell).
+## Fehlt ein Modell in den Daten, nimmt der Wagen den Kleinwagen.
+static func waehle_modell(samen: int, mit_renn: bool) -> String:
+	var summe := 0
+	for m: String in MISCHUNG:
+		if mit_renn or m != "renn":
+			summe += MISCHUNG[m]
+	var wahl := posmod(hash(samen), summe)
+	for m: String in MISCHUNG:
+		if not mit_renn and m == "renn":
+			continue
+		wahl -= MISCHUNG[m]
+		if wahl < 0:
+			return m if Wagenmesh.hat_modell(m) else "klein"
+	return "klein"
+
+
 func _lade_kreuzungen(liste: Array) -> void:
 	Verkehrsauto.kreuzung_orte = PackedVector2Array()
 	Verkehrsauto.kreuzung_klassen = PackedInt32Array()
@@ -117,20 +143,22 @@ func _route(zahlen: Array) -> PackedVector3Array:
 	return r
 
 
+## Je Sektor und Modell ein MultiMesh.
 func _stelle_geparkte(liste: Array) -> void:
-	var gruppen := {}  # Vector2i -> Array
+	var gruppen := {}  # [Vector2i, modell] -> Array
 	for g: Dictionary in liste:
 		var k := Vector2i(floori(g["x"] / 100.0 / SEKTOR_M), floori(g["y"] / 100.0 / SEKTOR_M))
-		if not gruppen.has(k):
-			gruppen[k] = []
-		gruppen[k].append(g)
-	var netz := Wagenmesh.netz(Color.WHITE, true)
-	for k: Vector2i in gruppen:
-		var teil: Array = gruppen[k]
+		var modell := waehle_modell(int(g["x"]) * 31 + int(g["y"]), false)
+		var schluessel := [k, modell]
+		if not gruppen.has(schluessel):
+			gruppen[schluessel] = []
+		gruppen[schluessel].append(g)
+	for schluessel: Array in gruppen:
+		var teil: Array = gruppen[schluessel]
 		var mm := MultiMesh.new()
 		mm.transform_format = MultiMesh.TRANSFORM_3D
 		mm.use_colors = true
-		mm.mesh = netz
+		mm.mesh = Wagenmesh.netz(Color.WHITE, true, schluessel[1])
 		mm.instance_count = teil.size()
 		for i in teil.size():
 			var g: Dictionary = teil[i]

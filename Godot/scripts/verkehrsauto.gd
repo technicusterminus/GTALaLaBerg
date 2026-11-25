@@ -3,7 +3,8 @@ extends AnimatableBody3D
 ## Ein KI-Auto auf einer festen Route (Rundkurs). Es wird nicht von der Physik
 ## bewegt, schiebt aber Spieler und Wagen beiseite (sync_to_physics). Es bremst
 ## vor Autos, Ampeln, Kurven, dem Spieler und wartepflichtigen Kreuzungen (siehe
-## Verkehrsbremse). Noch ohne Ueberholen und ohne Ausweichen nach rechts.
+## Verkehrsbremse), ueberholt Hindernisse und macht Platz fuer Streifen. Die Raeder drehen
+## und lenken, der Aufbau nickt und neigt sich, Brems- und Blinklichter kommen aus der Textur.
 
 const HALBE_LAENGE := 2.15
 const HALBE_WAGENBREITE := 0.88
@@ -30,6 +31,7 @@ var klassen := PackedInt32Array()    ## Klasse je Wegpunkt (die Route verkettet 
 var kreuzungen := PackedInt32Array() ## Kreuzungen auf der Route
 var lack := Color(0.5, 0.5, 0.5)
 var karosserie := Vector3.ONE   ## Laenge, Breite, Hoehe gegenueber dem Grundmodell
+var modell := "klein"          ## Fahrzeugmodell (Wagenmesh.MODELLE)
 var ueberholungen := 0   ## wie oft dieser Wagen schon ein Hindernis ueberholt hat
 
 var geparkt := false   ## abgestellt: weit unter der Stadt, unsichtbar, ohne Route
@@ -38,6 +40,17 @@ var gesperrt := false  ## Sperrwagen: steht quer auf der Strasse, Blaulicht an
 var _blick := Vector3(1, 0, 0)
 var _rechts := Vector3(0, 0, 1)
 var _netz := MeshInstance3D.new()
+var _aufbau := Node3D.new()      ## traegt die Karosserie; nickt beim Bremsen, neigt sich in Kurven
+var _raeder: Array[MeshInstance3D] = []
+var _rad_radius := 0.33
+var _radstand := 2.6
+var _drehung := 0.0              ## Winkel der Raeder (rad)
+var _lenkwinkel := 0.0
+var _tempo_vorher := 0.0
+var _beschl := 0.0               ## geglaettete Laengsbeschleunigung (m/s^2)
+var _gierrate := 0.0
+var _blinker := 0.0
+var _licht_stand := Vector3(-9, -9, -9)   ## zuletzt gesetzte Bremse, Blinker, Licht
 var _gier := 0.0
 var _lage := Vector3.ZERO   ## zuletzt gesetzte Position, sofort gueltig (siehe position_jetzt)
 var _geschwindigkeit := Vector3.ZERO
@@ -65,18 +78,107 @@ func _ready() -> void:
 	add_to_group("verletzbar")
 	var form := CollisionShape3D.new()
 	var box := BoxShape3D.new()
-	box.size = Vector3(4.3, 1.0, 1.8)
+	var masse := Wagenmesh.masse(modell)
+	box.size = Vector3(masse.x, 1.0, masse.y)
 	form.shape = box
 	form.position = Vector3(0, 0.55, 0)
 	add_child(form)
-	_netz.mesh = Wagenmesh.netz(lack)
-	_netz.scale = karosserie
+	_netz.mesh = Wagenmesh.netz(lack, false, modell, false)
+	_aufbau.scale = karosserie
 	_netz.visibility_range_end = 500.0
-	add_child(_netz)
+	_aufbau.add_child(_netz)
+	add_child(_aufbau)
+	_baue_raeder()
 	if weg.gueltig():
 		_setze_position(weg.ort)
 	if polizei:
 		_baue_blaulicht()
+
+
+## Vier einzeln drehbare Raeder; die vorderen lenken. Sie haengen am Wagen, nicht am Aufbau,
+## damit sie beim Nicken auf der Strasse bleiben.
+func _baue_raeder() -> void:
+	var lagen := Wagenmesh.radlagen(modell)
+	for k in lagen.size():
+		var l: Vector4 = lagen[k]
+		var rad := MeshInstance3D.new()
+		rad.mesh = Wagenmesh.rad_netz(modell, k / 2)
+		rad.position = Vector3(l.x, l.y, l.z) * karosserie
+		rad.visibility_range_end = 160.0
+		add_child(rad)
+		_raeder.append(rad)
+		_rad_radius = l.w
+	if lagen.size() >= 4:
+		_radstand = absf((lagen[0] as Vector4).x - (lagen[2] as Vector4).x)
+
+
+## Raeder drehen und lenken, Aufbau nicken und neigen, Lampen schalten.
+func _bewege_teile(delta: float) -> void:
+	var tempo := _geschwindigkeit.dot(_blick)
+	_drehung = fmod(_drehung + tempo / maxf(_rad_radius, 0.2) * delta, TAU)
+	var lenk_soll := 0.0
+	if absf(tempo) > 0.5:
+		lenk_soll = clampf(atan(_gierrate * _radstand / tempo), -0.6, 0.6)
+	_lenkwinkel = lerpf(_lenkwinkel, lenk_soll, minf(6.0 * delta, 1.0))
+	for k in _raeder.size():
+		_raeder[k].rotation = Vector3(0.0, _lenkwinkel if k < 2 else 0.0, -_drehung)
+	var a := (tempo - _tempo_vorher) / maxf(delta, 0.001)
+	_tempo_vorher = tempo
+	_beschl = lerpf(_beschl, clampf(a, -9.0, 6.0), minf(4.0 * delta, 1.0))
+	var nicken := clampf(_beschl * 0.006, -0.035, 0.025)
+	var neigen := clampf(tempo * _gierrate * 0.006, -0.04, 0.04)
+	_aufbau.rotation = Vector3(neigen, 0.0, nicken)
+	_aufbau.position.y = -absf(nicken) * 0.3
+	var bremst := 1.0 if (_beschl < -0.8 or (absf(tempo) < 0.3 and _bremse < 0.95)) else 0.0
+	var stand := Vector3(bremst, _blinker, 0.0)
+	if stand != _licht_stand:
+		_licht_stand = stand
+		_netz.set_instance_shader_parameter("bremse", bremst)
+		_netz.set_instance_shader_parameter("blinker", _blinker)
+
+
+## Blinker: vor einer Abbiegung auf der Route, beim Ausscheren zum Ueberholen (links), beim
+## Wiedereinordnen und beim Rechts-ran-Fahren fuer die Rettungsgasse (rechts).
+func _waehle_blinker() -> void:
+	if ist_ausgeschaltet():
+		_blinker = 2.0   # Warnblinker
+		return
+	if _gasse > 0.0:
+		_blinker = 1.0
+		return
+	if _ueberholt != null:
+		_blinker = -1.0 if absf(_seitversatz) < 1.0 else 0.0
+		return
+	_blinker = 0.0
+	var r := weg.route
+	if r.size() < 3:
+		return
+	var i := weg.index
+	var strecke := 0.0
+	var vorher := _lage
+	for k in 6:
+		var j := i + k * weg.richtung
+		if weg.rund:
+			j = posmod(j, r.size())
+		if j < 0 or j >= r.size():
+			return
+		strecke += Vector2(r[j].x - vorher.x, r[j].z - vorher.z).length()
+		vorher = r[j]
+		if strecke > 35.0:
+			return
+		var j2 := j + weg.richtung
+		if weg.rund:
+			j2 = posmod(j2, r.size())
+		if j2 < 0 or j2 >= r.size():
+			return
+		var d := Vector3(r[j2].x - r[j].x, 0, r[j2].z - r[j].z)
+		if d.length_squared() < 0.01:
+			continue
+		var winkel := _blick.signed_angle_to(d.normalized(), Vector3.UP)
+		if absf(winkel) > 0.6:
+			# Positiver Winkel um +Y: nach links (Richtung -Z, rechts ist +Z).
+			_blinker = -1.0 if winkel > 0.0 else 1.0
+			return
 
 
 ## Dachbalken: zwei flache Leuchten links und rechts, darueber ein Punktlicht, das
@@ -268,6 +370,7 @@ func _berechne_bremse() -> void:
 	_pruefe_hupe(0.12)
 	if _gasse > 0.0:
 		_bremse = minf(_bremse, 0.3)
+	_waehle_blinker()
 
 
 ## Stellt den Wagen an einen Ort und dreht ihn in eine Richtung.
@@ -325,7 +428,7 @@ func setze_leben(neu: float) -> void:
 
 func setze_lack(farbe: Color) -> void:
 	lack = farbe
-	_netz.mesh = Wagenmesh.netz(lack)
+	_netz.mesh = Wagenmesh.netz(lack, false, modell, false)
 
 
 ## Ein Paintball beult nicht, aber er nimmt Sicht und Lack: zehn Treffer setzen
@@ -362,6 +465,9 @@ func _physics_process(delta: float) -> void:
 	# Ohne Route (ausgeschaltet oder geparkt) bleibt der Wagen stehen, wo er ist.
 	if ist_ausgeschaltet() or not weg.gueltig():
 		_geschwindigkeit = Vector3.ZERO
+		if ist_ausgeschaltet() and _blinker != 2.0:
+			_blinker = 2.0
+			_bewege_teile(delta)
 		return
 	# Nach einem Treffer kurz fast stehen bleiben, dann wieder auf Tempo; sonst
 	# waere ein Treffer nur eine Farbe, kein Ereignis.
@@ -393,5 +499,8 @@ func _physics_process(delta: float) -> void:
 		ziel = rand   # ganz nach rechts, Platz fuer die Streife
 	_seitversatz = lerpf(_seitversatz, ziel, minf((1.6 if _ueberholt != null else 0.7) * delta, 1.0))
 	# Das Netz schaut nach +X; Drehung um Y bringt +X auf die Blickrichtung.
+	var gier_vorher := _gier
 	_setze_transform(weg.ort + _rechts * _seitversatz, -atan2(_blick.z, _blick.x))
 	_geschwindigkeit = (_lage - vorher) / delta
+	_gierrate = lerpf(_gierrate, wrapf(_gier - gier_vorher, -PI, PI) / delta, minf(5.0 * delta, 1.0))
+	_bewege_teile(delta)
