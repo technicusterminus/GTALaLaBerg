@@ -87,6 +87,12 @@ var _schraeg := Node3D.new()
 var _traeger: Node3D = self
 var _vorne: Array[bool] = []
 var _schraeglage := 0.0
+var _fahrer: Figur
+var _kurbel: MeshInstance3D       ## Fahrrad: Tretkurbel mit Pedalen, dreht mit dem Tempo
+var _kurbel_winkel := randf() * TAU
+var _tretlager := Vector3.ZERO
+const KURBEL := 0.17              ## Kurbellaenge (m)
+const UEBERSETZUNG := 2.6         ## Radumdrehungen je Kurbelumdrehung
 
 
 func _ready() -> void:
@@ -136,6 +142,61 @@ func _setze_fahrer() -> void:
 	f.fahrhaltung(modell)
 	for m: MeshInstance3D in f.find_children("*", "MeshInstance3D", true, false):
 		m.visibility_range_end = 140.0
+	_fahrer = f
+	if modell == "fahrrad":
+		_baue_kurbel()
+
+
+## Tretkurbel: zwei Arme mit Pedalen um das Tretlager (vor dem Hinterrad, 30 cm hoch).
+func _baue_kurbel() -> void:
+	var hinten: Vector4 = Wagenmesh.radlagen(modell)[1]
+	_tretlager = Vector3(hinten.x + 0.42, 0.30, 0.0)
+	var netz := ArrayMesh.new()
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for s in [-1.0, 1.0]:
+		# Arm nach oben (+Y) auf der linken Seite, nach unten rechts; Pedal quer am Ende.
+		var richtung := 1.0 if s < 0.0 else -1.0
+		var arm := BoxMesh.new()
+		arm.size = Vector3(0.025, KURBEL, 0.012)
+		st.append_from(arm, 0, Transform3D(Basis(), Vector3(0, richtung * KURBEL * 0.5, s * 0.075)))
+		var pedal := BoxMesh.new()
+		pedal.size = Vector3(0.09, 0.02, 0.08)
+		st.append_from(pedal, 0, Transform3D(Basis(), Vector3(0, richtung * KURBEL, s * 0.12)))
+	st.commit(netz)
+	var m := StandardMaterial3D.new()
+	m.albedo_color = Color(0.08, 0.08, 0.09)
+	m.metallic = 0.6
+	m.roughness = 0.4
+	netz.surface_set_material(0, m)
+	_kurbel = MeshInstance3D.new()
+	_kurbel.mesh = netz
+	_kurbel.position = _tretlager
+	_kurbel.visibility_range_end = 80.0
+	_aufbau.add_child(_kurbel)
+
+
+## Fahrrad: Kurbel nach dem Tempo drehen und die Beine des Fahrers auf die Pedale stellen
+## (nur nah an der Kamera; weiter weg genuegt die Kurbel).
+func _tritt(delta: float, tempo: float) -> void:
+	if _kurbel == null:
+		return
+	_kurbel_winkel = fmod(_kurbel_winkel + maxf(tempo, 0.0) / maxf(_rad_radius, 0.2)
+			/ UEBERSETZUNG * delta, TAU)
+	_kurbel.rotation.z = -_kurbel_winkel
+	if _fahrer == null:
+		return
+	var kamera := get_viewport().get_camera_3d()
+	if kamera == null or kamera.global_position.distance_to(_lage) > 60.0:
+		return
+	# Pedale im Aufbau: links oben bei Winkel 0, rechts gegenueber; vorwaerts ist +X.
+	var links := _tretlager + Vector3(sin(_kurbel_winkel), cos(_kurbel_winkel), 0.0) * KURBEL \
+			+ Vector3(0, 0.03, -0.12)
+	var rechts := _tretlager - Vector3(sin(_kurbel_winkel), cos(_kurbel_winkel), 0.0) * KURBEL \
+			+ Vector3(0, 0.03, 0.12)
+	var g := _aufbau.global_transform
+	_fahrer.tritt([g * links, g * rechts], (g.basis * Vector3.RIGHT).normalized(),
+			(g.basis * Vector3.UP).normalized())
 
 
 ## Vier einzeln drehbare Raeder; die vorderen lenken. Sie haengen am Wagen, nicht am Aufbau,
@@ -179,6 +240,7 @@ func _bewege_teile(delta: float) -> void:
 		_bremsen[k].rotation = Vector3(0.0, lenk, 0.0)
 	var a := (tempo - _tempo_vorher) / maxf(delta, 0.001)
 	_tempo_vorher = tempo
+	_tritt(delta, tempo)
 	_beschl = lerpf(_beschl, clampf(a, -9.0, 6.0), minf(4.0 * delta, 1.0))
 	_federung(delta, clampf(a, -10.0, 7.0), tempo)
 	var bremst := 1.0 if (_beschl < -0.8 or (absf(tempo) < 0.3 and _bremse < 0.95)) else 0.0

@@ -16,6 +16,7 @@ static var _szenen := {}
 var _anim: AnimationPlayer
 var _aktuell := ""
 var _innen := Node3D.new()
+var _skelett: Skeleton3D   ## gesetzt von fahrhaltung (fuer tritt)
 
 
 static func verfuegbar() -> bool:
@@ -96,6 +97,45 @@ func fahrhaltung(art: String) -> void:
 				* Quaternion(Vector3.RIGHT, deg_to_rad(-float(h["senken"]))))
 		setze.call("LowerArm" + n, Quaternion(Vector3.BACK, deg_to_rad(-v * float(h["unterarm"]))))
 	setze.call("Torso", Quaternion(Vector3.RIGHT, deg_to_rad(float(h["vor"]))))
+	_skelett = sk
+	_fuesse_setzen(sk)
+
+
+## Treten: jedes Bein mit zwei Gelenken auf sein Pedal (Weltkoordinaten, erst links, dann
+## rechts) gestellt. Hueftpunkt und Beinlaengen aus der Ruhelage des Rigs; in der Ebene aus
+## vorwaerts und oben ergeben sich Oberschenkelwinkel und Kniebeugung (Kosinussatz).
+func tritt(pedale: Array, vorwaerts: Vector3, oben: Vector3) -> void:
+	var sk := _skelett
+	if sk == null or not sk.is_inside_tree():
+		return
+	var seiten := [[".L", 1.0], [".R", -1.0]]
+	for k in 2:
+		var n: String = seiten[k][0]
+		var v: float = seiten[k][1]
+		var ober := sk.find_bone("UpperLeg" + n)
+		var knie := sk.find_bone("LowerLeg" + n)
+		var ende := sk.find_bone("LowerLeg" + n + "_end")
+		if ober < 0 or knie < 0 or ende < 0:
+			continue
+		var g := sk.global_transform
+		var huefte := g * sk.get_bone_global_rest(ober).origin
+		var l1 := huefte.distance_to(g * sk.get_bone_global_rest(knie).origin)
+		var l2 := (g * sk.get_bone_global_rest(knie).origin).distance_to(g * sk.get_bone_global_rest(ende).origin)
+		var t: Vector3 = (pedale[k] as Vector3) - huefte
+		var vor := t.dot(vorwaerts)
+		var hoch := t.dot(oben)
+		var d := clampf(sqrt(vor * vor + hoch * hoch), absf(l1 - l2) + 0.01, (l1 + l2) * 0.995)
+		var beuge := PI - acos(clampf((l1 * l1 + l2 * l2 - d * d) / (2.0 * l1 * l2), -1.0, 1.0))
+		var winkel := atan2(vor, -hoch) + acos(clampf((l1 * l1 + d * d - l2 * l2) / (2.0 * l1 * d), -1.0, 1.0))
+		sk.set_bone_pose_rotation(ober, sk.get_bone_rest(ober).basis.get_rotation_quaternion()
+				* Quaternion(Vector3.BACK, v * winkel))
+		sk.set_bone_pose_rotation(knie, sk.get_bone_rest(knie).basis.get_rotation_quaternion()
+				* Quaternion(Vector3.RIGHT, beuge))
+	_fuesse_setzen(sk)
+
+
+## Die Fuesse haengen im Rig an der Wurzel: an die Enden der Unterschenkel setzen.
+func _fuesse_setzen(sk: Skeleton3D) -> void:
 	for n in [".L", ".R"]:
 		var fuss := sk.find_bone("Foot" + n)
 		var ende := sk.find_bone("LowerLeg" + n + "_end")
