@@ -21,7 +21,16 @@ from PIL import Image
 HIER = os.path.dirname(os.path.abspath(__file__))
 TEXTUREN = os.path.join(HIER, "..", "Godot", "texturen")
 HD = os.path.join(HIER, "..", "Docs", "Konzept", "autos", "hd")
-MODELLE = ["klein", "limousine", "kombi", "bus", "sport", "renn", "super"]
+MODELLE = ["klein", "limousine", "kombi", "bus", "sport", "renn", "super", "motorrad", "fahrrad"]
+ZWEIRAD_AUFTRAG = (
+    "This is an orthographic {ansicht} view of a {art} on a pure white background, part of a "
+    "texture sheet. Re-render it as an ultra-detailed photorealistic texture at maximum "
+    "resolution. KEEP EXACTLY: the outline, position, size, framing and proportions (it must "
+    "overlay the input pixel-perfectly), the orthographic projection, the neutral light grey "
+    "paint, and the pure white background - every gap between tubes, spokes and parts must "
+    "stay pure white. ADD fine realistic detail: welds and tube joints, cables, chain links, "
+    "spokes, tyre tread and sidewall lettering, brake discs, bolts, rubber grips, saddle "
+    "texture, light internals. No shadows, no text labels, no rider, no perspective change.")
 ANSICHTEN = {"seite": "side", "oben": "top-down", "front": "front", "heck": "rear"}
 VERHAELTNISSE = {"1:1": 1.0, "4:3": 4 / 3, "3:2": 1.5, "16:9": 16 / 9, "21:9": 21 / 9,
                  "3:4": 3 / 4, "2:3": 2 / 3, "4:5": 0.8, "5:4": 1.25}
@@ -87,7 +96,12 @@ def verfeinere(modell: str, ansicht: str, neu: bool) -> None:
         ox, oy = (pw - w) // 2, (ph - h) // 2
         leinwand.paste(quelle, (ox, oy))
         print(f"{modell} {ansicht}: {w}x{h} -> {verh}")
-        ergebnis = anfrage(leinwand, AUFTRAG.format(ansicht=ANSICHTEN[ansicht]), verh)
+        if modell in ("motorrad", "fahrrad"):
+            auftrag = ZWEIRAD_AUFTRAG.format(ansicht=ANSICHTEN[ansicht],
+                                             art="motorcycle" if modell == "motorrad" else "bicycle")
+        else:
+            auftrag = AUFTRAG.format(ansicht=ANSICHTEN[ansicht])
+        ergebnis = anfrage(leinwand, auftrag, verh)
         # Zurueck auf den Ausschnitt: das Ergebnis deckt die ganze Leinwand.
         sx, sy = ergebnis.width / pw, ergebnis.height / ph
         ausschnitt = ergebnis.crop((round(ox * sx), round(oy * sy), round((ox + w) * sx),

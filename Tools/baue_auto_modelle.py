@@ -256,9 +256,98 @@ def baue(modell: str, laenge: float, spiegeln: bool) -> dict:
     return profil
 
 
+## Zweiraeder: Laenge, Seite spiegeln, Draufsicht spiegeln, Radradius (m).
+ZWEIRAEDER = {
+    "motorrad": (2.1, False, False, 0.31),
+    "fahrrad": (1.8, True, False, 0.35),
+}
+
+
+def baue_zweirad(modell: str, laenge: float, spiegel_seite: bool, spiegel_oben: bool,
+                 radius: float) -> dict:
+    """Einspurige Fahrzeuge: Ober- und Unterkante je Spalte (der Rahmen bleibt eine Scheibe,
+    der Shader schneidet den weissen Grund aus), halbe Breite aus der Draufsicht, Raeder aus
+    den Aufstandsflaechen, Lenker (breiteste Stelle vorn) und Sitz fuer den Fahrer."""
+    farbbild = Image.open(os.path.join(BLAETTER, f"{modell}_farbe.png")).convert("RGB")
+    bild = np.asarray(farbbild).astype(np.int32)
+    seg = np.asarray(Image.open(os.path.join(BLAETTER, f"{modell}_maske.png")).convert("RGB")
+                     .resize(farbbild.size, Image.NEAREST)).astype(np.int32)
+    v = ansichten(bild)
+    s_sl, s_maske = v["seite"]
+    o_sl, o_maske = v["oben"]
+    s_rgb, o_rgb, s_seg, o_seg = bild[s_sl], bild[o_sl], seg[s_sl], seg[o_sl]
+    if spiegel_seite:
+        s_maske, s_rgb, s_seg = s_maske[:, ::-1], s_rgb[:, ::-1], s_seg[:, ::-1]
+    if spiegel_oben:
+        o_maske, o_rgb, o_seg = o_maske[:, ::-1], o_rgb[:, ::-1], o_seg[:, ::-1]
+    h, w = s_maske.shape
+    masst = laenge / w
+    dach = np.zeros(w)
+    unten = np.zeros(w)
+    for i in range(w):
+        col = np.where(s_maske[:, i])[0]
+        if len(col):
+            dach[i] = (h - 1 - col.min()) * masst
+            unten[i] = (h - 1 - col.max()) * masst
+    # Raeder: Aufstandsflaechen in den untersten Zeilen.
+    boden = s_maske[int(h * 0.97):, :].any(axis=0)
+    gruppen = sorted(laeufe(np.where(boden)[0], 8), key=lambda g: g[0] - g[1])[:2]
+    gruppen = sorted(gruppen)
+    if len(gruppen) < 2:
+        raise SystemExit(f"{modell}: keine zwei Aufstandsflaechen")
+    raeder = [{"u": round((a + b) / 2 / w, 4), "r": radius} for a, b in gruppen]
+    oh, ow = o_maske.shape
+    halb = np.zeros(ow)
+    for i in range(ow):
+        col = np.where(o_maske[:, i])[0]
+        halb[i] = (col.max() - col.min()) / 2 if len(col) else 0.0
+    halb_m = halb * laenge / ow
+    # Lenker: breiteste Stelle in der vorderen Haelfte der Draufsicht.
+    vorn = slice(0, ow // 2)
+    lu = int(np.argmax(halb_m[vorn]))
+    lenker = {"u": round(lu / ow, 4), "breite": round(float(halb_m[lu] * 2), 3),
+              "hoehe": round(float(dach[min(int(lu / ow * w), w - 1)]), 3)}
+    # Sitz: Motorrad die Mulde hinter dem Tank, Fahrrad der Sattel (hoechster Punkt hinten).
+    u = np.arange(w) / w
+    hinten = (u > 0.35) & (u < 0.8)
+    idx = np.where(hinten)[0]
+    k = idx[np.argmax(dach[idx])] if modell == "fahrrad" else idx[np.argmin(dach[idx] + (u[idx] - 0.55) ** 2 * 2)]
+    sitz = {"u": round(float(k / w), 4), "hoehe": round(float(dach[k]), 3)}
+    samples = np.linspace(0.0, 1.0, SCHNITTE)
+
+    def probe(reihe, uu):
+        return float(np.interp(uu * (len(reihe) - 1), np.arange(len(reihe)), reihe))
+    profil = {
+        "einspurig": True, "laenge": laenge,
+        "dach": [round(probe(median(dach, 5), x), 3) for x in samples],
+        "unten": [round(probe(median(unten, 5), x), 3) for x in samples],
+        "halbe_breite": [round(probe(median(halb_m, 9), x), 3) for x in samples],
+        "raeder": raeder, "lenker": lenker, "sitz": sitz,
+        "schwelle": 0.0, "gurt": round(float(dach.max()) * 0.7, 3),
+        "seitenfenster": [0, 0], "windschutz": [0, 0], "heckscheibe": [0, 0],
+        "seite_hoehe": round(h * masst, 3), "oben_breite": round(oh * laenge / ow, 3),
+    }
+    os.makedirs(TEXTUREN, exist_ok=True)
+    speichere_ansicht(s_rgb, s_seg, f"auto_{modell}_", "seite")
+    speichere_ansicht(o_rgb, o_seg, f"auto_{modell}_", "oben")
+    for name in ("front", "heck"):
+        sl, _ = v[name]
+        teil = bild[sl]
+        speichere_ansicht(teil, seg[sl], f"auto_{modell}_", name)
+        profil[f"{name}_breite"] = round(teil.shape[1] * profil["seite_hoehe"] / teil.shape[0], 3)
+    with open(os.path.join(HIER, "Modelle", f"auto_profil_{modell}.json"), "w") as f:
+        json.dump(profil, f, separators=(",", ":"))
+    print("LALABERG_ZWEIRAD", modell, {k2: v2 for k2, v2 in profil.items()
+                                       if k2 not in ("dach", "unten", "halbe_breite")})
+    return profil
+
+
 def main() -> None:
-    namen = sys.argv[1:] or list(MODELLE)
+    namen = sys.argv[1:] or list(MODELLE) + list(ZWEIRAEDER)
     for n in namen:
+        if n in ZWEIRAEDER:
+            baue_zweirad(n, *ZWEIRAEDER[n])
+            continue
         laenge, spiegeln = MODELLE[n]
         baue(n, laenge, spiegeln)
 

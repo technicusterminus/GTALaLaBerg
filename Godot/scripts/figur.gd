@@ -62,6 +62,60 @@ func spiele(clip: String, tempo := 1.0) -> void:
 	_anim.play(voll, 0.18)
 
 
+## Sitzhaltung auf einem Zweirad: Animation aus, Oberschenkel nach vorn, Knie gebeugt, Arme
+## nach vorn und unten zum Lenker, Oberkoerper vorgebeugt. Winkel in Grad (siehe HALTUNG).
+## Die Achsen sind aus dem Rig ermittelt: Oberschenkel und Arme drehen um ihre lokale Z-Achse
+## (rechts gespiegelt), Knie, Armsenken und Oberkoerper um X. Die Fuesse haengen im Rig an der
+## Wurzel und werden an die Enden der Unterschenkel gesetzt.
+const HALTUNG := {
+	"fahrrad": {"bein": 62.0, "knie": 75.0, "arm": 62.0, "senken": 28.0, "unterarm": 12.0, "vor": 16.0},
+	"motorrad": {"bein": 72.0, "knie": 95.0, "arm": 66.0, "senken": 34.0, "unterarm": 22.0, "vor": 30.0},
+}
+
+
+func fahrhaltung(art: String) -> void:
+	var h: Dictionary = HALTUNG.get(art, HALTUNG["fahrrad"])
+	if _anim != null:
+		_anim.stop()
+		_anim.active = false
+	var sk: Skeleton3D = null
+	for k in _innen.find_children("*", "Skeleton3D", true, false):
+		sk = k
+	if sk == null:
+		return
+	var setze := func(knochen: String, q: Quaternion) -> void:
+		var i := sk.find_bone(knochen)
+		if i >= 0:
+			sk.set_bone_pose_rotation(i, sk.get_bone_rest(i).basis.get_rotation_quaternion() * q)
+	for seite in [[".L", 1.0], [".R", -1.0]]:
+		var n: String = seite[0]
+		var v: float = seite[1]
+		setze.call("UpperLeg" + n, Quaternion(Vector3.BACK, deg_to_rad(v * float(h["bein"]))))
+		setze.call("LowerLeg" + n, Quaternion(Vector3.RIGHT, deg_to_rad(float(h["knie"]))))
+		setze.call("UpperArm" + n, Quaternion(Vector3.BACK, deg_to_rad(-v * float(h["arm"])))
+				* Quaternion(Vector3.RIGHT, deg_to_rad(-float(h["senken"]))))
+		setze.call("LowerArm" + n, Quaternion(Vector3.BACK, deg_to_rad(-v * float(h["unterarm"]))))
+	setze.call("Torso", Quaternion(Vector3.RIGHT, deg_to_rad(float(h["vor"]))))
+	for n in [".L", ".R"]:
+		var fuss := sk.find_bone("Foot" + n)
+		var ende := sk.find_bone("LowerLeg" + n + "_end")
+		if fuss < 0 or ende < 0:
+			continue
+		var ziel := _knochen_global(sk, ende).origin
+		var eltern := sk.get_bone_parent(fuss)
+		var basis := _knochen_global(sk, eltern) if eltern >= 0 else Transform3D()
+		sk.set_bone_pose_position(fuss, basis.affine_inverse() * ziel)
+
+
+## Lage eines Knochens im Skelettraum aus den aktuellen Posen (ohne auf die Engine zu warten).
+func _knochen_global(sk: Skeleton3D, i: int) -> Transform3D:
+	var t := Transform3D()
+	while i >= 0:
+		t = sk.get_bone_pose(i) * t
+		i = sk.get_bone_parent(i)
+	return t
+
+
 func clip() -> String:
 	return _aktuell
 

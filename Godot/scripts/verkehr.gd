@@ -16,7 +16,10 @@ const LACKE := [
 ## Supercars, ganz selten ein Rennwagen. Geparkt stehen keine Rennwagen.
 const MISCHUNG := {
 	"klein": 24, "limousine": 22, "kombi": 22, "bus": 9, "sport": 12, "super": 7, "renn": 4,
+	"motorrad": 7, "fahrrad": 8,
 }
+## Nicht unter den geparkten Wagen (die stehen auf Autoparkplaetzen).
+const NICHT_GEPARKT := ["renn", "fahrrad"]
 ## Lack fuer die Sportler: kraeftiger als der Alltagslack.
 const SPORTLACKE := [
 	Color(0.85, 0.08, 0.04), Color(0.95, 0.75, 0.05), Color(0.05, 0.25, 0.75),
@@ -45,9 +48,11 @@ func _ready() -> void:
 		auto.tempo_ms = randf_range(28.0, 46.0) / 3.6
 		auto.modell = waehle_modell(autos.size() * 7919 + 17, true)
 		auto.lack = LACKE[autos.size() % LACKE.size()]
-		if auto.modell in ["sport", "super", "renn"]:
+		if auto.modell in ["sport", "super", "renn", "motorrad"]:
 			auto.lack = SPORTLACKE[autos.size() % SPORTLACKE.size()]
 			auto.tempo_ms *= 1.12
+		elif auto.modell == "fahrrad":
+			auto.tempo_ms = randf_range(15.0, 23.0) / 3.6
 		auto.breiten = PackedFloat32Array(a.get("bp", []))
 		auto.klasse = int(a.get("klasse", 3))
 		auto.klassen = PackedInt32Array(a.get("kp", []))
@@ -92,15 +97,16 @@ func _ready() -> void:
 
 
 ## Ein Modell nach MISCHUNG, fest aus einer Zahl (gleiche Zahl, gleiches Modell).
-## Fehlt ein Modell in den Daten, nimmt der Wagen den Kleinwagen.
-static func waehle_modell(samen: int, mit_renn: bool) -> String:
+## Fehlt ein Modell in den Daten, nimmt der Wagen den Kleinwagen. fahrend = false: ohne die
+## Modelle aus NICHT_GEPARKT.
+static func waehle_modell(samen: int, fahrend: bool) -> String:
 	var summe := 0
 	for m: String in MISCHUNG:
-		if mit_renn or m != "renn":
+		if fahrend or not m in NICHT_GEPARKT:
 			summe += MISCHUNG[m]
 	var wahl := posmod(hash(samen), summe)
 	for m: String in MISCHUNG:
-		if not mit_renn and m == "renn":
+		if not fahrend and m in NICHT_GEPARKT:
 			continue
 		wahl -= MISCHUNG[m]
 		if wahl < 0:

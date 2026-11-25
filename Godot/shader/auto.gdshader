@@ -44,6 +44,9 @@ void fragment() {
 		if (lackiert && detail_an) {
 			vec3 stoerung;
 			farbe_z = zeichnung(grund, glas_m, chrom, leucht, stoerung);
+			if (ausschneiden && chrom > 0.5 && dot(farbe_z, vec3(0.333)) > 0.9) {
+				discard;
+			}
 			NORMAL = normalize(NORMAL + (achse_x * stoerung.x + achse_y * stoerung.y
 					+ achse_z * stoerung.z) * 1.2);
 			nv = clamp(dot(NORMAL, VIEW), 0.0, 1.0);

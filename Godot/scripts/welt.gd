@@ -295,6 +295,7 @@ func _einsteigen() -> void:
 func _uebernimm(ki: Verkehrsauto) -> Auto:
 	var neu := Auto.new()
 	neu.lack = ki.lack
+	neu.modell = ki.modell
 	neu.uebernommen = true
 	add_child(neu)
 	neu.global_position = ki.position_jetzt() + Vector3(0, 0.4, 0)

@@ -12,6 +12,8 @@ uniform vec3 leuchten = vec3(0.0);
 // Linienzeichnung (Tuerfugen, Fenster, Leisten) als Detail auf dem Lack: Seitenansicht und
 // Draufsicht, auf ihre Umrisse beschnitten (u ueber die Laenge, vorn = 0).
 uniform bool detail_an = false;
+// Zweiraeder: der weisse Grund der Zeichnung wird ausgeschnitten (nur Rohre und Teile bleiben).
+uniform bool ausschneiden = false;
 uniform sampler2D tex_seite : source_color, filter_linear_mipmap, repeat_disable;
 uniform sampler2D tex_oben : source_color, filter_linear_mipmap, repeat_disable;
 uniform float laenge = 4.3;

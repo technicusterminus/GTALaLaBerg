@@ -34,6 +34,10 @@ static func netz(lack: Color, instanziert := false, modell := "klein",
 	if _cache.has(schluessel):
 		return _cache[schluessel]
 	var profil := _profil(modell)
+	if profil.get("einspurig", false):
+		var zwei := _zweirad(lack, instanziert, profil, modell, mit_raedern)
+		_cache[schluessel] = zwei
+		return zwei
 	if not profil.is_empty():
 		var neu := _karosserie(lack, instanziert, profil, modell, mit_raedern)
 		_cache[schluessel] = neu
@@ -119,6 +123,12 @@ static func radlagen(modell := "klein") -> Array:
 	if p.is_empty():
 		return r
 	var n: int = (p["dach"] as Array).size()
+	if p.get("einspurig", false):
+		# Zweirad: vorn, hinten, beide auf der Mittellinie.
+		for rad: Dictionary in p["raeder"]:
+			var uu: float = rad["u"]
+			r.append(Vector4((0.5 - uu) * float(p["laenge"]), float(rad["r"]), 0.0, float(rad["r"])))
+		return r
 	for rad: Dictionary in p["raeder"]:
 		var u: float = rad["u"]
 		var i := clampi(roundi(u * (n - 1)), 0, n - 1)
@@ -143,6 +153,9 @@ static func rad_netz(modell := "klein", nr := 0, links := false) -> ArrayMesh:
 	var p := _profil(modell)
 	var schluessel := "%s|%d|%s" % [modell, nr, links]
 	if _rad_cache.has(schluessel):
+		return _rad_cache[schluessel]
+	if p.get("einspurig", false):
+		_rad_cache[schluessel] = _zweirad_rad(modell, _radius(p, nr))
 		return _rad_cache[schluessel]
 	var r := _radius(p, nr)
 	var s := -1.0 if links else 1.0
@@ -211,6 +224,9 @@ static func bremse_netz(modell := "klein", nr := 0, links := false) -> ArrayMesh
 	var schluessel := "bremse|%s|%d|%s" % [modell, nr, links]
 	if _rad_cache.has(schluessel):
 		return _rad_cache[schluessel]
+	if p.get("einspurig", false):
+		_rad_cache[schluessel] = _zweirad_bremse(modell, _radius(p, nr), nr)
+		return _rad_cache[schluessel]
 	var r := _radius(p, nr)
 	var s := -1.0 if links else 1.0
 	var h := RAD_BREITE * 0.5
@@ -232,6 +248,79 @@ static func bremse_netz(modell := "klein", nr := 0, links := false) -> ArrayMesh
 	_anfuegen(netz, st, _radmaterial(modell))
 	_rad_cache[schluessel] = netz
 	return netz
+
+
+## Zweirad-Rad: schmaler Reifen, Felgenring; Motorrad fuenf Speichen aus Guss, Fahrrad
+## 28 duenne Drahtspeichen; durchsichtig (keine Rueckwand). Achse entlang Z.
+static func _zweirad_rad(modell: String, r: float) -> ArrayMesh:
+	var rad := modell == "fahrrad"
+	var h := (0.019 if rad else 0.085)
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	st.set_smooth_group(0)
+	var wulst := 0.90 if rad else 0.66
+	var reifen := [Vector2(wulst, -0.9), Vector2(lerpf(wulst, 1.0, 0.5), -1.0), Vector2(0.99, -0.7),
+			Vector2(1.0, 0.0), Vector2(0.99, 0.7), Vector2(lerpf(wulst, 1.0, 0.5), 1.0),
+			Vector2(wulst, 0.9)]
+	for j in reifen.size() - 1:
+		_drehflaeche(st, Vector2(reifen[j].x * r, reifen[j].y * h),
+				Vector2(reifen[j + 1].x * r, reifen[j + 1].y * h), 28, TEIL_GUMMI, 0)
+	st.set_smooth_group(-1)
+	var ring := wulst - 0.02
+	for s in [1.0, -1.0]:
+		_drehflaeche(st, Vector2(wulst * r, 0.8 * h * s), Vector2(ring * r, 0.8 * h * s), 28,
+				TEIL_FELGE, 2, s)
+	_drehflaeche(st, Vector2(ring * r, 0.8 * h), Vector2(ring * r, -0.8 * h), 28, TEIL_FELGE, 1)
+	var nabe := 0.06 * r if rad else 0.16 * r
+	_drehflaeche(st, Vector2(nabe, 1.4 * h), Vector2(nabe, -1.4 * h), 10, TEIL_FELGE, 0)
+	if rad:
+		# Drahtspeichen, abwechselnd zu beiden Nabenflanschen gekreuzt.
+		for k in 28:
+			var w := TAU * float(k) / 28.0
+			var zs := 1.2 * h * (1.0 if k % 2 == 0 else -1.0)
+			var a := _polar(nabe, w + 0.25 * (1.0 if k % 2 == 0 else -1.0), zs)
+			var b := _polar(ring * r, w, 0.0)
+			var quer := Vector3(0, 0, 0.0016)
+			var seit := (b - a).cross(Vector3(0, 0, 1)).normalized() * 0.0016
+			_viereck(st, a - seit, b - seit, b + seit, a + seit, Vector3(0, 0, 1), TEIL_FELGE)
+			_viereck(st, a - seit, b - seit, b + seit, a + seit, Vector3(0, 0, -1), TEIL_FELGE)
+			_viereck(st, a - quer, b - quer, b + quer, a + quer, seit, TEIL_FELGE)
+	else:
+		for k in 5:
+			var w := TAU * float(k) / 5.0
+			for s in [1.0, -1.0]:
+				var e := [_polar(nabe, w - 0.22, 0.5 * h * s), _polar(nabe, w + 0.22, 0.5 * h * s),
+						_polar(ring * r, w + 0.07, 0.3 * h * s), _polar(ring * r, w - 0.07, 0.3 * h * s)]
+				_viereck(st, e[0], e[1], e[2], e[3], Vector3(0, 0, s), TEIL_FELGE)
+	var netz := ArrayMesh.new()
+	_anfuegen(netz, st, _radmaterial(modell))
+	return netz
+
+
+## Zweirad-Bremse: Motorrad mit grosser Scheibe und Sattel (vorn beidseitig), Fahrrad nur
+## eine kleine Nabenbremse.
+static func _zweirad_bremse(modell: String, r: float, nr: int) -> ArrayMesh:
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	st.set_smooth_group(-1)
+	if modell == "fahrrad":
+		_drehflaeche(st, Vector2(0.09 * r, 0.03), Vector2(0.09 * r, -0.03), 10, TEIL_SCHEIBE, 0)
+	else:
+		var seiten := [1.0, -1.0] if nr == 0 else [1.0]
+		for s in seiten:
+			var z: float = 0.075 * s
+			_drehflaeche(st, Vector2(0.52 * r, z), Vector2(0.24 * r, z), 20, TEIL_SCHEIBE, 2, s)
+			var w := 2.3 if nr == 0 else 3.9
+			_quader(st, Transform3D(Basis(Vector3.BACK, w), _polar(0.48 * r, w, z + 0.02 * s)),
+					Vector3(0.1, 0.17, 0.04), TEIL_SATTEL)
+	var netz := ArrayMesh.new()
+	_anfuegen(netz, st, _radmaterial(modell))
+	return netz
+
+
+## Gibt es dieses Modell als Zweirad?
+static func ist_einspurig(modell: String) -> bool:
+	return bool(_profil(modell).get("einspurig", false))
 
 
 const TEIL_GUMMI := 0
@@ -544,6 +633,109 @@ static func _karosserie(lack: Color, instanziert: bool, p: Dictionary, modell: S
 		_anfuegen(netz, scheiben, glasmaterial)
 	_raeder_und_licht(netz, p, halbringe, modell, mit_raedern)
 	return netz
+
+
+## Zweirad: der Rahmen als Scheibe mit den Umrissen der Seitenansicht (Ober- und Unterkante je
+## Schnitt, schmal; der Shader schneidet den weissen Grund aus, so bleiben nur Rohre, Tank,
+## Motor, Sitz), ueber den Raedern offen; dazu Gabel, Schwinge bzw. Streben und Lenker als
+## Rohre, vorn und hinten die Raeder (bei geparkten fest eingebaut).
+static func _zweirad(lack: Color, instanziert: bool, p: Dictionary, modell: String,
+		mit_raedern: bool) -> ArrayMesh:
+	var laenge: float = p["laenge"]
+	var dach: Array = p["dach"]
+	var unten: Array = p["unten"]
+	var breiten: Array = p["halbe_breite"]
+	var n := dach.size()
+	var rad := modell == "fahrrad"
+	var hoechstbreite := 0.03 if rad else 0.2
+	var lagen := radlagen(modell)
+	var rahmen := SurfaceTool.new()
+	rahmen.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var schnitte: Array = []
+	for i in n:
+		var x := (0.5 - float(i) / float(n - 1)) * laenge
+		var y0 := float(unten[i])
+		for l: Vector4 in lagen:
+			var dx := absf(x - l.x)
+			if dx < l.w:
+				y0 = maxf(y0, l.y + sqrt(l.w * l.w - dx * dx) + 0.01)
+		var y1 := maxf(float(dach[i]), y0)
+		var b := clampf(float(breiten[i]), 0.012, hoechstbreite)
+		schnitte.append([Vector3(x, y0, -b), Vector3(x, y0, b), Vector3(x, y1, b), Vector3(x, y1, -b)])
+	for i in n - 1:
+		var a: Array = schnitte[i]
+		var c: Array = schnitte[i + 1]
+		if (a[2] as Vector3).y - (a[1] as Vector3).y < 0.005 and (c[2] as Vector3).y - (c[1] as Vector3).y < 0.005:
+			continue
+		# rechts (+Z), links (-Z), oben, unten
+		_viereck(rahmen, a[1], c[1], c[2], a[2], Vector3(0, 0, 1), -1)
+		_viereck(rahmen, a[0], c[0], c[3], a[3], Vector3(0, 0, -1), -1)
+		_viereck(rahmen, a[3], c[3], c[2], a[2], Vector3.UP, -1)
+		_viereck(rahmen, a[0], c[0], c[1], a[1], Vector3.DOWN, -1)
+	for ende in [0, n - 1]:
+		var q: Array = schnitte[ende]
+		_viereck(rahmen, q[0], q[1], q[2], q[3], Vector3(1.0 if ende == 0 else -1.0, 0, 0), -1)
+	var netz := ArrayMesh.new()
+	var lackmaterial := _material(lack, true, instanziert, false, 0.3)
+	_zeichnung_zuweisen(lackmaterial, p, modell)
+	lackmaterial.set_shader_parameter("ausschneiden", true)
+	_anfuegen(netz, rahmen, lackmaterial)
+	# Rohre: Gabel (Motorrad gold), Schwinge/Streben, Lenker mit Griffen.
+	var rohre := SurfaceTool.new()
+	rohre.begin(Mesh.PRIMITIVE_TRIANGLES)
+	rohre.set_smooth_group(0)
+	var vorn: Vector4 = lagen[0]
+	var hinten: Vector4 = lagen[1]
+	var lenker: Dictionary = p["lenker"]
+	var x_lenker := (0.5 - float(lenker["u"])) * laenge
+	var y_lenker := float(lenker["hoehe"])
+	var gabel_oben := Vector3(lerpf(vorn.x, x_lenker, 0.85), lerpf(vorn.y, y_lenker, 0.85), 0.0)
+	var gabel_z := 0.045 if rad else 0.09
+	for s in [1.0, -1.0]:
+		_rohr(rohre, Vector3(vorn.x, vorn.y, s * gabel_z), gabel_oben + Vector3(0, 0, s * gabel_z),
+				0.012 if rad else 0.025, TEIL_SATTEL if not rad else TEIL_FELGE)
+		var schwinge_vorn := Vector3(hinten.x + (0.42 if rad else 0.55), (0.3 if rad else 0.42), 0.0)
+		_rohr(rohre, Vector3(hinten.x, hinten.y, s * gabel_z), schwinge_vorn + Vector3(0, 0, s * 0.03),
+				0.011 if rad else 0.03, TEIL_INNEN)
+		if rad:
+			# Sitzstreben vom Hinterrad zum Sattelrohr.
+			var sitz: Dictionary = p["sitz"]
+			var x_sitz := (0.5 - float(sitz["u"])) * laenge
+			_rohr(rohre, Vector3(hinten.x, hinten.y, s * gabel_z),
+					Vector3(x_sitz + 0.08, float(sitz["hoehe"]) - 0.2, s * 0.015), 0.009, TEIL_FELGE)
+	var halb_l := float(lenker["breite"]) * 0.5
+	_rohr(rohre, Vector3(x_lenker, y_lenker - 0.02, -halb_l), Vector3(x_lenker, y_lenker - 0.02, halb_l),
+			0.012 if rad else 0.014, TEIL_INNEN)
+	for s in [1.0, -1.0]:
+		_rohr(rohre, Vector3(x_lenker, y_lenker - 0.02, s * (halb_l - 0.12)),
+				Vector3(x_lenker, y_lenker - 0.02, s * halb_l), 0.018, TEIL_GUMMI)
+	if not rad:
+		_rohr(rohre, gabel_oben + Vector3(0, 0, -gabel_z), gabel_oben + Vector3(0, 0, gabel_z), 0.03,
+				TEIL_INNEN)
+	_anfuegen(netz, rohre, _radmaterial(modell))
+	if mit_raedern:
+		var alle := SurfaceTool.new()
+		for k in lagen.size():
+			var l: Vector4 = lagen[k]
+			var t := Transform3D(Basis(), Vector3(l.x, l.y, l.z))
+			alle.append_from(rad_netz(modell, k), 0, t)
+			alle.append_from(bremse_netz(modell, k), 0, t)
+		alle.commit(netz)
+		netz.surface_set_material(netz.get_surface_count() - 1, _radmaterial(modell))
+	return netz
+
+
+## Ein Rohr (sechseckig) von a nach b.
+static func _rohr(st: SurfaceTool, a: Vector3, b: Vector3, radius: float, teil: int) -> void:
+	var achse := (b - a).normalized()
+	var u := achse.cross(Vector3.UP if absf(achse.y) < 0.9 else Vector3.RIGHT).normalized()
+	var v := achse.cross(u)
+	for k in 6:
+		var w0 := TAU * float(k) / 6.0
+		var w1 := TAU * float(k + 1) / 6.0
+		var d0 := (u * cos(w0) + v * sin(w0)) * radius
+		var d1 := (u * cos(w1) + v * sin(w1)) * radius
+		_viereck(st, a + d0, b + d0, b + d1, a + d1, (d0 + d1), teil)
 
 
 ## Innenraum hinter den Scheiben: Verkleidung und Himmel (Innenseite des Glashauses), Boden,

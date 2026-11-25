@@ -81,6 +81,12 @@ var _blockiert := 0.0
 var _leuchten: Array[MeshInstance3D] = []
 var _blaulicht := OmniLight3D.new()
 var _sirene: AudioStreamPlayer3D
+## Zweiraeder (Motorrad, Fahrrad): alles haengt an einem Knoten, der sich in die Kurve legt.
+var _einspurig := false
+var _schraeg := Node3D.new()
+var _traeger: Node3D = self
+var _vorne: Array[bool] = []
+var _schraeglage := 0.0
 
 
 func _ready() -> void:
@@ -100,12 +106,36 @@ func _ready() -> void:
 	# Beidseitig: der Innenraum zeigt nach innen und soll trotzdem Schatten werfen.
 	_netz.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_DOUBLE_SIDED
 	_aufbau.add_child(_netz)
-	add_child(_aufbau)
+	_einspurig = Wagenmesh.ist_einspurig(modell)
+	if _einspurig:
+		add_child(_schraeg)
+		_traeger = _schraeg
+		_setze_fahrer()
+	_traeger.add_child(_aufbau)
 	_baue_raeder()
 	if weg.gueltig():
 		_setze_position(weg.ort)
 	if polizei:
 		_baue_blaulicht()
+
+
+## Zweirad: ein Fahrer in Fahrhaltung auf dem Sitz (Kleidung nach der Instanz).
+func _setze_fahrer() -> void:
+	var f := Figur.neu(get_instance_id() % 2)
+	if f == null:
+		return
+	var p := Wagenmesh._profil(modell)
+	var sitz: Dictionary = p.get("sitz", {"u": 0.6, "hoehe": 0.8})
+	_aufbau.add_child(f)
+	f.passe_an()
+	f.einkleiden(get_instance_id() % 100003)
+	# Die Figur schaut nach -Z, das Fahrzeug nach +X.
+	f.rotation.y = -PI / 2.0
+	f.position = Vector3((0.5 - float(sitz["u"])) * float(p["laenge"]) - 0.05,
+			float(sitz["hoehe"]) - 0.92, 0.0)
+	f.fahrhaltung(modell)
+	for m: MeshInstance3D in f.find_children("*", "MeshInstance3D", true, false):
+		m.visibility_range_end = 140.0
 
 
 ## Vier einzeln drehbare Raeder; die vorderen lenken. Sie haengen am Wagen, nicht am Aufbau,
@@ -116,17 +146,19 @@ func _baue_raeder() -> void:
 	for k in lagen.size():
 		var l: Vector4 = lagen[k]
 		var rad := MeshInstance3D.new()
-		rad.mesh = Wagenmesh.rad_netz(modell, k / 2, k % 2 == 0)
+		var nr := k if _einspurig else k / 2
+		rad.mesh = Wagenmesh.rad_netz(modell, nr, k % 2 == 0 and not _einspurig)
 		rad.position = Vector3(l.x, l.y, l.z) * karosserie
 		rad.visibility_range_end = 160.0
-		add_child(rad)
+		_traeger.add_child(rad)
 		_raeder.append(rad)
+		_vorne.append(l.x > 0.0)
 		var bremse := MeshInstance3D.new()
-		bremse.mesh = Wagenmesh.bremse_netz(modell, k / 2, k % 2 == 0)
+		bremse.mesh = Wagenmesh.bremse_netz(modell, nr, k % 2 == 0 and not _einspurig)
 		bremse.position = rad.position
 		bremse.visibility_range_end = 60.0
 		bremse.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		add_child(bremse)
+		_traeger.add_child(bremse)
 		_bremsen.append(bremse)
 		_rad_radius = l.w
 	if lagen.size() >= 4:
@@ -142,7 +174,7 @@ func _bewege_teile(delta: float) -> void:
 		lenk_soll = clampf(atan(_gierrate * _radstand / tempo), -0.6, 0.6)
 	_lenkwinkel = lerpf(_lenkwinkel, lenk_soll, minf(6.0 * delta, 1.0))
 	for k in _raeder.size():
-		var lenk := _lenkwinkel if k < 2 else 0.0
+		var lenk := _lenkwinkel if _vorne[k] else 0.0
 		_raeder[k].rotation = Vector3(0.0, lenk, -_drehung)
 		_bremsen[k].rotation = Vector3(0.0, lenk, 0.0)
 	var a := (tempo - _tempo_vorher) / maxf(delta, 0.001)
@@ -169,12 +201,21 @@ func _federung(delta: float, a: float, tempo: float) -> void:
 	var vr := _rad_hub[1]
 	var hl := _rad_hub[2]
 	var hr := _rad_hub[3]
+	if _einspurig:
+		vr = vl
+		hl = _rad_hub[1]
+		hr = hl
+		# Schraeglage in die Kurve: tan(Neigung) = v * Gierrate / g (links positiv -> nach links).
+		var soll := -atan(tempo * _gierrate / 9.81)
+		_schraeglage = lerpf(_schraeglage, clampf(soll, -0.7, 0.7), minf(3.0 * delta, 1.0))
+		_schraeg.rotation.x = _schraeglage
 	var spur := 1.5
 	var ziel := Vector3(
 		(vl + vr + hl + hr) * 0.25,
 		clampf(a * 0.0055, -0.045, 0.03) + ((vl + vr) - (hl + hr)) * 0.5 / maxf(_radstand, 1.0),
 		# Rechts hoeher (Rad auf dem Bordstein) kippt den Aufbau nach links (-Drehung um X).
-		clampf(tempo * _gierrate * 0.0065, -0.05, 0.05) - ((vr + hr) - (vl + hl)) * 0.5 / spur)
+		0.0 if _einspurig else clampf(tempo * _gierrate * 0.0065, -0.05, 0.05)
+				- ((vr + hr) - (vl + hl)) * 0.5 / spur)
 	var w0 := TAU * FEDER_HZ
 	var beschl := (ziel - _feder) * w0 * w0 - _feder_v * 2.0 * FEDER_D * w0
 	_feder_v += beschl * delta
@@ -567,6 +608,8 @@ func _physics_process(delta: float) -> void:
 	var spur := breite * 0.25
 	var rand := maxf(0.0, breite * 0.5 - HALBE_WAGENBREITE)
 	var ziel := minf(spur + (MAX_SEITVERSATZ if _bremse_objekt < 0.9 else 0.0), rand)
+	if modell == "fahrrad":
+		ziel = maxf(rand - 0.4, spur)   # Radfahrer am rechten Rand
 	if _ueberholt != null:
 		ziel = -minf(spur, rand)   # auf die Gegenspur
 	elif _gasse > 0.0:

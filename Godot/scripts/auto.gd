@@ -19,6 +19,8 @@ const FAHRWERK := {
 	"sport": [60.0, 3.0, 3.4, 0.16, 0.25],
 	"super": [70.0, 3.2, 3.6, 0.14, 0.2],
 	"renn": [90.0, 3.6, 4.0, 0.10, 0.15],
+	"motorrad": [55.0, 2.8, 3.2, 0.14, 0.1],
+	"fahrrad": [40.0, 2.4, 2.8, 0.05, 0.1],
 }
 
 @export var lack := Color(0.55, 0.06, 0.05)
@@ -53,7 +55,8 @@ func _ready() -> void:
 	if Konto.hat_lack() and not uebernommen:
 		lack = Konto.lack()
 	mass = 1300.0
-	_motor = Ton.schleife(self, "SFX_Motor", -4.0)
+	if modell != "fahrrad":
+		_motor = Ton.schleife(self, "SFX_Motor", -4.0)
 	center_of_mass_mode = RigidBody3D.CENTER_OF_MASS_MODE_CUSTOM
 	center_of_mass = Vector3(0, -0.15, 0)
 	linear_damp = 0.05
@@ -61,7 +64,9 @@ func _ready() -> void:
 
 	var form := CollisionShape3D.new()
 	var box := BoxShape3D.new()
-	box.size = Vector3(1.8, 0.9, 4.3)
+	var masse := Wagenmesh.masse(modell)
+	var einspurig := Wagenmesh.ist_einspurig(modell)
+	box.size = Vector3(maxf(masse.y, 0.5), 0.9, masse.x) if modell != "klein" else Vector3(1.8, 0.9, 4.3)
 	form.shape = box
 	form.position = Vector3(0, 0.45, 0)
 	add_child(form)
@@ -81,9 +86,15 @@ func _ready() -> void:
 		var vorne := k < 2
 		var links := k % 2 == 0
 		var ort := Vector3(-0.76 if links else 0.76, 0.0, -1.31 if vorne else 1.31)
-		if k < lagen.size():
-			var l: Vector4 = lagen[k]
+		# Zweirad: zwei Radlagen; die Physik faehrt auf vier eng stehenden Raedern (stabil),
+		# zu sehen ist je Achse ein Rad in der Mitte.
+		var lage_nr := k / 2 if einspurig else k
+		var sichtbar := lage_nr < lagen.size() and (not einspurig or links)
+		if lage_nr < lagen.size():
+			var l: Vector4 = lagen[lage_nr]
 			ort = Vector3(l.z, 0.0, -l.x)
+			if einspurig:
+				ort.x = -0.14 if links else 0.14
 		var rad := VehicleWheel3D.new()
 		rad.position = ort
 		var fw: Array = FAHRWERK.get(modell, FAHRWERK["klein"])
@@ -101,13 +112,16 @@ func _ready() -> void:
 		add_child(rad)
 		# Das Radnetz (Achse entlang Z) dreht sich mit dem Rad; Godot dreht und lenkt
 		# den Radknoten selbst.
-		if k < lagen.size():
+		if sichtbar:
+			var nr := lage_nr if einspurig else k / 2
 			var netz := MeshInstance3D.new()
-			netz.mesh = Wagenmesh.rad_netz(modell, k / 2, links)
+			netz.mesh = Wagenmesh.rad_netz(modell, nr, links and not einspurig)
 			netz.rotation.y = PI / 2.0
+			netz.position.x = -ort.x if einspurig else 0.0
 			rad.add_child(netz)
 			var bremse := MeshInstance3D.new()
-			bremse.mesh = Wagenmesh.bremse_netz(modell, k / 2, links)
+			bremse.mesh = Wagenmesh.bremse_netz(modell, nr, links and not einspurig)
+			bremse.position.x = netz.position.x
 			rad.add_child(bremse)
 			_bremsen.append([rad, bremse])
 
