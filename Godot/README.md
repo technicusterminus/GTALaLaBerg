@@ -157,6 +157,13 @@ Rauch- und Filmtest schreiben nur in eine eigene Spielstanddatei.
 9. Vom REWE entlang der Breslauer Straße über Römerhang, Von-den-Hoff-Straße
    und Mühlweg bis zum Danziger Platz fahren. Mittelinseln, Radweg, Haltestellen
    und Querungsmarkierungen folgen dem Verlauf der vorhandenen Straße.
+10. Am Danziger Platz die getrennten Zuläufe, Abbiegespuren, Inseln und Furten
+    ansehen. Weiter über die Katharinenstraße zur Karolinenbrücke fahren. Roter
+    Radstreifen, Gehwege, Brückenköpfe und Fahrbahn sollen durchgehend sein.
+11. Von der Karolinenbrücke aus prüfen, ob das Westufer begrünt und die
+    Altstadtkante gemauert erscheint. Mit Forward+ spiegeln sich die Brücke und
+    die Altstadt im Wasser. Weiter flussabwärts unterscheiden sich Lady-Herkomer-Steg,
+    Lechsteg und Sandauer Brücke an Deckbreite, Tragwerk und Geländern.
 
 Referenzen zum Bestandsbau des Klinikums sind das [Eingangsfoto des Klinikums
 von 2025](https://www.klinikum-landsberg.de/wp-content/uploads/Umwelterklaerung-2025_Klinikum-Landsberg-am-Lech.pdf)
@@ -189,6 +196,22 @@ Der Konverter erzeugt dafür eine schmale, entlang des Straßenzugs ausgerichtet
 Belagstextur. Das Straßennetz liefert die Fahrbahnhöhen und Verkehrsampeln für
 den Abschnitt.
 
+Für Danziger Platz, Katharinenstraße und Lechufer wurden Fahrbahnränder,
+Inseln und Wege anhand des [amtlichen Orthofotos](https://geodatenonline.bayern.de/geodatenonline/seiten/wms_dop20cm)
+eingepasst. Am Lech wurden die vier Lechquerungen gemäß dem
+[Landsberger Stadtplan](https://www.landsberg.de/fileadmin/user_upload/download/Tourismus-Stadtfuehrungen/LLbrosch_stadtfuehrungen_ONLINE_2025.pdf)
+modelliert. Brückenbreiten und sichtbare Bauformen orientieren sich an den
+[Aufnahmen der Karolinen- und Sandauer Brücke](https://www.karl-gotsch.de/Album/D_S_andere.htm),
+den [Bauangaben zum Lady-Herkomer-Steg](https://www.gls.at/DE/verkehrswegebau?inhaltID=534)
+und dem [Foto des Lechstegs](https://commons.wikimedia.org/wiki/File:Landsberg_am_Lech,_Lechsteg.JPG).
+Das [Karolinenwehr](https://www.landsberg.de/tourismus/erlebnisse/sehenswuerdigkeiten/lechwehr/)
+liegt modelliert zwischen den beiden Uferbereichen.
+
+Kleinere Bach- und Bahnquerungen greifen auf die in der Karte liegenden
+Brückenachsen von [© OpenStreetMap-Mitwirkenden](https://www.openstreetmap.org/copyright)
+zurück. Deckhöhen und Geländerdetails sind dort aus Gelände und Bildmaterial
+angenähert. Die A96-Lechbrücke liegt außerhalb der bebauten Spielkarte.
+
 ## Noch offen gegenüber der Unreal-Version
 
 Stand der Unreal-Version: Git-Historie, Commit `dea4cec`; ihre Dokumentation steht
@@ -200,8 +223,8 @@ in `Docs/Unreal-Archiv/README-Unreal-Archiv.md`.
 
 ## Hinweise
 
-- Geprüft unter Godot 4.5.1: Import ohne Fehler, Rauchtest bestanden (headless und
-  mit Software-OpenGL). Nicht geprüft: echte GPU-Leistung, Vulkan-Renderer, Ton.
+- Godot 4.5.1 lädt die Stadt auch im Headless-Rauchtest. Die Ansichten von
+  Danziger Platz und Lech wurden unter Windows mit Vulkan und Forward+ geprüft.
 - Die Dreiecks-Wicklung wird im Konverter gedreht (siehe dessen Kopf); ohne das trägt
   der Boden von oben nicht.
 - `AnimatableBody3D` mit `sync_to_physics` liest `global_position` nach dem Setzen noch

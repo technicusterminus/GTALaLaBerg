@@ -16,6 +16,8 @@ uniform bool hat_katharinen_belag = false;
 uniform sampler2D katharinen_belag : hint_default_black, filter_linear_mipmap, repeat_disable;
 uniform bool hat_breslauer_belag = false;
 uniform sampler2D breslauer_belag : hint_default_black, filter_linear_mipmap_anisotropic, repeat_disable;
+uniform bool hat_katharinenachse_belag = false;
+uniform sampler2D katharinenachse_belag : hint_default_black, filter_linear_mipmap_anisotropic, repeat_disable;
 
 varying vec3 welt;
 varying vec3 blickposition;
@@ -362,6 +364,7 @@ void fragment() {
 	vec3 c = farbe;
 	float rau = rauheit;
 	float glanz = 0.25;
+	float metallisch = 0.0;
 	bool platanenschule = welt.x > -1214.0 && welt.x < -1099.0 && welt.z > -634.0 && welt.z < -475.0;
 
 	if (stil == 1) {
@@ -379,16 +382,21 @@ void fragment() {
 		}
 	} else if (stil == 2) {
 		// Die Dreiecke des Flussbetts sollen sich in der Spiegelung nicht abzeichnen.
-		float phase1 = dot(welt.xz, vec2(2.4, 1.4));
-		float phase2 = dot(welt.xz, vec2(-1.6, 3.2));
-		float w1 = sin(phase1 + TIME * 1.35) * (1.0 - smoothstep(0.25, 1.3, fwidth(phase1)));
-		float w2 = sin(phase2 - TIME * 1.7) * (1.0 - smoothstep(0.25, 1.3, fwidth(phase2)));
-		vec3 welle = vec3(w1 * 0.036 - w2 * 0.019, 1.0, w1 * 0.021 + w2 * 0.038);
+		vec2 p = welt.xz + vec2(0.0, TIME * 0.36);
+		float stroemung = wert(p * 0.088) * 0.68 + wert(p * 0.26) * 0.32;
+		float wirbel = wert(p * 0.36 + vec2(8.1, -3.7));
+		float phase1 = dot(p, vec2(1.18, 3.14)) + stroemung * 7.4;
+		float phase2 = dot(p, vec2(-2.23, 4.23)) + wirbel * 4.7;
+		float w1 = sin(phase1 + TIME * 1.12) * (1.0 - smoothstep(0.25, 1.3, fwidth(phase1)));
+		float w2 = sin(phase2 + TIME * 1.64) * (1.0 - smoothstep(0.25, 1.3, fwidth(phase2)));
+		float kraft = mix(0.27, 1.24, stroemung);
+		vec3 welle = vec3((w1 * 0.018 - w2 * 0.017) * kraft, 1.0, (w1 * 0.029 + w2 * 0.021) * kraft);
 		n = normalize(mat3(VIEW_MATRIX) * welle);
-		float spiegelung = pow(1.0 - clamp(dot(n, VIEW), 0.0, 1.0), 4.0);
-		c *= mix(0.75, 1.19, wert(welt.xz / 12.0));
-		c = mix(c, vec3(0.26, 0.37, 0.40), spiegelung * 0.65);
-		glanz = 0.72;
+		float fresnel = pow(1.0 - clamp(dot(n, VIEW), 0.0, 1.0), 4.0);
+		c = mix(c * mix(0.70, 1.15, stroemung), vec3(0.093, 0.164, 0.179), fresnel * 0.86);
+		rau = mix(0.07, 0.13, stroemung);
+		glanz = 0.81;
+		metallisch = mix(0.17, 0.54, fresnel);
 	} else if (stil == 4) {
 		float entlang = abs(wn.z) > abs(wn.x) ? welt.x : welt.z;
 		float reihe = floor(welt.y / 0.37);
@@ -488,9 +496,20 @@ void fragment() {
 			c = mix(c, belag.rgb * (0.93 + 0.13 * struktur), belag.a);
 		}
 	}
+	if (hat_katharinenachse_belag) {
+		vec2 d = welt.xz - vec2(-1014.70, 788.60);
+		vec2 ort = vec2(dot(d, vec2(0.55, 0.8351647)), dot(d, vec2(0.8351647, -0.55)));
+		vec2 karte = (ort - vec2(-215.0, -95.0)) / vec2(400.0, 1305.0);
+		if (all(greaterThan(karte, vec2(0.0))) && all(lessThan(karte, vec2(1.0)))) {
+			vec4 belag = texture(katharinenachse_belag, karte);
+			float korn = wert(welt.xz * 2.85) * 0.67 + wert(welt.xz * 5.15) * 0.33;
+			c = mix(c, belag.rgb * (0.89 + 0.21 * korn), belag.a);
+		}
+	}
 
 	NORMAL = n;
 	ALBEDO = OUTPUT_IS_SRGB ? pow(c, vec3(1.0 / 2.2)) : c;
 	ROUGHNESS = rau;
 	SPECULAR = glanz;
+	METALLIC = metallisch;
 }

@@ -29,6 +29,11 @@ from pathlib import Path
 import numpy as np
 
 from breslauer_strasse import KREUZUNGEN, breslauer_karte, breslauer_raster, strassenpunkt
+from karolinenbruecke import (BRUECKENSEKTOR, brueckenprofil, entferne_versunkene_fahrbahn,
+                             fahrbahnstreifen, verkehr_auf_bruecke, wasser_am_brueckenkopf)
+from katharinenachse import (FAHRBAHN, FLICKEN, KREUZUNGEN as KATHARINEN_KREUZUNGEN, karolinenwehr,
+                            katharinenachse_karte, katharinenachse_raster, uferkante_ost)
+from lechbruecken import BRUECKEN, KLEINBRUECKEN, bahneinschnitte, kleine_bruecken, verkehr_auf_lechbruecken
 from stadtfreiflaechen import ACKER, ASPHALT, INSEL, RASEN, hartmann_karte, katharinen_karte
 
 WURZEL = Path(__file__).resolve().parent.parent
@@ -354,6 +359,22 @@ def zeichne_markierungen(achsen, hoehe):
     return np.asarray(pos, dtype=np.float32), np.asarray(idx, dtype=np.int32)
 
 
+def zeichne_furten(polygone, hoehe):
+    pos, idx = [], []
+    for ecken in polygone:
+        y = [hoehe(p) for p in ecken]
+        if any(h is None for h in y) or max(y) - min(y) > 0.38:
+            continue
+        flaeche = np.sum(ecken[:, 0] * np.roll(ecken[:, 1], -1) - ecken[:, 1] * np.roll(ecken[:, 0], -1))
+        if flaeche < 0:
+            ecken, y = ecken[::-1], y[::-1]
+        start = len(pos)
+        pos.extend((x, h + 0.015, z) for (x, z), h in zip(ecken, y))
+        for i in range(1, len(ecken) - 1):
+            idx.extend([start, start + i, start + i + 1])
+    return np.asarray(pos, dtype=np.float32), np.asarray(idx, dtype=np.int32)
+
+
 def positioniere_ampeln(ampeln, fahrbahn, untergrund, gehweg):
     """Löst den Ampelmast vom OSM-Knoten und stellt ihn neben die Fahrbahn."""
     for ampel in ampeln:
@@ -396,9 +417,9 @@ def stelle_parkautos(verkehr, karte, stellplaetze, untergrund):
                                   "gier": round(winkel, 1), "lack": lacks[rng.integers(len(lacks))]})
 
 
-def breslauer_kreuzungsdecken(manifest):
+def kreuzungsdecken(manifest, kreuzungen):
     """Liest die Fahrbahnumrisse der Kreuzungen sektorübergreifend."""
-    kreuzungen = [(strassenpunkt(z), radius) for z, radius in KREUZUNGEN]
+    kreuzungen = [(np.asarray(p), radius) for p, radius in kreuzungen]
     for sektor in manifest["sectors"]:
         x0, z0, x1, z1 = np.asarray(sektor["boundsCm"]) / 100
         aktiv = [(p, radius) for p, radius in kreuzungen
@@ -418,6 +439,26 @@ def breslauer_kreuzungsdecken(manifest):
                     yield dreieck, mitte, radius
 
 
+def brueckenanschluesse(manifest):
+    enden = np.asarray([achse[i] for _, _, _, achse in KLEINBRUECKEN for i in (0, -1)])
+    flaechen = []
+    for sektor in manifest["sectors"]:
+        x0, z0, x1, z1 = np.asarray(sektor["boundsCm"]) / 100
+        relevant = enden[((enden >= [x0, z0]) & (enden <= [x1, z1])).all(axis=1)]
+        if not relevant.size:
+            continue
+        for abschnitt in json.loads((QUELLE / "Sectors" / sektor["file"]).read_bytes())["sections"]:
+            if art(abschnitt["name"]) not in {"Road", "Ground", "Gehweg", "Sidewalk", "Plaza"}:
+                continue
+            pos = nach_godot(np.asarray(abschnitt["positions"]))
+            drei = pos[np.asarray(abschnitt["indices"])].reshape(-1, 3, 3)
+            von, bis = drei[:, :, ::2].min(axis=1), drei[:, :, ::2].max(axis=1)
+            maske = ((von[:, None] <= relevant) & (bis[:, None] >= relevant)).all(axis=2).any(axis=1)
+            if np.any(maske):
+                flaechen.append(drei[maske])
+    return hoehenabfrage(flaechen)
+
+
 def main() -> int:
     manifest_pfad = QUELLE / "Sectors" / "manifest.json"
     if not manifest_pfad.exists() or manifest_pfad.stat().st_size < 1000:
@@ -427,25 +468,47 @@ def main() -> int:
     (ZIEL / "sektoren").mkdir(parents=True, exist_ok=True)
     dachkanten = jva_dachkanten(manifest)
     groesse = manifest["cellSizeCm"] / 100
+    alle_bruecken = (*BRUECKEN, *kleine_bruecken(brueckenanschluesse(manifest)))
+    wehr = karolinenwehr()
     verkehr = json.loads((QUELLE / "Verkehr/verkehr.json").read_text(encoding="utf-8"))
+    for auto in verkehr["autos"]:
+        auto["p"] = verkehr_auf_lechbruecken(verkehr_auf_bruecke(auto["p"]), alle_bruecken)
+    for passant in verkehr["passanten"]:
+        passant["p"] = verkehr_auf_lechbruecken(verkehr_auf_bruecke(passant["p"], fussweg=True),
+                                             alle_bruecken, fussweg=True)
+    for bruecke in BRUECKEN:
+        if bruecke.bauart in {"corten", "steg"}:
+            weg = bruecke.fussweg()
+            for laufrichtung in (weg, reversed(weg)):
+                verkehr["passanten"].append({"p": [wert for punkt in laufrichtung for wert in punkt]})
+    netz = json.loads((QUELLE / "Verkehr/netz.json").read_text(encoding="utf-8"))
+    netz["p"] = verkehr_auf_lechbruecken(verkehr_auf_bruecke(netz["p"]), alle_bruecken)
     hartmann, buchung, hartmann_baeume = hartmann_karte()
     katharinen, katharinen_baeume = katharinen_karte()
-    breslauer, mittelinseln, strassenbaeume, strassenobjekte = breslauer_karte(breslauer_kreuzungsdecken(manifest))
+    breslauer, mittelinseln, strassenbaeume, strassenobjekte = breslauer_karte(
+        kreuzungsdecken(manifest, [(strassenpunkt(z), radius) for z, radius in KREUZUNGEN]))
+    katharinenachse, platzinseln, uferbaeume, furten = katharinenachse_karte(
+        kreuzungsdecken(manifest, KATHARINEN_KREUZUNGEN))
     (ZIEL / "texturen").mkdir(parents=True, exist_ok=True)
     hartmann.speichern(ZIEL / "texturen" / "hartmann_freiflaechen.tga")
     katharinen.speichern(ZIEL / "texturen" / "katharinen_freiflaechen.tga")
     breslauer.speichern(ZIEL / "texturen" / "breslauer_freiflaechen.tga")
+    katharinenachse.speichern(ZIEL / "texturen" / "katharinenachse_freiflaechen.tga")
     geparkt = verkehr["geparkt"]
     verkehr["geparkt"] = [a for a in geparkt if hartmann.farbe_an(
         np.array([a["x"], a["y"]]) / 100)[:3] != ASPHALT]
-    buchungen, pflanzungen, inseln, objekte, fusswege = {}, {}, {}, {}, {}
+    buchungen, pflanzungen, inseln, objekte, fusswege, platzmarkierungen = {}, {}, {}, {}, {}, {}
+    neues_gruen = {tuple(punkt) for punkt, _ in uferbaeume}
+    for markierung in furten:
+        k = tuple(np.floor(markierung.mean(axis=0) / groesse).astype(int))
+        platzmarkierungen.setdefault(k, []).append(markierung)
     for punkt, richtung in buchung:
         k = tuple(np.floor(punkt / groesse).astype(int))
         buchungen.setdefault(k, []).append((punkt, richtung))
-    for punkt, baumgroesse in hartmann_baeume + katharinen_baeume + strassenbaeume:
+    for punkt, baumgroesse in hartmann_baeume + katharinen_baeume + strassenbaeume + uferbaeume:
         k = tuple(np.floor(punkt / groesse).astype(int))
         pflanzungen.setdefault(k, []).append((punkt, baumgroesse))
-    for punkt in mittelinseln:
+    for punkt in mittelinseln + platzinseln:
         k = tuple(np.floor(punkt / groesse).astype(int))
         inseln.setdefault(k, []).append(punkt)
     for z, seite, typ in strassenobjekte:
@@ -477,6 +540,11 @@ def main() -> int:
         strassen = []
         untergrund, gehwege = [], []
         k = tuple(eintrag["index"])
+        b = eintrag["boundsCm"]
+        grenzen = np.asarray(b) / 100
+        bruecken = [p for p in alle_bruecken if p.sektor(groesse) == k]
+        schnitte = [p for p in alle_bruecken if np.all(p.grenzen[:2] <= grenzen[2:])
+                    and np.all(p.grenzen[2:] >= grenzen[:2])]
         with open(ZIEL / "sektoren" / f"{eintrag['id']}.msh", "wb") as msh:
             for a in daten["sections"]:
                 abschnittsart = art(a["name"])
@@ -487,6 +555,10 @@ def main() -> int:
                 idx = np.ascontiguousarray(idx.reshape(-1, 3)[:, [0, 2, 1]]).reshape(-1)
                 if abschnittsart == "Ground":
                     freie_pflasterkanten(pos)
+                if eintrag["id"] in {"S_N2_N2", "S_N2_N1", "S_N1_P1"} and abschnittsart in {"Ground", "Rail"}:
+                    bahneinschnitte(pos)
+                if abschnittsart == "Water" and eintrag["id"] == BRUECKENSEKTOR:
+                    wasser_am_brueckenkopf(pos, wehr)
                 elif abschnittsart == "Roof" and eintrag["id"] in JVA_DACHSEKTOREN:
                     pos, idx = jva_walmdach(pos, idx, dachkanten)
                 elif abschnittsart == "Tree":
@@ -512,6 +584,13 @@ def main() -> int:
                     "Roof", "Wall", "Kamin", "Sockel", "Tuer", "Gesims"
                 }:
                     hartmann_flachdaecher(pos)
+                if abschnittsart in {"Road", "Gehweg", "Sidewalk"}:
+                    if eintrag["id"] == BRUECKENSEKTOR:
+                        idx = entferne_versunkene_fahrbahn(pos, idx)
+                    for bruecke in schnitte:
+                        idx = bruecke.entferne_flaechen(pos, idx)
+                    if not len(idx):
+                        continue
                 msh.write(pos.tobytes())
                 msh.write(idx.tobytes())
                 meta = {"n": a["name"], "a": abschnittsart,
@@ -538,20 +617,41 @@ def main() -> int:
                 if abschnittsart == "Road":
                     strassen.append(hindernisse[-1])
                 if (k in ampeln or k in buchungen or k in pflanzungen or k in inseln
-                        or k in objekte or k in fusswege) and abschnittsart in {
+                        or k in objekte or k in fusswege or k in platzmarkierungen) and abschnittsart in {
                     "Ground", "Road", "Plaza", "Sidewalk", "Gehweg"
                 }:
                     flaeche = kollision[-1].reshape(-1, 3, 3)
                     untergrund.append(flaeche)
                     if abschnittsart in {"Sidewalk", "Gehweg"}:
                         gehwege.append(flaeche)
-            fahrbahn = hoehenabfrage(strassen) if k in achsen or k in ampeln else None
+            brueckendecks = [(bruecke.name, bruecke.streifen()) for bruecke in bruecken]
+            if eintrag["id"] == BRUECKENSEKTOR:
+                brueckendecks.append(("Karolinenbruecke", fahrbahnstreifen()))
+            for brueckenname, streifen in brueckendecks:
+                for name, pos, idx, farbe in streifen:
+                    msh.write(pos.tobytes())
+                    msh.write(idx.tobytes())
+                    abschnitte.append({"n": brueckenname + "_" + name, "a": name, "c": farbe,
+                                        "v": len(pos), "i": len(idx)})
+                    kollision.append(pos[idx])
+                    flaeche = kollision[-1].reshape(-1, 3, 3)
+                    hindernisse.append(flaeche)
+                    untergrund.append(flaeche)
+                    if name == "Road":
+                        strassen.append(flaeche)
+                    elif name in {"Gehweg", "Stegdeck", "Holzsteg"}:
+                        gehwege.append(flaeche)
+                    dreiecke += len(idx) // 3
+            fahrbahn = hoehenabfrage(strassen) if k in achsen or k in ampeln or k in pflanzungen else None
             bodenhoehe = hoehenabfrage(untergrund)
             if k in ampeln:
                 positioniere_ampeln(ampeln[k], fahrbahn, bodenhoehe, hoehenabfrage(gehwege))
             if k in buchungen:
                 stelle_parkautos(verkehr, hartmann, buchungen[k], bodenhoehe)
             for punkt, baumgroesse in pflanzungen.get(k, []):
+                if tuple(punkt) in neues_gruen and (fahrbahn(punkt) is not None or
+                        katharinenachse.farbe_an(katharinenachse_raster(punkt))[:3] in {FAHRBAHN, FLICKEN}):
+                    continue
                 h = bodenhoehe(punkt)
                 if h is None or any(np.linalg.norm(punkt - np.array([krone[0], krone[2]])) < 3.5
                                     for krone in kronen):
@@ -570,25 +670,30 @@ def main() -> int:
                               for p, h in zip(weg, hoehen)]
                     for strecke in (punkte, reversed(punkte)):
                         verkehr["passanten"].append({"p": [wert for p in strecke for wert in p]})
-            pos, idx = zeichne_markierungen(achsen.get(k, []), fahrbahn)
-            if idx.size:
-                msh.write(pos.tobytes())
-                msh.write(idx.tobytes())
-                abschnitte.append({"n": "Leitlinien", "a": "Markierung", "c": [1, 1, 1],
-                                    "v": len(pos), "i": len(idx)})
-                dreiecke += len(idx) // 3
+            for name, (pos, idx) in (
+                ("Leitlinien", zeichne_markierungen(achsen.get(k, []), fahrbahn)),
+                ("FurtenUndSpuren", zeichne_furten(platzmarkierungen.get(k, []), bodenhoehe)),
+            ):
+                if idx.size:
+                    msh.write(pos.tobytes())
+                    msh.write(idx.tobytes())
+                    abschnitte.append({"n": name, "a": "Markierung", "c": [1, 1, 1],
+                                        "v": len(pos), "i": len(idx)})
+                    dreiecke += len(idx) // 3
         flaechen = np.concatenate(kollision) if kollision else np.zeros((0, 3), np.float32)
         (ZIEL / "sektoren" / f"{eintrag['id']}.col").write_bytes(flaechen.tobytes())
         summe_msh += (ZIEL / "sektoren" / f"{eintrag['id']}.msh").stat().st_size
         summe_col += flaechen.nbytes
-        b = eintrag["boundsCm"]
         wiesenstreuung = []
         for punkt in wiesenpunkte(wiesen, hindernisse, eintrag):
-            farbe = hartmann.farbe_an(np.asarray(punkt)[[0, 2]])
+            ort = np.asarray(punkt)[[0, 2]]
+            farbe = katharinenachse.farbe_an(katharinenachse_raster(ort))
             if not farbe[3]:
-                farbe = katharinen.farbe_an(np.asarray(punkt)[[0, 2]])
+                farbe = hartmann.farbe_an(ort)
             if not farbe[3]:
-                farbe = breslauer.farbe_an(breslauer_raster(np.asarray(punkt)[[0, 2]]))
+                farbe = katharinen.farbe_an(ort)
+            if not farbe[3]:
+                farbe = breslauer.farbe_an(breslauer_raster(ort))
             if not farbe[3] or farbe[:3] in {RASEN, ACKER, INSEL}:
                 wiesenstreuung.append(punkt)
         for punkt in inseln.get(k, []):
@@ -601,6 +706,12 @@ def main() -> int:
                        "wiese": wiesenstreuung, "kronen": kronen}
         if breslauer_objekte:
             sektor_info["breslauer_objekte"] = breslauer_objekte
+        if bruecken:
+            sektor_info["lechbruecken"] = [bruecke.profil() for bruecke in bruecken]
+        if eintrag["id"] == BRUECKENSEKTOR:
+            sektor_info["karolinenbruecke"] = brueckenprofil()
+            sektor_info["karolinenbruecke"]["ufer"] = np.round(uferkante_ost(), 2).tolist()
+            sektor_info["karolinenbruecke"]["wehr"] = wehr.round(2).tolist()
         verzeichnis.append(sektor_info)
 
     spawn = manifest["spawn"]
@@ -611,10 +722,11 @@ def main() -> int:
         "sektoren": verzeichnis}, separators=(",", ":")))
 
     # Kleine Datensaetze unveraendert mitnehmen; die Skripte lesen sie aus res://daten.
-    for datei in ("Orte/orte.json", "Fahrzeug/wagen.json", "Verkehr/netz.json",
+    for datei in ("Orte/orte.json", "Fahrzeug/wagen.json",
                   "Story/drehbuch.json", "Story/missionen.json"):
         shutil.copy(QUELLE / datei, ZIEL / Path(datei).name)
     (ZIEL / "verkehr.json").write_text(json.dumps(verkehr, separators=(",", ":")), encoding="utf-8")
+    (ZIEL / "netz.json").write_text(json.dumps(netz, separators=(",", ":")), encoding="utf-8")
 
     # Karte: die kleine Vorlage (3 m je Pixel) reicht fuer Mini- und Vollkarte.
     karte = QUELLE / "Karte" / "karte-klein.png"

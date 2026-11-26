@@ -924,6 +924,12 @@ func _umgebung() -> void:
 	env.fog_light_color = Color(0.64, 0.72, 0.76)
 	env.fog_density = 0.00048
 	env.fog_sky_affect = 0.18
+	if RenderingServer.get_current_rendering_method() == "forward_plus":
+		env.ssr_enabled = true
+		env.ssr_max_steps = 72
+		env.ssr_fade_in = 0.055
+		env.ssr_fade_out = 2.3
+		env.ssr_depth_tolerance = 0.34
 	var we := WorldEnvironment.new()
 	we.environment = env
 	add_child(we)
